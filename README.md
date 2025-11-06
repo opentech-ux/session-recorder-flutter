@@ -6,8 +6,7 @@ A Flutter package for capturing and analyzing a structured record of user behavi
 
 Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
 
-> [!important]
-> 
+> 📢 **Important**  
 > This package is in beta and some things may break your app.
 
 
@@ -19,18 +18,15 @@ Designed for production use — efficient, isolated, and safe to integrate with 
 
 ## Installing
 
-Add the dependency: 
-
-```bash
-$ flutter pub add session_record_ux
-```
-
-This will add a line like this to your package's pubspec.yaml (and run an implicit flutter pub get):
+Add the dependency in your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  session_record_ux: ^1.0.0
+  session_record_ux:
+    git: git@gitlab.ux-key.csd:UX-Key/opentech-ux-mobile-session-record-development-kit.git
 ```
+
+This is only for DEV's having the key SSH.
 
 Now in your Dart code, you can use:
 
@@ -47,8 +43,7 @@ For proper integration of Session Record UX, the implementation is divided into 
 
 This separation ensures clean architecture, improved scalability, and easier debugging when integrating with complex Flutter applications.
 
-> [!note]
-> 
+> 💡 **Note**   
 > Both components are completely __MANDATORY__.
 
 
@@ -88,8 +83,7 @@ There are some parameters to configure :
 
 Check the class documentation for more details.
 
-> [!important]
-> 
+> 📢 **Important**  
 > * `init` must be called only once — ideally from `main()`.
 > You don’t need to wrap it in `WidgetsBinding.instance.addPostFrameCallback`, since `init` already handles that internally.
 > * The `key` provided must be the same instance in your `MaterialApp`.
@@ -109,8 +103,7 @@ return MaterialApp(
     ),
 );
 ```
-> [!important]
-> 
+> 📢 **Important**  
 > This widget must be set **only once** in the entire app.
 
 
