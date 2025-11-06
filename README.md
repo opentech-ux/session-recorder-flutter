@@ -1,12 +1,12 @@
 # Session Record UX
 
-<img src="https://github.com/session_record_ux/raw/main/assets/uxkey.png" width="100%">
+<img src="https://gitlab.ux-key.csd/-/ide/project/UX-Key/opentech-ux-mobile-session-record-development-kit/edit/main/-/assets/uxkey.png" width="50%">
 
 A Flutter package for capturing and analyzing a structured record of user behavior sessions.
 
 Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
 
-> [!IMPORTANT]    
+> [!important]
 > This package is in beta and some things may break your app.
 
 ## Features
@@ -45,7 +45,7 @@ For proper integration of Session Record UX, the implementation is divided into 
 
 This separation ensures clean architecture, improved scalability, and easier debugging when integrating with complex Flutter applications.
 
-> [!NOTE]    
+> [!note]
 > Both components are completely __MANDATORY__.
 
 ### Logic Layer
@@ -84,7 +84,7 @@ There are some parameters to configure :
 
 Check the class documentation for more details.
 
-> [!IMPORTANT]    
+> [!important]
 > * `init` must be called only once — ideally from `main()`.
 > You don’t need to wrap it in `WidgetsBinding.instance.addPostFrameCallback`, since `init` already handles that internally.
 > * The `key` provided must be the same instance in your `MaterialApp`.
@@ -103,7 +103,7 @@ return MaterialApp(
     ),
 );
 ```
-> [!IMPORTANT]    
+> [!important]
 > This widget must be set **only once** in the entire app.
 
 ## Contact us
