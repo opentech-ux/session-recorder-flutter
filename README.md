@@ -1,6 +1,6 @@
 # Session Recorder Flutter
 
-<img src="https://github.com/opentech-ux/session-recorder-flutter.git/-/raw/6cb92b6226df7abe46d7503225e849beb82b7973/assets/uxkey.png" width="50%">
+<img src="https://raw.githubusercontent.com/opentech-ux/session-recorder-flutter/refs/heads/main/assets/uxkey.png" width="50%">
 
 A Flutter package for capturing and analyzing a structured record of user behavior sessions.
 
