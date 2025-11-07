@@ -4,7 +4,7 @@ A Flutter package for capturing and analyzing a structured record of user behavi
 
 Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
 
-> [!important]
+> [!warning]
 > 
 > This package is in beta and some things may break your app.
 
@@ -21,7 +21,7 @@ Add the dependency in your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  session_record_flutter:
+  session_recorder_flutter:
     git: https://github.com/opentech-ux/session-recorder-flutter.git
 ```
 
