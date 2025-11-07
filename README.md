@@ -1,12 +1,13 @@
 # Session Recorder Flutter
 
-<img src="https://gitlab.ux-key.csd/UX-Key/opentech-ux-mobile-session-record-development-kit/-/raw/6cb92b6226df7abe46d7503225e849beb82b7973/assets/uxkey.png" width="50%">
+<img src="https://github.com/opentech-ux/session-recorder-flutter.git/-/raw/6cb92b6226df7abe46d7503225e849beb82b7973/assets/uxkey.png" width="50%">
 
 A Flutter package for capturing and analyzing a structured record of user behavior sessions.
 
 Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
 
-> 📢 **Important**  
+> [!important]
+> 
 > This package is in beta and some things may break your app.
 
 
@@ -23,10 +24,8 @@ Add the dependency in your `pubspec.yaml`:
 ```yaml
 dependencies:
   session_record_flutter:
-    git: git@gitlab.ux-key.csd:UX-Key/opentech-ux-mobile-session-record-development-kit.git
+    git: https://github.com/opentech-ux/session-recorder-flutter.git
 ```
-
-This is only for DEV's having the key SSH.
 
 Now in your Dart code, you can use:
 
@@ -43,7 +42,8 @@ For proper integration of Session Recorder Flutter, the implementation is divide
 
 This separation ensures clean architecture, improved scalability, and easier debugging when integrating with complex Flutter applications.
 
-> 💡 **Note**   
+> [!note]
+>  
 > Both components are completely __MANDATORY__.
 
 
@@ -83,7 +83,8 @@ There are some parameters to configure :
 
 Check the class documentation for more details.
 
-> 📢 **Important**  
+> [!important]
+> 
 > * `init` must be called only once — ideally from `main()`.
 > You don’t need to wrap it in `WidgetsBinding.instance.addPostFrameCallback`, since `init` already handles that internally.
 > * The `key` provided must be the same instance in your `MaterialApp`.
@@ -103,7 +104,8 @@ return MaterialApp(
     ),
 );
 ```
-> 📢 **Important**  
+> [!important]
+> 
 > This widget must be set **only once** in the entire app.
 
 
