@@ -1,7 +1,5 @@
 # Session Recorder Flutter
 
-<img src="https://raw.githubusercontent.com/opentech-ux/session-recorder-flutter/refs/heads/main/assets/uxkey.png" width="50%">
-
 A Flutter package for capturing and analyzing a structured record of user behavior sessions.
 
 Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
@@ -107,8 +105,3 @@ return MaterialApp(
 > [!important]
 > 
 > This widget must be set **only once** in the entire app.
-
-
-## Contact us
-
-E-mail: **contact@ux-key.com**
