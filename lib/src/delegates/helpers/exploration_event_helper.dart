@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'package:session_record_ux/src/constants/gestures_constants.dart';
-import 'package:session_record_ux/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 import '../../enums/gestures_type_enum.dart';
 import '../../models/models.dart'

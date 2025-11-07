@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 
-import 'package:session_record_ux/src/constants/gestures_constants.dart';
-import 'package:session_record_ux/src/services/session_record.dart';
-import 'package:session_record_ux/src/delegates/helpers/action_event_helper.dart';
-import 'package:session_record_ux/src/delegates/helpers/exploration_event_helper.dart';
-import 'package:session_record_ux/src/delegates/chunk_delegate.dart';
-import 'package:session_record_ux/src/delegates/layout_object_manager_delegate.dart';
-import 'package:session_record_ux/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
+import 'package:session_recorder_flutter/src/services/session_recorder.dart';
+import 'package:session_recorder_flutter/src/delegates/helpers/action_event_helper.dart';
+import 'package:session_recorder_flutter/src/delegates/helpers/exploration_event_helper.dart';
+import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
+import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 import '../enums/gestures_type_enum.dart';
 import '../models/models.dart' show PointerTrace, ScaleStats, TimedPosition;
@@ -29,8 +29,8 @@ import '../models/models.dart' show PointerTrace, ScaleStats, TimedPosition;
 /// data, applies motion thresholds, and dispatches normalized events
 /// to subscribed listeners or services.
 ///
-/// Typically used internally by [SessionRecord] and then, used
-/// externally by [SessionRecordWidget] to avoid calling by any other class.
+/// Typically used internally by [SessionRecorder] and then, used
+/// externally by [SessionRecorderWidget] to avoid calling by any other class.
 ///
 /// {@endtemplate}
 class InteractionDelegate {

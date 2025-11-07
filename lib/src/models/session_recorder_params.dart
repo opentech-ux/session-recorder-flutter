@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class SessionRecordParams {
+class SessionRecorderParams {
   /// The [GlobalKey] attached to the app’s [Navigator].
   ///
   /// Used internally by the recording service to access navigation context
@@ -23,7 +23,7 @@ class SessionRecordParams {
   /// __Defaults to [false]__
   final bool disable;
 
-  /// Configuration object required by [SessionRecord.init].
+  /// Configuration object required by [SessionRecorder.init].
   ///
   /// This class provides the set of parameters that the session recording
   /// service needs to operate:
@@ -33,5 +33,5 @@ class SessionRecordParams {
   /// Both fields are required and must not be null. The service will throw
   /// a [ArgumentError] if the provided key is not yet mounted at initialization
   /// time.
-  SessionRecordParams({this.key, this.endpoint, this.disable = false});
+  SessionRecorderParams({this.key, this.endpoint, this.disable = false});
 }

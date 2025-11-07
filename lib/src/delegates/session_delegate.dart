@@ -15,7 +15,7 @@ class SessionNotInitializedException implements Exception {
 /// The [SessionDelegate] is used to initialize a new [Session] with a [Uuid]
 /// version 4 identifier, as well as the higher-level interaction logic.
 ///
-/// Typically initialized internally by [SessionRecord].
+/// Typically initialized internally by [SessionRecorder].
 /// {@endtemplate}
 class SessionDelegate {
   static final SessionDelegate _instance = SessionDelegate._internal();

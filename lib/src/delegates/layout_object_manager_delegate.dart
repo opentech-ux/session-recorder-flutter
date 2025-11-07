@@ -2,8 +2,8 @@ import 'package:uuid/uuid.dart';
 
 import 'package:flutter/material.dart';
 
-import 'package:session_record_ux/src/constants/widgets_excluded_constants.dart';
-import 'package:session_record_ux/src/services/session_record.dart';
+import 'package:session_recorder_flutter/src/constants/widgets_excluded_constants.dart';
+import 'package:session_recorder_flutter/src/services/session_recorder.dart';
 
 import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;
 
@@ -21,7 +21,7 @@ class LomNotInitializedException implements Exception {
 /// converts it into instances of [Root], finally putting everything into
 /// a [Lom].
 ///
-/// Typically initialized internally by [SessionRecord] and managed
+/// Typically initialized internally by [SessionRecorder] and managed
 /// in [InteractionDelegate].
 /// {@endtemplate}
 class LomDelegate {
@@ -86,7 +86,7 @@ class LomDelegate {
       final output = <Rect>[];
       recursiveBox(lomFound.root!, output);
 
-      SessionRecord().rects.value = List.unmodifiable(output);
+      SessionRecorder().rects.value = List.unmodifiable(output);
 
       return LomRef(
         id: lomFound.id,
@@ -160,7 +160,7 @@ class LomDelegate {
 
     final output = <Rect>[];
     recursiveBox(_lom!.root!, output);
-    SessionRecord().rects.value = List.unmodifiable(output);
+    SessionRecorder().rects.value = List.unmodifiable(output);
 
     _cacheLom[signature] = _lom!;
 

@@ -1,6 +1,6 @@
-name: session_record_ux
+name: session_recorder_flutter
 description: A Flutter package for capturing, analyzing, and uploading user interaction for session analytics in Flutter apps.
-version: 1.0.0
+version: 1.0.1
 homepage:  https://gitlab.com/
 
 environment:

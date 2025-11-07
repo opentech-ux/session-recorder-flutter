@@ -1,5 +1,5 @@
-import 'package:session_record_ux/session_record.dart';
-import 'package:session_record_ux/src/constants/version_constant.dart';
+import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import '../models/models.dart'
     show Chunk, LomAbstract, ExplorationEvent, ActionEvent;
@@ -18,7 +18,7 @@ class ChunkNotInitializedException implements Exception {
 /// deleting the attributes of a [Chunk], as well as the higher-level
 /// interaction logic.
 ///
-/// Typically initialized internally by [SessionRecord] and managed
+/// Typically initialized internally by [SessionRecorder] and managed
 /// in [InteractionDelegate].
 /// {@endtemplate}
 class ChunkDelegate {

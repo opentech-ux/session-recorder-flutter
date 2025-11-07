@@ -1,4 +1,4 @@
-# Session Record UX
+# Session Recorder Flutter
 
 <img src="https://gitlab.ux-key.csd/UX-Key/opentech-ux-mobile-session-record-development-kit/-/raw/6cb92b6226df7abe46d7503225e849beb82b7973/assets/uxkey.png" width="50%">
 
@@ -22,7 +22,7 @@ Add the dependency in your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  session_record_ux:
+  session_record_flutter:
     git: git@gitlab.ux-key.csd:UX-Key/opentech-ux-mobile-session-record-development-kit.git
 ```
 
@@ -31,12 +31,12 @@ This is only for DEV's having the key SSH.
 Now in your Dart code, you can use:
 
 ```dart
-import 'package:session_record_ux/session_record.dart';
+import 'package:session_recorder_flutter/session_recorder.dart';
 ```
 
 ## Usage
 
-For proper integration of Session Record UX, the implementation is divided into two main components:
+For proper integration of Session Recorder Flutter, the implementation is divided into two main components:
 
 *   **Logic layer:** responsible for handling the internal mechanisms that analyze user interactions and session data.
 *   **UI layer:** focuses on detecting, visualizing, and transmitting user behavior directly from the widget tree.
@@ -49,7 +49,7 @@ This separation ensures clean architecture, improved scalability, and easier deb
 
 ### Logic Layer
 
-Access the `SessionRecord` instance via `SessionRecord.instance`.
+Access the `SessionRecorder` instance via `SessionRecorder.instance`.
 
 Then, invoke the `init()` method in your `main` method.
 
@@ -60,12 +60,12 @@ void main() {
     // Important to add it before calling init method
     WidgetsFlutterBinding.ensureInitialized();
 
-    final params = SessionRecordParams(
+    final params = SessionRecorderParams(
         key: navigatorKey,
         endpoint: 'https://api.example.com/session',
     );
 
-    SessionRecord.instance.init(params);
+    SessionRecorder.instance.init(params);
 
     runApp(
         MyApp(navigatorKey: navigatorKey),
@@ -73,7 +73,7 @@ void main() {
 }
 ```
 
-The `init()` method requires the `SessionRecordParams` object, which is the customizable configuration for the client.
+The `init()` method requires the `SessionRecorderParams` object, which is the customizable configuration for the client.
 
 There are some parameters to configure : 
 
@@ -93,12 +93,12 @@ Check the class documentation for more details.
 
 ### UI Layer
 
-To start capturing the user behavior, provide the `SessionRecordWidget` in your `MaterialApp.builder`.
+To start capturing the user behavior, provide the `SessionRecorderWidget` in your `MaterialApp.builder`.
 
 ```dart
 return MaterialApp(
     navigatorKey: key,
-    builder: (context, child) => SessionRecordWidget(
+    builder: (context, child) => SessionRecorderWidget(
         child: child ?? SizedBox.shrink(),
     ),
 );

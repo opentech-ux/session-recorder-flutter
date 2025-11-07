@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:session_record_ux/src/enums/gestures_type_enum.dart';
+import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 
 class PointerTrace {
   final int pointer;

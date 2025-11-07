@@ -4,15 +4,16 @@ typedef SessionCallback = Future<void> Function();
 
 /// Singleton that manages a periodic session-record timer.
 ///
-/// Use the factory constructor [SessionRecordTimer()] to obtain the single
+/// Use the factory constructor [SessionRecorderTimer()] to obtain the single
 /// shared instance.
 ///
 /// - Call `init()` to start the service and `dispose()` to stop and release
 ///   resources when no longer needed.
-class SessionRecordTimer {
-  static final SessionRecordTimer _instance = SessionRecordTimer._internal();
-  factory SessionRecordTimer() => _instance;
-  SessionRecordTimer._internal();
+class SessionRecorderTimer {
+  static final SessionRecorderTimer _instance =
+      SessionRecorderTimer._internal();
+  factory SessionRecorderTimer() => _instance;
+  SessionRecorderTimer._internal();
 
   /// The active periodic [Timer], or `null` if no timer is running.
   ///
@@ -34,9 +35,9 @@ class SessionRecordTimer {
 
   /// Callback invoked on every timer tick.
   ///
-  /// If this is [null], `onInvokeSessionRecordTimer()` will refuse to start
+  /// If this is [null], `onInvokeSessionRecorderTimer()` will refuse to start
   /// timer.
-  /// Assign a callback before calling `init()` or `onInvokeSessionRecordTimer()`.
+  /// Assign a callback before calling `init()` or `onInvokeSessionRecorderTimer()`.
   SessionCallback? onSessionRecord;
 
   /// Initializes the session record timer subsystem.
@@ -46,7 +47,7 @@ class SessionRecordTimer {
   void init() {
     if (_initialized) return;
     _initialized = true;
-    _startSessionRecordTimer();
+    _startSessionRecorderTimer();
   }
 
   /// Disposes the session record timer subsystem.
@@ -63,13 +64,13 @@ class SessionRecordTimer {
   ///
   /// Can be called externally when you need to ensure the periodic recording
   /// timer is running immediately.
-  void onInvokeSessionRecordTimer() => _startSessionRecordTimer();
+  void onInvokeSessionRecorderTimer() => _startSessionRecorderTimer();
 
   /// Starts the periodic session-record timer if it is not already running.
   ///
   /// The timer will call `onSessionRecord` on each tick. `onSessionRecord` must
   /// have the signature `void Function(Timer)` (or `SessionCallback`).
-  void _startSessionRecordTimer() {
+  void _startSessionRecorderTimer() {
     if (_timer?.isActive ?? false) return;
 
     if (onSessionRecord == null) return;

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 
 // ignore: depend_on_referenced_packages
-import 'package:session_record_ux/session_record.dart';
+import 'package:session_recorder_flutter/session_recorder.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final params = SessionRecordParams(
+  final params = SessionRecorderParams(
     key: navigatorKey,
     endpoint: 'https://api.example.com/session',
   );
 
-  SessionRecord.instance.init(params);
+  SessionRecorder.instance.init(params);
 
   runApp(const MainApp());
 }
@@ -26,7 +26,7 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navigatorKey,
       home: ExampleApp(),
-      builder: (context, child) => SessionRecordWidget(
+      builder: (context, child) => SessionRecorderWidget(
         showLayout: true,
         child: child ?? SizedBox.shrink(),
       ),

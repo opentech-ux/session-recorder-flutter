@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:http/io_client.dart';
-import 'package:session_record_ux/session_record.dart';
+import 'package:session_recorder_flutter/session_recorder.dart';
 
-import 'package:session_record_ux/src/delegates/chunk_delegate.dart';
-import 'package:session_record_ux/src/delegates/interaction_delegate.dart';
-import 'package:session_record_ux/src/delegates/layout_object_manager_delegate.dart';
-import 'package:session_record_ux/src/delegates/session_delegate.dart';
-import 'package:session_record_ux/src/services/timers/inactivity_timer.dart';
-import 'package:session_record_ux/src/services/timers/session_record_timer.dart';
-import 'package:session_record_ux/src/utils/serialize_tree_utils.dart';
+import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
+import 'package:session_recorder_flutter/src/delegates/interaction_delegate.dart';
+import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
+import 'package:session_recorder_flutter/src/delegates/session_delegate.dart';
+import 'package:session_recorder_flutter/src/services/timers/inactivity_timer.dart';
+import 'package:session_recorder_flutter/src/services/timers/session_recorder_timer.dart';
+import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
 /// Main service coordinator for session recording and interaction capture.
 ///
@@ -38,12 +38,12 @@ import 'package:session_record_ux/src/utils/serialize_tree_utils.dart';
 ///   // Important to add it before calling init method
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
-///   final params = SessionRecordParams(
+///   final params = SessionRecorderParams(
 ///     key: navigatorKey,
 ///     endpoint: 'https://api.example.com/session',
 ///   );
 ///
-///   SessionRecord.instance.init(params);
+///   SessionRecorder.instance.init(params);
 ///
 ///   runApp(MyApp(navigatorKey: navigatorKey));
 /// }
@@ -65,10 +65,10 @@ import 'package:session_record_ux/src/utils/serialize_tree_utils.dart';
 /// See also
 ///  - [InteractionDelegate], chunk/layout processors, which perform the
 /// low-level traversal and gesture analysis.
-class SessionRecord extends WidgetsBindingObserver {
-  SessionRecord._internal();
-  static final SessionRecord instance = SessionRecord._internal();
-  factory SessionRecord() => instance;
+class SessionRecorder extends WidgetsBindingObserver {
+  SessionRecorder._internal();
+  static final SessionRecorder instance = SessionRecorder._internal();
+  factory SessionRecorder() => instance;
 
   /// Navigator key used to access the app's current widget tree context.
   ///
@@ -87,7 +87,7 @@ class SessionRecord extends WidgetsBindingObserver {
   late final ChunkDelegate _chunkDelegate;
   late final LomDelegate _lomDelegate;
   late final SessionDelegate _sessionDelegate;
-  late final SessionRecordTimer _sessionRecordTimer;
+  late final SessionRecorderTimer _sessionRecorderTimer;
   late final InactivityTimer _inactivityTimer;
   InteractionDelegate? _interactionDelegate;
 
@@ -175,14 +175,14 @@ class SessionRecord extends WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         _inactivityTimer.onInvokeInactivityTimer();
-        _sessionRecordTimer.onInvokeSessionRecordTimer();
+        _sessionRecorderTimer.onInvokeSessionRecorderTimer();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
         _inactivityTimer.stop();
-        _sessionRecordTimer.stop();
+        _sessionRecorderTimer.stop();
 
         break;
     }
@@ -206,10 +206,10 @@ class SessionRecord extends WidgetsBindingObserver {
   /// {@macro session_record}
   ///
   /// See also
-  ///  - [SessionRecordParams] for more information on what can be shared.
+  ///  - [SessionRecorderParams] for more information on what can be shared.
   ///
-  /// Throws [ArgumentError] if [SessionRecordParams] are invalid.
-  void init(SessionRecordParams params) {
+  /// Throws [ArgumentError] if [SessionRecorderParams] are invalid.
+  void init(SessionRecorderParams params) {
     _disableRecord = params.disable;
 
     if (_serviceInitialized || _disableRecord) return;
@@ -260,7 +260,7 @@ class SessionRecord extends WidgetsBindingObserver {
   /// the [InteractionDelegate] with its required dependencies.
   ///
   /// Called once during setup to ensure all components are ready.
-  void _initServices(SessionRecordParams params) {
+  void _initServices(SessionRecorderParams params) {
     _navigatorKey = params.key;
 
     WidgetsBinding.instance.addObserver(this);
@@ -270,22 +270,22 @@ class SessionRecord extends WidgetsBindingObserver {
     _chunkDelegate = ChunkDelegate();
     _lomDelegate = LomDelegate();
     _sessionDelegate = SessionDelegate();
-    _sessionRecordTimer = SessionRecordTimer();
+    _sessionRecorderTimer = SessionRecorderTimer();
     _inactivityTimer = InactivityTimer();
 
     _sessionDelegate.init();
     _chunkDelegate.init(_sessionDelegate.getId());
 
     // * INACTIVITY TIMER
-    _inactivityTimer.onInactive = () => _sessionRecordTimer.stop();
+    _inactivityTimer.onInactive = () => _sessionRecorderTimer.stop();
     _inactivityTimer.onActive = () =>
-        _sessionRecordTimer.onInvokeSessionRecordTimer();
+        _sessionRecorderTimer.onInvokeSessionRecorderTimer();
 
     _inactivityTimer.init();
 
     // * TIMER SESSION RECORD
-    _sessionRecordTimer.onSessionRecord = () => _sendSessionRecord(params);
-    _sessionRecordTimer.init();
+    _sessionRecorderTimer.onSessionRecord = () => _sendSessionRecord(params);
+    _sessionRecorderTimer.init();
 
     _serviceInitialized = true;
 
@@ -305,7 +305,7 @@ class SessionRecord extends WidgetsBindingObserver {
   /// ```dart
   /// @override
   /// void dispose() {
-  ///   SessionRecord.instance.dispose();
+  ///   SessionRecorder.instance.dispose();
   ///   super.dispose();
   /// }
   /// ```
@@ -374,7 +374,7 @@ class SessionRecord extends WidgetsBindingObserver {
       if (context == null) {
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary(
-            'SessionRecord.init failed: navigatorKey.currentContext is null.',
+            'SessionRecorder.init failed: navigatorKey.currentContext is null.',
           ),
           ErrorHint('Ensure you pass the same navigatorKey to your app.'),
           ErrorHint(
@@ -431,8 +431,8 @@ class SessionRecord extends WidgetsBindingObserver {
   /// via `Timer.periodic(Duration(seconds: 30), _sendSessionRecord)`).
   ///
   /// If there is no data available in the [Chunk], returns nothing until
-  /// [InactivityTimer] cancels the [SessionRecordTimer].
-  Future<void> _sendSessionRecord(SessionRecordParams params) async {
+  /// [InactivityTimer] cancels the [SessionRecorderTimer].
+  Future<void> _sendSessionRecord(SessionRecorderParams params) async {
     if (_chunkDelegate.isChunkEmpty) return;
 
     final chunk = _chunkDelegate.chunk;
