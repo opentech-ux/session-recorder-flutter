@@ -1,5 +1,4 @@
 import 'package:session_recorder_flutter/session_recorder.dart';
-import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import '../models/models.dart'
     show Chunk, LomAbstract, ExplorationEvent, ActionEvent;
@@ -44,7 +43,6 @@ class ChunkDelegate {
   /// Creates and assigns a new [Chunk] instance using the given `sessionId`.
   void init(String sessionId) {
     _chunk = Chunk(
-      libraryVersion: libraryVersion,
       timestamp: DateTime.now().millisecondsSinceEpoch,
       sId: sessionId,
       loms: [],

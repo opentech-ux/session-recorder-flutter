@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import 'models.dart';
 
 class Chunk {
-  final String libraryVersion;
   final int timestamp;
   final String sId;
   final List<LomAbstract> loms;
@@ -13,7 +13,6 @@ class Chunk {
   final List<ActionEvent> actionsEvents;
 
   Chunk({
-    required this.libraryVersion,
     required this.timestamp,
     required this.sId,
     required this.loms,
@@ -22,7 +21,6 @@ class Chunk {
   });
 
   Chunk copyWith({
-    String? libraryVersion,
     int? timestamp,
     String? sId,
     List<LomAbstract>? loms,
@@ -30,7 +28,6 @@ class Chunk {
     List<ActionEvent>? actionsEvents,
   }) {
     return Chunk(
-      libraryVersion: libraryVersion ?? this.libraryVersion,
       timestamp: timestamp ?? this.timestamp,
       sId: sId ?? this.sId,
       loms: loms ?? this.loms,
@@ -42,6 +39,7 @@ class Chunk {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
+      'lib_t': libraryType,
       'ts': timestamp,
       'sid': sId,
       'loms': loms.map((x) => x.toMap()).toList(),
@@ -56,7 +54,8 @@ class Chunk {
   @override
   String toString() {
     return 'Chunk('
-        'libraryVersion: $libraryVersion, '
+        'lib_v: $libraryVersion, '
+        'lib_t: $libraryType, '
         'timestamp: $timestamp, '
         'sId: $sId,'
         'loms: $loms, '
@@ -69,8 +68,7 @@ class Chunk {
   bool operator ==(covariant Chunk other) {
     if (identical(this, other)) return true;
 
-    return other.libraryVersion == libraryVersion &&
-        other.timestamp == timestamp &&
+    return other.timestamp == timestamp &&
         other.sId == sId &&
         listEquals(other.loms, loms) &&
         listEquals(other.explorationEvents, explorationEvents) &&
@@ -79,8 +77,7 @@ class Chunk {
 
   @override
   int get hashCode {
-    return libraryVersion.hashCode ^
-        timestamp.hashCode ^
+    return timestamp.hashCode ^
         sId.hashCode ^
         loms.hashCode ^
         explorationEvents.hashCode ^

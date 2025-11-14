@@ -1,4 +1,4 @@
-import 'dart:async' show Timer;
+import 'dart:async' show Timer, TimeoutException;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -289,7 +289,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
     _serviceInitialized = true;
 
-    debugPrint("SESSION RECORD INITIALIZED");
+    debugPrint("> [ SESSION RECORDER INITIALIZED ]");
   }
 
   /// Releases all resources held by this service.
@@ -439,15 +439,36 @@ class SessionRecorder extends WidgetsBindingObserver {
 
     final body = chunk.toJson();
 
-    await _httpClient.post(
-      Uri.parse(params.endpoint!),
-      // Uri.parse('http://127.0.0.1:5002/endpoint'),
-      // Uri.parse('https://continuedpassage.ux-key.com/endpoint'),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: body,
-    );
+    final uri = Uri.parse(params.endpoint!);
+
+    try {
+      final response = await _httpClient.post(
+        uri,
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: body,
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'Server responded with status ${response.statusCode}',
+          uri: uri,
+        );
+      }
+
+      debugPrint(">> [ Sended Data - SESSION RECORDER ]");
+    } on SocketException catch (e) {
+      debugPrint('!! Network error while sending data: $e');
+    } on TimeoutException catch (e) {
+      debugPrint('!! Request timed out: $e');
+    } on FormatException catch (e) {
+      debugPrint('!! Response format error: $e');
+    } on HttpException catch (e) {
+      debugPrint('!! HTTP exception: $e');
+    } catch (e, st) {
+      debugPrint('!! Unexpected error sending data: $e\n$st');
+    }
 
     _lomDelegate.clearLom();
     _chunkDelegate.init(_sessionDelegate.getId());
