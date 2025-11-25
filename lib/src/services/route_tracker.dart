@@ -1,0 +1,275 @@
+import 'package:flutter/widgets.dart';
+
+import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
+import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
+
+import '../models/models.dart';
+
+typedef CaptureTreeHandler = void Function();
+typedef InitSessionHandler = bool Function();
+
+class RouteTracker {
+  RouteTracker._internal();
+  static final RouteTracker instance = RouteTracker._internal();
+  factory RouteTracker() => instance;
+
+  ///
+  final Map<Route<dynamic>, RouteRecorded> _routes = {};
+
+  ///
+  bool isObserving = false;
+
+  ///
+  NavigationType _lastNavigationType = NavigationType.none;
+
+  ///
+  CaptureTreeHandler? _captureTreeHandler;
+
+  ///
+  InitSessionHandler? _isInitializedSession;
+
+  ///
+  void registerTreeHandler(CaptureTreeHandler tree) =>
+      _captureTreeHandler = tree;
+  void registerInitSessionHandler(InitSessionHandler init) =>
+      _isInitializedSession = init;
+
+  bool get isSessionServiceInitialized =>
+      _isInitializedSession?.call() ?? false;
+
+  ///
+  RouteRecorded? getCurrentRoute() {
+    final List<RouteRecorded> routes = _routes.values
+        .where((route) => route.rect != null)
+        .toList(growable: false);
+
+    if (routes.isEmpty) return null;
+
+    if (routes.length == 1) return routes.first;
+
+    return routes.last;
+  }
+
+  ///
+  void handleRouting(
+    Route<dynamic>? route,
+    NavigationType type, {
+    Route<dynamic>? oldRoute,
+  }) {
+    assert(() {
+      if (!isSessionServiceInitialized) {
+        throw FlutterError.fromParts(<DiagnosticsNode>[
+          ErrorSummary(
+            'SessionRecorderObserver failed: SessionRecorder not initialized.',
+          ),
+          ErrorHint(
+            'Ensure you pass the SessionRecorder.instance.init() to your app.',
+          ),
+          ErrorHint(
+            'Example in main():\n'
+            '  SessionRecorder.instance.init(params);\n',
+          ),
+          ErrorHint(
+            'This call is blocking and will throw to surface the incorrect'
+            'initialization order immediately.',
+          ),
+        ]);
+      }
+
+      return true;
+    }());
+
+    if (!isSessionServiceInitialized) return;
+
+    isObserving = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // TODO : verify again positions Routes?
+      // TODO : remove every unmounted ?
+
+      BuildContext? routeContext;
+      String routeKey = "";
+      final bool isValidRoute = _isValidRoute(route);
+
+      if (isValidRoute) {
+        routeContext = _findRouteContext(route!);
+        routeKey = SerializeTreeUtils.createKeyRoute(route, routeContext);
+      }
+
+      String oldRouteKey = "";
+      final bool isValidOldRoute = _isValidRoute(oldRoute);
+      if (isValidOldRoute) {
+        final BuildContext? oldRouteContext = _findRouteContext(oldRoute!);
+        oldRouteKey = SerializeTreeUtils.createKeyRoute(
+          oldRoute,
+          oldRouteContext,
+        );
+      }
+
+      if (isValidRoute) {
+        switch (type) {
+          case NavigationType.push:
+            final routeFound = _findRoute(routeKey, route!);
+            if (routeFound != null) {
+              _removeRoute(routeFound.value.key, routeFound.key);
+            }
+
+            _addRoute(routeKey, route, routeContext!);
+
+            break;
+          case NavigationType.remove:
+            final routeFound = _findRoute(routeKey, route!);
+            if (routeFound != null) {
+              if (_lastNavigationType == NavigationType.push) {
+                _removeRoute(routeFound.value.key, routeFound.key);
+                break;
+              }
+
+              _removeRoutesAfter(routeFound.value.key, routeFound.key);
+              break;
+            }
+
+            break;
+          case NavigationType.pop:
+            final routeFound = _findRoute(routeKey, route!);
+
+            if (routeFound != null) {
+              _removeRoutesAfter(routeFound.value.key, routeFound.key);
+
+              break;
+            }
+
+            _removeRoutesAfter(routeKey, route);
+
+            break;
+          case NavigationType.replace:
+            if (isValidOldRoute) {
+              final routeFound = _findRoute(oldRouteKey, oldRoute!);
+              if (routeFound != null) {
+                _removeRoute(routeFound.value.key, routeFound.key);
+              }
+
+              _addRoute(routeKey, route!, routeContext!);
+            }
+
+            break;
+          default:
+            break;
+        }
+      }
+
+      _lastNavigationType = type;
+
+      _captureTreeHandler?.call();
+    });
+  }
+
+  ///
+  void _addRoute(
+    String key,
+    Route<dynamic> route,
+    BuildContext subtreeContext,
+  ) {
+    final String routeName =
+        route.settings.name ?? route.runtimeType.toString();
+    final Rect? rect = _getRectFromContext(subtreeContext);
+
+    final RouteRecorded routeRecorded = RouteRecorded(
+      key: key,
+      route: route,
+      name: routeName,
+      subtreeContext: subtreeContext,
+      rect: rect,
+    );
+
+    _routes[route] = routeRecorded;
+  }
+
+  ///
+  void _removeRoute(String routeKey, Route<dynamic> route) => _routes
+      .removeWhere((key, value) => (value.key == routeKey || key == route));
+
+  ///
+  void _removeRoutesAfter(String routeKey, Route<dynamic> route) {
+    bool isRouteFound = false;
+    final List<MapEntry<Route<dynamic>, RouteRecorded>> routesToRemove = [];
+
+    for (MapEntry<Route<dynamic>, RouteRecorded> entry
+        in _routes.entries.toList()) {
+      if (isRouteFound) {
+        routesToRemove.add(entry);
+      } else if ((entry.key == route || entry.value.key == routeKey)) {
+        isRouteFound = true;
+        routesToRemove.add(entry);
+      }
+    }
+
+    for (MapEntry<Route<dynamic>, RouteRecorded> entry in routesToRemove) {
+      _routes.remove(entry.key);
+    }
+  }
+
+  ///
+  MapEntry<Route<dynamic>, RouteRecorded>? _findRoute(
+    String key,
+    Route<dynamic> route,
+  ) => _routes.entries
+      .cast<MapEntry<Route<dynamic>, RouteRecorded>?>()
+      .firstWhere(
+        (entry) => (entry!.key == route) || (entry.value.key == key),
+        orElse: () => null,
+      );
+
+  ///
+  bool _isValidRoute(Route<dynamic>? route) {
+    if (route == null) return false;
+
+    try {
+      if (route is ModalRoute) {
+        return true;
+      }
+
+      if (route is OverlayRoute) {
+        return false;
+      }
+
+      if (route.settings.name != null && route.settings.name!.isNotEmpty) {
+        return true;
+      }
+
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  ///
+  BuildContext? _findRouteContext(Route<dynamic> route) {
+    if (route is ModalRoute && route.subtreeContext != null) {
+      final BuildContext? context = route.subtreeContext;
+      if (context is Element && context.mounted) return context;
+      if (context is BuildContext) return context;
+    }
+
+    final BuildContext? navigatorContext = route.navigator?.context;
+    if (navigatorContext is Element && navigatorContext.mounted) {
+      return navigatorContext;
+    }
+    if (navigatorContext is BuildContext) return navigatorContext;
+
+    return null;
+  }
+
+  ///
+  Rect? _getRectFromContext(BuildContext? context) {
+    if (context == null) return null;
+
+    final RenderObject? render = context.findRenderObject();
+    if (render is RenderBox && render.attached && render.hasSize) {
+      final Offset coordinates = render.localToGlobal(Offset.zero);
+      return coordinates & render.size;
+    }
+
+    return null;
+  }
+}

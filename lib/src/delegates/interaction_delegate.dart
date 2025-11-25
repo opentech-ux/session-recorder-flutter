@@ -34,9 +34,8 @@ import '../models/models.dart' show PointerTrace, ScaleStats, TimedPosition;
 ///
 /// {@endtemplate}
 class InteractionDelegate {
-  InteractionDelegate(this._navigatorKey);
+  InteractionDelegate();
 
-  final GlobalKey<NavigatorState>? _navigatorKey;
   final ChunkDelegate _chunkDelegate = ChunkDelegate();
   final LomDelegate _lomDelegate = LomDelegate();
 
@@ -85,74 +84,84 @@ class InteractionDelegate {
   /// Doing nothing if `_didScroll` is [true].
   ///
   void onPointerDown(PointerDownEvent details) {
-    final int pointer = details.pointer;
-    int timestampNow = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final int pointer = details.pointer;
+      int timestampNow = DateTime.now().millisecondsSinceEpoch;
 
-    /// Add the first [PointerTrace]
-    addPointer(pointer, details.position, timestampNow);
+      /// Add the first [PointerTrace]
+      addPointer(pointer, details.position, timestampNow);
 
-    final PointerTrace pointerTrace = _pointers[pointer]!;
+      final PointerTrace pointerTrace = _pointers[pointer]!;
 
-    /// If we still don't have any pointers to evaluate in [Zoom], we initialize
-    if (_pointers.length >= 2 && _initialScaleStats.scalePointers == null) {
-      _initZoomValues();
-    } else if (_pointers.length >= 2 &&
-        _initialScaleStats.scalePointers != null) {
-      /// Enter here if a [Zoom] is already being evaluated but a new
-      /// pointer is added.
-      _initZoomValues();
+      /// If we still don't have any pointers to evaluate in [Zoom], we initialize
+      if (_pointers.length >= 2 && _initialScaleStats.scalePointers == null) {
+        _initZoomValues();
+      } else if (_pointers.length >= 2 &&
+          _initialScaleStats.scalePointers != null) {
+        /// Enter here if a [Zoom] is already being evaluated but a new
+        /// pointer is added.
+        _initZoomValues();
+      }
+
+      /// Initialize [LongPress] timer
+      pointerTrace.timer = Timer(longPressTimeout, () {
+        pointerTrace.setType(GesturesType.longPress);
+        timestampNow = DateTime.now().millisecondsSinceEpoch;
+
+        /// Clears the current [PointerTrace] to at the end compare the
+        /// timestamps
+        pointerTrace.clear();
+
+        /// Subtract the `longPressTimeout` cause it's the [LongPress]'s
+        /// duration by default
+        pointerTrace.add(
+          details.position,
+          timestampNow - longPressTimeout.inMilliseconds,
+        );
+      });
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return;
     }
-
-    /// Initialize [LongPress] timer
-    pointerTrace.timer = Timer(longPressTimeout, () {
-      pointerTrace.setType(GesturesType.longPress);
-      timestampNow = DateTime.now().millisecondsSinceEpoch;
-
-      /// Clears the current [PointerTrace] to at the end compare the
-      /// timestamps
-      pointerTrace.clear();
-
-      /// Subtract the `longPressTimeout` cause it's the [LongPress]'s
-      /// duration by default
-      pointerTrace.add(
-        details.position,
-        timestampNow - longPressTimeout.inMilliseconds,
-      );
-    });
   }
 
   /// Initialize, if necessary, the variables used to begin evaluating
   /// whether there is a [Zoom] or not.
   void _initZoomValues() {
-    if (_pointers.length < 2) {
-      _initialScaleStats = ScaleStats.zero();
+    try {
+      if (_pointers.length < 2) {
+        _initialScaleStats = ScaleStats.zero();
 
-      /// We set [false] if there are not active pointers
-      if (_pointers.isEmpty) _hasZoomed = false;
+        /// We set [false] if there are not active pointers
+        if (_pointers.isEmpty) _hasZoomed = false;
 
+        return;
+      }
+
+      /// Creates a [Clone] with inmutable map
+      _initialScaleStats.scalePointers = {
+        for (final entry in _pointers.entries)
+          entry.key: PointerTrace(
+            pointer: entry.value.pointer,
+            positions: entry.value.positions
+                .map((p) => TimedPosition(p.timestamp, p.position))
+                .toList(),
+            type: entry.value.type,
+            timer: null, // no copiar timers
+          ),
+      };
+
+      _initialScaleStats.centroid = MathUtils.getCentroid(
+        _initialScaleStats.scalePointers!,
+      );
+      _initialScaleStats.avgDistance = MathUtils.getAverageDistance(
+        _initialScaleStats.scalePointers!,
+        _initialScaleStats.centroid!,
+      );
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
       return;
     }
-
-    /// Creates a [Clone] with inmutable map
-    _initialScaleStats.scalePointers = {
-      for (final entry in _pointers.entries)
-        entry.key: PointerTrace(
-          pointer: entry.value.pointer,
-          positions: entry.value.positions
-              .map((p) => TimedPosition(p.timestamp, p.position))
-              .toList(),
-          type: entry.value.type,
-          timer: null, // no copiar timers
-        ),
-    };
-
-    _initialScaleStats.centroid = MathUtils.getCentroid(
-      _initialScaleStats.scalePointers!,
-    );
-    _initialScaleStats.avgDistance = MathUtils.getAverageDistance(
-      _initialScaleStats.scalePointers!,
-      _initialScaleStats.centroid!,
-    );
   }
 
   /// Called whenever the pointer moves across the screen.
@@ -167,71 +176,76 @@ class InteractionDelegate {
   /// Doing nothing if `_didScroll` is [true].
   ///
   void onPointerMove(PointerMoveEvent details) {
-    final int pointer = details.pointer;
-    final Offset position = details.position;
-    final int timestampNow = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final int pointer = details.pointer;
+      final Offset position = details.position;
+      final int timestampNow = DateTime.now().millisecondsSinceEpoch;
 
-    final PointerTrace? pointerTrace = _pointers[pointer];
+      final PointerTrace? pointerTrace = _pointers[pointer];
 
-    /// If for some reason the current `pointer` not exist in `_pointers`, we
-    /// add it
-    if (pointerTrace == null) {
-      /// Add the [PointerTrace]
-      addPointer(pointer, position, timestampNow);
-
-      return;
-    }
-
-    final GesturesType type = pointerTrace.type;
-
-    /// Evaluates the distance first [PointerTrace] position with the current
-    /// one and if it's bigger than `touchSlop`, we start to adding the
-    /// `position` and `timestampNow`
-    final double distance = (position - pointerTrace.lastPosition!).distance;
-
-    if (distance >= touchSlop) {
-      /// Dispose the [Timer]
-      pointerTrace.dispose();
-
-      final lastTimedPosition = pointerTrace.last;
-
-      if (lastTimedPosition == null ||
-          (timestampNow - lastTimedPosition.timestamp) >= 100) {
-        pointerTrace.add(position, timestampNow);
-      }
-
-      /// Enters here when the [Tap] or [LongPress] is moving, so it's a [Pan]
-      if (type == GesturesType.tap || type == GesturesType.longPress) {
-        pointerTrace.setType(GesturesType.pan);
+      /// If for some reason the current `pointer` not exist in `_pointers`, we
+      /// add it
+      if (pointerTrace == null) {
+        /// Add the [PointerTrace]
+        addPointer(pointer, position, timestampNow);
 
         return;
       }
 
-      // * ZOOM
-      if (!_isZooming) {
-        if (ExplorationEventHelper.evaluateZoomGesture(
-          _pointers,
-          _initialScaleStats,
-        )) {
-          _isZooming = true;
-          _hasZoomed = true;
+      final GesturesType type = pointerTrace.type;
 
-          for (var p in _pointers.values) {
-            p.setType(GesturesType.zoom);
-            _scalePointers.addEntries([MapEntry(p.pointer, p)]);
-          }
+      /// Evaluates the distance first [PointerTrace] position with the current
+      /// one and if it's bigger than `touchSlop`, we start to adding the
+      /// `position` and `timestampNow`
+      final double distance = (position - pointerTrace.lastPosition!).distance;
+
+      if (distance >= touchSlop) {
+        /// Dispose the [Timer]
+        pointerTrace.dispose();
+
+        final lastTimedPosition = pointerTrace.last;
+
+        if (lastTimedPosition == null ||
+            (timestampNow - lastTimedPosition.timestamp) >= 100) {
+          pointerTrace.add(position, timestampNow);
+        }
+
+        /// Enters here when the [Tap] or [LongPress] is moving, so it's a [Pan]
+        if (type == GesturesType.tap || type == GesturesType.longPress) {
+          pointerTrace.setType(GesturesType.pan);
 
           return;
         }
 
-        /// Validates if `_hasZoomed` already and comes from a [Zoom]
-        if (_hasZoomed && type == GesturesType.zoom) {
-          pointerTrace.setType(GesturesType.pan);
+        // * ZOOM
+        if (!_isZooming) {
+          if (ExplorationEventHelper.evaluateZoomGesture(
+            _pointers,
+            _initialScaleStats,
+          )) {
+            _isZooming = true;
+            _hasZoomed = true;
 
-          /// Removes the current `pointerTrace` to reset the positions
-          _pointers.remove(pointer);
+            for (var p in _pointers.values) {
+              p.setType(GesturesType.zoom);
+              _scalePointers.addEntries([MapEntry(p.pointer, p)]);
+            }
+
+            return;
+          }
+
+          /// Validates if `_hasZoomed` already and comes from a [Zoom]
+          if (_hasZoomed && type == GesturesType.zoom) {
+            pointerTrace.setType(GesturesType.pan);
+
+            /// Removes the current `pointerTrace` to reset the positions
+            _pointers.remove(pointer);
+          }
         }
       }
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return;
     }
   }
 
@@ -260,98 +274,37 @@ class InteractionDelegate {
   ///
   /// Doing nothing if `_didScroll` is [true].
   ///
-  void onPointerUp(PointerUpEvent details) {
-    final int pointer = details.pointer;
-    final PointerTrace? pointerTrace = _pointers[pointer];
+  void onPointerUp(PointerUpEvent details, BuildContext? context) {
+    try {
+      final int pointer = details.pointer;
+      final PointerTrace? pointerTrace = _pointers[pointer];
 
-    if (pointerTrace == null) return;
+      if (pointerTrace == null) return;
 
-    /// Remove instantly the current `pointer`
-    _removePointers([pointer]);
+      /// Remove instantly the current `pointer`
+      _removePointers([pointer]);
 
-    final GesturesType pointerType = pointerTrace.type;
+      final GesturesType pointerType = pointerTrace.type;
 
-    /// Timer for [LongPress] and if it's not a [LongPress] action, then dispose
-    if (pointerTrace.timer != null && pointerType != GesturesType.longPress) {
-      pointerTrace.dispose();
-    }
+      /// Timer for [LongPress] and if it's not a [LongPress] action, then dispose
+      if (pointerTrace.timer != null && pointerType != GesturesType.longPress) {
+        pointerTrace.dispose();
+      }
 
-    if (_isZooming) _isZooming = false;
+      if (_isZooming) _isZooming = false;
 
-    /// Reset [ZoomStats] value
-    _initZoomValues();
+      /// Reset [ZoomStats] value
+      _initZoomValues();
 
-    if (_chunkDelegate.hasChunk) {
-      switch (pointerType) {
-        case GesturesType.longPress:
-          final int timestampNow = DateTime.now().millisecondsSinceEpoch;
+      if (_chunkDelegate.hasChunk) {
+        switch (pointerType) {
+          case GesturesType.longPress:
+            final int timestampNow = DateTime.now().millisecondsSinceEpoch;
 
-          pointerTrace.add(details.position, timestampNow);
-
-          final actionList = ActionEventHelper.detectActionEvent(
-            _navigatorKey?.currentContext,
-            pointerTrace,
-            _lastViewportScroll,
-            _lomDelegate.rootReference,
-          );
-
-          if (actionList.isNotEmpty) {
-            for (final action in actionList) {
-              _chunkDelegate.addActionEvent(action);
-            }
-          }
-
-          return;
-        case GesturesType.zoom:
-          if (_scalePointers.length >= 2) {
-            final touchExplorationEvents =
-                ExplorationEventHelper.detectTouchExplorationEvent(
-                  _scalePointers.values.toList(),
-                  _lastViewportScroll,
-                );
-
-            if (_chunkDelegate.hasChunk) {
-              _chunkDelegate.addExplorationEvents(touchExplorationEvents);
-            }
-          }
-
-          _scalePointers.clear();
-
-          break;
-        case GesturesType.pan:
-          final lastTimedPosition = pointerTrace.last;
-
-          final Offset position = details.position;
-
-          if (lastTimedPosition == null ||
-              lastTimedPosition.position != position) {
-            final int tsNow = DateTime.now().millisecondsSinceEpoch;
-            pointerTrace.add(position, tsNow);
-          }
-
-          /// If `_didScroll` is [true], the [ExplorationEvent] logic does into
-          /// the [ScrollNotification]
-          if (_didScroll) return;
-
-          final touchExplorationEvents =
-              ExplorationEventHelper.detectTouchExplorationEvent([
-                pointerTrace,
-              ], _lastViewportScroll);
-
-          if (_chunkDelegate.hasChunk) {
-            _chunkDelegate.addExplorationEvents(touchExplorationEvents);
-          }
-
-          return;
-        case GesturesType.tap:
-        case GesturesType.doubleTap:
-          _doubleTapPointers[pointer] = pointerTrace;
-
-          pointerTrace.timer = Timer(doubleTapTimeout, () {
-            pointerTrace.setType(GesturesType.tap);
+            pointerTrace.add(details.position, timestampNow);
 
             final actionList = ActionEventHelper.detectActionEvent(
-              _navigatorKey?.currentContext,
+              context,
               pointerTrace,
               _lastViewportScroll,
               _lomDelegate.rootReference,
@@ -363,34 +316,57 @@ class InteractionDelegate {
               }
             }
 
-            _doubleTapPointers.clear();
+            return;
+          case GesturesType.zoom:
+            if (_scalePointers.length >= 2) {
+              final touchExplorationEvents =
+                  ExplorationEventHelper.detectTouchExplorationEvent(
+                    _scalePointers.values.toList(),
+                    _lastViewportScroll,
+                  );
+
+              if (_chunkDelegate.hasChunk) {
+                _chunkDelegate.addExplorationEvents(touchExplorationEvents);
+              }
+            }
+
+            _scalePointers.clear();
+
+            break;
+          case GesturesType.pan:
+            final lastTimedPosition = pointerTrace.last;
+
+            final Offset position = details.position;
+
+            if (lastTimedPosition == null ||
+                lastTimedPosition.position != position) {
+              final int tsNow = DateTime.now().millisecondsSinceEpoch;
+              pointerTrace.add(position, tsNow);
+            }
+
+            /// If `_didScroll` is [true], the [ExplorationEvent] logic does into
+            /// the [ScrollNotification]
+            if (_didScroll) return;
+
+            final touchExplorationEvents =
+                ExplorationEventHelper.detectTouchExplorationEvent([
+                  pointerTrace,
+                ], _lastViewportScroll);
+
+            if (_chunkDelegate.hasChunk) {
+              _chunkDelegate.addExplorationEvents(touchExplorationEvents);
+            }
 
             return;
-          });
+          case GesturesType.tap:
+          case GesturesType.doubleTap:
+            _doubleTapPointers[pointer] = pointerTrace;
 
-          final PointerTrace? lastPointer = _doubleTapPointers[pointer - 1];
-
-          /// If the last pointer is not [null], we can assume in advance that
-          /// there may be some double tapping.
-          if (lastPointer != null && lastPointer.type == GesturesType.tap) {
-            final int lastDifference =
-                pointerTrace.lastTimestamp! - lastPointer.lastTimestamp!;
-            final double lastDistance =
-                (pointerTrace.lastPosition! - lastPointer.lastPosition!)
-                    .distance;
-
-            if (lastDifference < doubleTapTimeout.inMilliseconds &&
-                lastDistance < doubleTapTouchSlop) {
-              /// Dispose both [Timer]s
-              lastPointer.dispose();
-              pointerTrace.dispose();
-
-              /// Set both [DoubleTap] action
-              pointerTrace.setType(GesturesType.doubleTap);
-              lastPointer.setType(GesturesType.doubleTap);
+            pointerTrace.timer = Timer(doubleTapTimeout, () {
+              pointerTrace.setType(GesturesType.tap);
 
               final actionList = ActionEventHelper.detectActionEvent(
-                _navigatorKey?.currentContext,
+                context,
                 pointerTrace,
                 _lastViewportScroll,
                 _lomDelegate.rootReference,
@@ -403,13 +379,56 @@ class InteractionDelegate {
               }
 
               _doubleTapPointers.clear();
+
+              return;
+            });
+
+            final PointerTrace? lastPointer = _doubleTapPointers[pointer - 1];
+
+            /// If the last pointer is not [null], we can assume in advance that
+            /// there may be some double tapping.
+            if (lastPointer != null && lastPointer.type == GesturesType.tap) {
+              final int lastDifference =
+                  pointerTrace.lastTimestamp! - lastPointer.lastTimestamp!;
+              final double lastDistance =
+                  (pointerTrace.lastPosition! - lastPointer.lastPosition!)
+                      .distance;
+
+              if (lastDifference < doubleTapTimeout.inMilliseconds &&
+                  lastDistance < doubleTapTouchSlop) {
+                /// Dispose both [Timer]s
+                lastPointer.dispose();
+                pointerTrace.dispose();
+
+                /// Set both [DoubleTap] action
+                pointerTrace.setType(GesturesType.doubleTap);
+                lastPointer.setType(GesturesType.doubleTap);
+
+                final actionList = ActionEventHelper.detectActionEvent(
+                  context,
+                  pointerTrace,
+                  _lastViewportScroll,
+                  _lomDelegate.rootReference,
+                );
+
+                if (actionList.isNotEmpty) {
+                  for (final action in actionList) {
+                    _chunkDelegate.addActionEvent(action);
+                  }
+                }
+
+                _doubleTapPointers.clear();
+              }
             }
-          }
 
-          break;
+            break;
 
-        default:
+          default:
+        }
       }
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return;
     }
   }
 
@@ -444,80 +463,85 @@ class InteractionDelegate {
   /// This method manages viewports and relevant finger scroll positions to
   /// then converts them into [ScrollExplorationEvent] and [PanExplorationEvent].
   bool handleScrollNotification(ScrollNotification notification) {
-    final context = notification.context;
+    try {
+      final context = notification.context;
 
-    if (context == null) return false;
+      if (context == null) return false;
 
-    final scrollableState = Scrollable.maybeOf(context);
+      final scrollableState = Scrollable.maybeOf(context);
 
-    if (notification is UserScrollNotification) {
-      if (notification.direction == ScrollDirection.idle) {
-        _didScroll = false;
-        _isAtScrollEdge = false;
+      if (notification is UserScrollNotification) {
+        if (notification.direction == ScrollDirection.idle) {
+          _didScroll = false;
+          _isAtScrollEdge = false;
 
-        final scrollExplorationEvents =
-            ExplorationEventHelper.getScrollExploration(
-              _scrollPanScrollablePositions,
-              _scrollViewportRects,
-            );
+          final scrollExplorationEvents =
+              ExplorationEventHelper.getScrollExploration(
+                _scrollPanScrollablePositions,
+                _scrollViewportRects,
+              );
 
-        if (_chunkDelegate.hasChunk) {
-          _chunkDelegate.addExplorationEvents(scrollExplorationEvents);
+          if (_chunkDelegate.hasChunk) {
+            _chunkDelegate.addExplorationEvents(scrollExplorationEvents);
+          }
+        } else {
+          _didScroll = true;
         }
       } else {
-        _didScroll = true;
-      }
-    } else {
-      ScrollPosition scrollPosition;
+        ScrollPosition scrollPosition;
 
-      if (scrollableState != null) {
-        scrollPosition = scrollableState.position;
-      } else {
-        scrollPosition = notification.metrics as ScrollPosition;
-      }
+        if (scrollableState != null) {
+          scrollPosition = scrollableState.position;
+        } else {
+          scrollPosition = notification.metrics as ScrollPosition;
+        }
 
-      final ts = DateTime.now().millisecondsSinceEpoch;
+        final ts = DateTime.now().millisecondsSinceEpoch;
 
-      final lastRect = _scrollViewportRects.entries.isNotEmpty
-          ? _scrollViewportRects.entries.last
-          : null;
+        final lastRect = _scrollViewportRects.entries.isNotEmpty
+            ? _scrollViewportRects.entries.last
+            : null;
 
-      if (notification is! OverscrollNotification) {
-        if (!_isAtScrollEdge) {
-          captureViewportGeometry(context, scrollPosition);
+        if (notification is! OverscrollNotification) {
+          if (!_isAtScrollEdge) {
+            captureViewportGeometry(context, scrollPosition);
 
-          if (lastRect == null || scrollPosition.atEdge) {
-            _scrollViewportRects[ts] = _lastViewportScroll;
-          } else {
-            if (lastRect.value != _lastViewportScroll) {
+            if (lastRect == null || scrollPosition.atEdge) {
               _scrollViewportRects[ts] = _lastViewportScroll;
+            } else {
+              if (lastRect.value != _lastViewportScroll) {
+                _scrollViewportRects[ts] = _lastViewportScroll;
+              }
+            }
+          }
+
+          /// First set the `rect` before to know it is in the edge
+          _isAtScrollEdge = scrollPosition.atEdge;
+
+          if (notification is ScrollStartNotification) {
+            if (notification.dragDetails != null) {
+              _scrollPanScrollablePositions[ts] =
+                  notification.dragDetails!.globalPosition;
+            }
+          } else if (notification is ScrollUpdateNotification) {
+            if (notification.dragDetails != null) {
+              _scrollPanScrollablePositions[ts] =
+                  notification.dragDetails!.globalPosition;
+            }
+          } else if (notification is ScrollEndNotification) {
+            if (notification.dragDetails != null) {
+              _scrollPanScrollablePositions[ts] =
+                  notification.dragDetails!.globalPosition;
             }
           }
         }
-
-        /// First set the `rect` before to know it is in the edge
-        _isAtScrollEdge = scrollPosition.atEdge;
-
-        if (notification is ScrollStartNotification) {
-          if (notification.dragDetails != null) {
-            _scrollPanScrollablePositions[ts] =
-                notification.dragDetails!.globalPosition;
-          }
-        } else if (notification is ScrollUpdateNotification) {
-          if (notification.dragDetails != null) {
-            _scrollPanScrollablePositions[ts] =
-                notification.dragDetails!.globalPosition;
-          }
-        } else if (notification is ScrollEndNotification) {
-          if (notification.dragDetails != null) {
-            _scrollPanScrollablePositions[ts] =
-                notification.dragDetails!.globalPosition;
-          }
-        }
       }
-    }
 
-    return false;
+      return false;
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return false;
+    }
   }
 
   /// Computes and updates the current viewport rectangle for a scrollable
@@ -536,25 +560,31 @@ class InteractionDelegate {
     BuildContext context,
     ScrollPosition? scrollPosition,
   ) {
-    final renderObject = context.findRenderObject();
+    try {
+      final renderObject = context.findRenderObject();
 
-    if (renderObject is! RenderBox) return;
+      if (renderObject is! RenderBox) return;
 
-    final initPosition = renderObject.localToGlobal(Offset.zero);
+      final initPosition = renderObject.localToGlobal(Offset.zero);
 
-    Rect rect = initPosition & renderObject.size;
+      Rect rect = initPosition & renderObject.size;
 
-    _lastViewportScroll = rect;
+      _lastViewportScroll = rect;
 
-    if (scrollPosition == null) return;
+      if (scrollPosition == null) return;
 
-    final double contentHeight =
-        scrollPosition.maxScrollExtent + scrollPosition.viewportDimension;
-    final double left = rect.left;
-    final double contentTop = rect.top - scrollPosition.pixels;
+      final double contentHeight =
+          scrollPosition.maxScrollExtent + scrollPosition.viewportDimension;
+      final double left = rect.left;
+      final double contentTop = rect.top - scrollPosition.pixels;
 
-    rect = Rect.fromLTWH(left, contentTop, rect.width, contentHeight);
+      rect = Rect.fromLTWH(left, contentTop, rect.width, contentHeight);
 
-    _lastViewportScroll = rect;
+      _lastViewportScroll = rect;
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      _lastViewportScroll = Rect.zero;
+      return;
+    }
   }
 }

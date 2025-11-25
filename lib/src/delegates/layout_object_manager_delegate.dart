@@ -1,3 +1,4 @@
+import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:flutter/material.dart';
@@ -80,91 +81,99 @@ class LomDelegate {
   /// Instead, insert a [LomRef] that references the existing [Lom] instance.
   /// Improves performance and prevents data duplication.
   LomAbstract? createLomTree(Element element, String signature) {
-    if (_cacheLom.keys.contains(signature)) {
-      final Lom lomFound = _cacheLom[signature]!;
+    try {
+      if (!element.mounted) return null;
+
+      if (_cacheLom.keys.contains(signature)) {
+        final Lom lomFound = _cacheLom[signature]!;
+
+        final output = <Rect>[];
+        recursiveBox(lomFound.root!, output);
+
+        SessionRecorder().rects.value = List.unmodifiable(output);
+
+        return LomRef(
+          id: lomFound.id,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+        );
+      }
+
+      if (rootReference.isNotEmpty) rootReference.clear();
+
+      final RenderObject? rootRenderObject = element.renderObject;
+
+      if (rootRenderObject == null) return null;
+      if (!rootRenderObject.attached) return null;
+      if (rootRenderObject is! RenderBox) return null;
+
+      final RenderBox renderBox = rootRenderObject;
+      final Size rootSize = renderBox.size;
+
+      if (rootSize.width == 0 && rootSize.height == 0) return null;
+
+      _init(rootSize);
+
+      /// Resets the count zones
+      _zoneId = 1;
+
+      final Offset rootOffset = renderBox.localToGlobal(Offset.zero);
+
+      /// First [Root] node
+      final Root root = _createRootFromElement(
+        widgetType: element.widget.runtimeType.toString(),
+        renderObject: rootRenderObject,
+        box: Rect.fromLTWH(
+          rootOffset.dx,
+          rootOffset.dy,
+          rootSize.width,
+          rootSize.height,
+        ),
+      );
+
+      rootReference[root.objectId] = root;
+
+      /// Recursively elements
+      element.visitChildElements((child) => _mapRootTree(child));
+
+      /// Re-create a new map based by `rootReference` but with their `children`
+      final Map<int, Root> rootMap = {
+        for (final root in rootReference.values)
+          root.id: root.copyWith(children: List<Root>.from(root.children)),
+      };
+
+      /// Delete the first [Root] to avoid duplication of the first same [Root]
+      /// We gonna already used it in `_mapRootTree` and it is set it after
+      /// in the `_lom`
+      rootMap.remove(root.id);
+
+      final Set<Root> rootsAttached = {};
+
+      /// Attach every [Root] node that corresponds their `parentId`
+      for (final root in rootMap.values) {
+        final int parentId = root.parentId;
+
+        if (parentId == root.id || !rootMap.containsKey(parentId)) {
+          rootsAttached.add(root);
+        } else {
+          rootMap[parentId]!.children.add(root);
+        }
+      }
+
+      _lom = _lom!.copyWith(
+        root: root.copyWith(children: rootsAttached.toList()),
+      );
 
       final output = <Rect>[];
-      recursiveBox(lomFound.root!, output);
-
+      recursiveBox(_lom!.root!, output);
       SessionRecorder().rects.value = List.unmodifiable(output);
 
-      return LomRef(
-        id: lomFound.id,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      );
+      _cacheLom[signature] = _lom!;
+
+      return _lom;
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return null;
     }
-
-    if (rootReference.isNotEmpty) rootReference.clear();
-
-    final RenderObject? rootRenderObject = element.renderObject;
-
-    if (rootRenderObject == null) return null;
-    if (rootRenderObject is! RenderBox) return null;
-
-    final RenderBox renderBox = rootRenderObject;
-    final Size rootSize = renderBox.size;
-
-    if (rootSize.width == 0 && rootSize.height == 0) return null;
-
-    _init(rootSize);
-
-    /// Resets the count zones
-    _zoneId = 1;
-
-    final Offset rootOffset = renderBox.localToGlobal(Offset.zero);
-
-    /// First [Root] node
-    final Root root = _createRootFromElement(
-      widgetType: element.widget.runtimeType.toString(),
-      renderObject: rootRenderObject,
-      box: Rect.fromLTWH(
-        rootOffset.dx,
-        rootOffset.dy,
-        rootSize.width,
-        rootSize.height,
-      ),
-    );
-
-    rootReference[root.objectId] = root;
-
-    /// Recursively elements
-    element.visitChildElements((child) => _mapRootTree(child));
-
-    /// Re-create a new map based by `rootReference` but with their `children`
-    final Map<int, Root> rootMap = {
-      for (final root in rootReference.values)
-        root.id: root.copyWith(children: List<Root>.from(root.children)),
-    };
-
-    /// Delete the first [Root] to avoid duplication of the first same [Root]
-    /// We gonna already used it in `_mapRootTree` and it is set it after
-    /// in the `_lom`
-    rootMap.remove(root.id);
-
-    final Set<Root> rootsAttached = {};
-
-    /// Attach every [Root] node that corresponds their `parentId`
-    for (final root in rootMap.values) {
-      final int parentId = root.parentId;
-
-      if (parentId == root.id || !rootMap.containsKey(parentId)) {
-        rootsAttached.add(root);
-      } else {
-        rootMap[parentId]!.children.add(root);
-      }
-    }
-
-    _lom = _lom!.copyWith(
-      root: root.copyWith(children: rootsAttached.toList()),
-    );
-
-    final output = <Rect>[];
-    recursiveBox(_lom!.root!, output);
-    SessionRecorder().rects.value = List.unmodifiable(output);
-
-    _cacheLom[signature] = _lom!;
-
-    return _lom;
   }
 
   /// Recursively maps the `element` tree widgets into a [Root] instance.
@@ -177,48 +186,55 @@ class LomDelegate {
   /// from top to bottom, but also finds its ancestor [Element] to add its
   /// hashCode id.
   void _mapRootTree(Element element) {
-    final Widget widgetElement = element.widget;
+    try {
+      final Widget widgetElement = element.widget;
 
-    final RenderObject? renderObject = element.renderObject;
+      final RenderObject? renderObject = element.renderObject;
 
-    if (renderObject == null) {
-      element.visitChildren((child) => _mapRootTree(child));
-      return;
-    }
-
-    if (widgetElement is RenderObjectWidget && renderObject is RenderBox) {
-      if (_shouldInclude(widgetElement, renderObject)) {
-        final Offset offset = renderObject.localToGlobal(Offset.zero);
-        final Rect rect = Rect.fromLTWH(
-          offset.dx,
-          offset.dy,
-          renderObject.size.width,
-          renderObject.size.height,
-        );
-
-        Root root = _createRootFromElement(
-          widgetType: widgetElement.runtimeType.toString(),
-          renderObject: renderObject,
-          box: rect,
-        );
-
-        /// Visit `element`'s ancestor to set the `parentId` attribute
-        if (element.mounted) {
-          element.visitAncestorElements((parent) {
-            final RenderObject? parentRender = parent.renderObject;
-            if (parentRender == null) return true;
-
-            final parentNode = rootReference[parentRender.hashCode];
-            if (parentNode == null) return true;
-
-            root = root.copyWith(parentId: parentNode.id);
-
-            return false;
-          });
-        }
-
-        rootReference[root.objectId] = root;
+      if (renderObject == null) {
+        element.visitChildren((child) => _mapRootTree(child));
+        return;
       }
+
+      if (widgetElement is RenderObjectWidget && renderObject is RenderBox) {
+        if (_shouldInclude(widgetElement, renderObject)) {
+          if (SerializeTreeUtils.isWidgetVisible(element)) {
+            final Offset offset = renderObject.localToGlobal(Offset.zero);
+            final Rect rect = Rect.fromLTWH(
+              offset.dx,
+              offset.dy,
+              renderObject.size.width,
+              renderObject.size.height,
+            );
+
+            Root root = _createRootFromElement(
+              widgetType: widgetElement.runtimeType.toString(),
+              renderObject: renderObject,
+              box: rect,
+            );
+
+            /// Visit `element`'s ancestor to set the `parentId` attribute
+            if (element.mounted) {
+              element.visitAncestorElements((parent) {
+                final RenderObject? parentRender = parent.renderObject;
+                if (parentRender == null) return true;
+
+                final parentNode = rootReference[parentRender.hashCode];
+                if (parentNode == null) return true;
+
+                root = root.copyWith(parentId: parentNode.id);
+
+                return false;
+              });
+            }
+
+            rootReference[root.objectId] = root;
+          }
+        }
+      }
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return;
     }
 
     element.visitChildren((child) => _mapRootTree(child));

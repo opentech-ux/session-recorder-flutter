@@ -24,22 +24,27 @@ class ActionEventHelper {
     Rect viewportScroll,
     Map<int, Root> rootReference,
   ) {
-    if (context == null) return [];
+    try {
+      if (context == null) return [];
 
-    final List<ActionEvent> actionEvents = [];
+      final List<ActionEvent> actionEvents = [];
 
-    final ActionEvent? actionEvent = _createActionEvent(
-      context,
-      pointer,
-      viewportScroll,
-      rootReference,
-    );
+      final ActionEvent? actionEvent = _createActionEvent(
+        context,
+        pointer,
+        viewportScroll,
+        rootReference,
+      );
 
-    if (actionEvent == null) return [];
+      if (actionEvent == null) return [];
 
-    actionEvents.add(actionEvent);
+      actionEvents.add(actionEvent);
 
-    return actionEvents;
+      return actionEvents;
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return [];
+    }
   }
 
   /// Creates and returns the [ActionEvent] object with its zone.
@@ -49,39 +54,40 @@ class ActionEventHelper {
     Rect viewportScroll,
     Map<int, Root> rootReference,
   ) {
-    final TimedPosition firstPosition = pointer.first ?? pointer.last!;
+    try {
+      final TimedPosition firstPosition = pointer.first ?? pointer.last!;
 
-    final root = _findZone(
-      context,
-      firstPosition,
-      rootReference,
-    );
+      final root = _findZone(context, firstPosition, rootReference);
 
-    if (root == null) return null;
+      if (root == null) return null;
 
-    switch (pointer.type) {
-      case GesturesType.longPress:
-        return LongPressActionEvent(
-          zone: "z${root.id}",
-          timestampRelative: firstPosition.timestamp,
-          duration: pointer.duration,
-          viewport: viewportScroll,
-          position: firstPosition.position,
-        );
-      case GesturesType.doubleTap:
-        return DoubleTapActionEvent(
-          zone: "z${root.id}",
-          timestampRelative: firstPosition.timestamp,
-          viewport: viewportScroll,
-          position: firstPosition.position,
-        );
-      default:
-        return TapActionEvent(
-          zone: "z${root.id}",
-          timestampRelative: firstPosition.timestamp,
-          viewport: viewportScroll,
-          position: firstPosition.position,
-        );
+      switch (pointer.type) {
+        case GesturesType.longPress:
+          return LongPressActionEvent(
+            zone: "z${root.id}",
+            timestampRelative: firstPosition.timestamp,
+            duration: pointer.duration,
+            viewport: viewportScroll,
+            position: firstPosition.position,
+          );
+        case GesturesType.doubleTap:
+          return DoubleTapActionEvent(
+            zone: "z${root.id}",
+            timestampRelative: firstPosition.timestamp,
+            viewport: viewportScroll,
+            position: firstPosition.position,
+          );
+        default:
+          return TapActionEvent(
+            zone: "z${root.id}",
+            timestampRelative: firstPosition.timestamp,
+            viewport: viewportScroll,
+            position: firstPosition.position,
+          );
+      }
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return null;
     }
   }
 
@@ -93,45 +99,52 @@ class ActionEventHelper {
     TimedPosition firstPosition,
     Map<int, Root> rootReference,
   ) {
-    final RenderObject? rootRender = context.findRenderObject();
+    try {
+      if (!context.mounted) return null;
 
-    if (rootRender == null || rootRender is! RenderBox) return null;
+      final RenderObject? rootRender = context.findRenderObject();
 
-    final RenderBox rootBox = rootRender;
+      if (rootRender == null || rootRender is! RenderBox) return null;
 
-    final BoxHitTestResult boxHitTestResult = BoxHitTestResult();
+      final RenderBox rootBox = rootRender;
 
-    rootBox.hitTest(
-      boxHitTestResult,
-      position: rootBox.globalToLocal(firstPosition.position),
-    );
+      final BoxHitTestResult boxHitTestResult = BoxHitTestResult();
 
-    Root? rootTouched;
+      rootBox.hitTest(
+        boxHitTestResult,
+        position: rootBox.globalToLocal(firstPosition.position),
+      );
 
-    final entries = boxHitTestResult.path.toList();
+      Root? rootTouched;
 
-    // TODO : To RE-VALIDATE the current Zone, we can do a logic to compare the hit size and get all Roots with this size (have to do logic scroll in Listener)
+      final entries = boxHitTestResult.path.toList();
 
-    for (int i = 0; i <= entries.length - 1; i++) {
-      final target = entries[i].target;
+      // TODO : To RE-VALIDATE the current Zone, we can do a logic to compare the hit size and get all Roots with this size (have to do logic scroll in Listener)
 
-      if (target is! RenderBox) continue;
+      for (int i = 0; i <= entries.length - 1; i++) {
+        final target = entries[i].target;
 
-      if (!target.hasSize || target.size == Size.zero) continue;
+        if (target is! RenderBox) continue;
 
-      final renderBox = target;
+        if (!target.hasSize || target.size == Size.zero) continue;
 
-      final renderExists = rootReference.containsKey(renderBox.hashCode);
+        final renderBox = target;
 
-      if (!renderExists) continue;
+        final renderExists = rootReference.containsKey(renderBox.hashCode);
 
-      rootTouched = rootReference[target.hashCode]!;
+        if (!renderExists) continue;
 
-      break;
+        rootTouched = rootReference[target.hashCode]!;
+
+        break;
+      }
+
+      if (rootTouched == null) return null;
+
+      return rootTouched;
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return null;
     }
-
-    if (rootTouched == null) return null;
-
-    return rootTouched;
   }
 }

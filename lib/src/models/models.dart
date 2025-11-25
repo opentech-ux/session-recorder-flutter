@@ -4,6 +4,7 @@ export 'package:session_recorder_flutter/src/models/exploration_event.dart';
 export 'package:session_recorder_flutter/src/models/lom.dart';
 export 'package:session_recorder_flutter/src/models/root.dart';
 export 'package:session_recorder_flutter/src/models/pointer_trace.dart';
+export 'package:session_recorder_flutter/src/models/route_recorded.dart';
 export 'package:session_recorder_flutter/src/models/scale_stats.dart';
 export 'package:session_recorder_flutter/src/models/session_recorder_params.dart';
 export 'package:session_recorder_flutter/src/models/session.dart';

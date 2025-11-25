@@ -9,7 +9,6 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   final params = SessionRecorderParams(
-    key: navigatorKey,
     endpoint: 'https://api.example.com/session',
   );
 

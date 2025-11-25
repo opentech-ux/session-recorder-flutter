@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:http/io_client.dart';
-import 'package:session_recorder_flutter/session_recorder.dart';
 
 import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
 import 'package:session_recorder_flutter/src/delegates/interaction_delegate.dart';
 import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
 import 'package:session_recorder_flutter/src/delegates/session_delegate.dart';
+import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/services/route_tracker.dart';
 import 'package:session_recorder_flutter/src/services/timers/inactivity_timer.dart';
 import 'package:session_recorder_flutter/src/services/timers/session_recorder_timer.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
@@ -70,28 +71,19 @@ class SessionRecorder extends WidgetsBindingObserver {
   static final SessionRecorder instance = SessionRecorder._internal();
   factory SessionRecorder() => instance;
 
-  /// Navigator key used to access the app's current widget tree context.
-  ///
-  /// This property is nullable and must be provided by calling [init()]
-  /// with an existing `GlobalKey<NavigatorState>`.
-  ///
-  ///  - Intended for global navigation operations (e.g. screen's navigation,
-  /// showing dialogs/snackbar without a local BuildContext).
-  ///  - Avoid creating multiple navigator keys; prefer the app-level
-  /// MaterialApp `navigatorKey`.
-  ///  - GlobalKeys have a cost if overused; keep usage limited to global
-  /// entry points.
-  GlobalKey<NavigatorState>? _navigatorKey;
-
   // * DELEGATES
   late final ChunkDelegate _chunkDelegate;
   late final LomDelegate _lomDelegate;
   late final SessionDelegate _sessionDelegate;
   late final SessionRecorderTimer _sessionRecorderTimer;
   late final InactivityTimer _inactivityTimer;
+  late final RouteTracker _routeTracker;
   InteractionDelegate? _interactionDelegate;
 
   final ValueNotifier<List<Rect>> rects = ValueNotifier<List<Rect>>([]);
+
+  ///
+  RouteRecorded? _currentRoute;
 
   /// Stores the last generated hash of the entire widget tree if there is a
   /// change.
@@ -214,13 +206,13 @@ class SessionRecorder extends WidgetsBindingObserver {
 
     if (_serviceInitialized || _disableRecord) return;
 
-    if (params.key == null || params.endpoint == null) {
+    if (params.endpoint == null) {
       throw ArgumentError.notNull(
         'The endpoint and navigator key must be provided',
       );
     }
 
-    if (params.endpoint != null && params.endpoint!.isEmpty) {
+    if (params.endpoint!.isEmpty) {
       throw ArgumentError('Endpoint provided, but cannot be empty');
     }
 
@@ -245,6 +237,9 @@ class SessionRecorder extends WidgetsBindingObserver {
     /// we traverse the tree.
     buildOwner.onBuildScheduled = () {
       onBuildScheduled?.call();
+
+      if (_routeTracker.isObserving) return;
+
       _requestTreeCapture(debounce: true);
     };
 
@@ -261,12 +256,9 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// Called once during setup to ensure all components are ready.
   void _initServices(SessionRecorderParams params) {
-    _navigatorKey = params.key;
-
     WidgetsBinding.instance.addObserver(this);
 
-    _interactionDelegate = InteractionDelegate(_navigatorKey);
-
+    _interactionDelegate = InteractionDelegate();
     _chunkDelegate = ChunkDelegate();
     _lomDelegate = LomDelegate();
     _sessionDelegate = SessionDelegate();
@@ -275,6 +267,10 @@ class SessionRecorder extends WidgetsBindingObserver {
 
     _sessionDelegate.init();
     _chunkDelegate.init(_sessionDelegate.getId());
+
+    _routeTracker = RouteTracker();
+    _routeTracker.registerTreeHandler(_requestTreeCaptureFromRouting);
+    _routeTracker.registerInitSessionHandler(() => _serviceInitialized);
 
     // * INACTIVITY TIMER
     _inactivityTimer.onInactive = () => _sessionRecorderTimer.stop();
@@ -342,6 +338,18 @@ class SessionRecorder extends WidgetsBindingObserver {
     });
   }
 
+  ///
+  void _requestTreeCaptureFromRouting() {
+    _debounce?.cancel();
+    _debounce = Timer(Duration(milliseconds: 16), () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _captureId++;
+        _routeTracker.isObserving = false;
+        _captureTree(id: _captureId);
+      });
+    });
+  }
+
   /// Captures the Widget Tree rooted at the navigator key's context and triggers
   /// further processing if the  structure has changed.
   ///
@@ -368,61 +376,71 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// Throw `FlutterError` if no navigator context is found.
   Future<void> _captureTree({int id = 0}) async {
-    final BuildContext? context = _navigatorKey!.currentContext;
+    try {
+      _currentRoute = _routeTracker.getCurrentRoute();
 
-    assert(() {
-      if (context == null) {
-        throw FlutterError.fromParts(<DiagnosticsNode>[
-          ErrorSummary(
-            'SessionRecorder.init failed: navigatorKey.currentContext is null.',
-          ),
-          ErrorHint('Ensure you pass the same navigatorKey to your app.'),
-          ErrorHint(
-            'Example:\n'
-            '  final navigatorKey = GlobalKey<NavigatorState>();\n'
-            '  runApp(MaterialApp(navigatorKey: navigatorKey, ...));\n',
-          ),
-          ErrorHint(
-            'This call is blocking and will throw to surface the incorrect'
-            'initialization order immediately.',
-          ),
-        ]);
+      if (_currentRoute == null) return;
+
+      final BuildContext? context = _currentRoute!.subtreeContext;
+
+      assert(() {
+        if (context == null) {
+          throw FlutterError.fromParts(<DiagnosticsNode>[
+            ErrorSummary('SessionRecorder.init failed: context not found.'),
+            ErrorHint(
+              'Ensure you pass the SessionRecorderObserver to your app.',
+            ),
+            ErrorHint(
+              'Example:\n'
+              '  runApp(MaterialApp(observers: [SessionRecorderObserver()], ...));\n',
+            ),
+            ErrorHint(
+              'This call is blocking and will throw to surface the incorrect'
+              'initialization order immediately.',
+            ),
+          ]);
+        }
+
+        return true;
+      }());
+
+      if (context == null) return;
+
+      if (!context.mounted) return;
+
+      /// If a newer capture was requested while this one was running, abort
+      /// processing.
+      if (id != _captureId) return;
+
+      final Element element = context as Element;
+
+      /// Signs the `element` Tree Widgets
+      final String signature = await SerializeTreeUtils.processTreeSignature(
+        element,
+      );
+
+      /// If the stable structure did not change, no additional processing is
+      /// performed.
+      if (signature == _lastHash) return;
+
+      _lastHash = signature;
+
+      _lomDelegate.clearLom();
+
+      final lom = _lomDelegate.createLomTree(element, signature);
+      if (lom == null) return;
+
+      /// Captures the first current `context` viewport
+      if (context.mounted) {
+        // ignore: use_build_context_synchronously
+        _interactionDelegate!.captureViewportGeometry(context, null);
       }
 
-      return true;
-    }());
-
-    if (context == null) return;
-
-    /// If a newer capture was requested while this one was running, abort
-    /// processing.
-    if (id != _captureId) return;
-
-    final Element element = context as Element;
-
-    /// Signs the `element` Tree Widgets
-    final String signature = await SerializeTreeUtils.processTreeSignature(
-      element,
-    );
-
-    /// If the stable structure did not change, no additional processing is
-    /// performed.
-    if (signature == _lastHash) return;
-
-    _lastHash = signature;
-
-    _lomDelegate.clearLom();
-
-    final lom = _lomDelegate.createLomTree(element, signature);
-    if (lom == null) return;
-
-    /// Captures the first current `context` viewport
-    if (context.mounted) {
-      // ignore: use_build_context_synchronously
-      _interactionDelegate!.captureViewportGeometry(context, null);
+      _chunkDelegate.addLom(lom);
+    } catch (e, s) {
+      debugPrint(" !! >> [Some error : $e, $s]");
+      return;
     }
-
-    _chunkDelegate.addLom(lom);
   }
 
   /// Periodic callback that sends the pending session record to the server.
@@ -478,28 +496,30 @@ class SessionRecorder extends WidgetsBindingObserver {
 
   /// Forwards the [PointerDownEvent] to the [InteractionDelegate].
   void onPointerDown(PointerDownEvent e) {
-    if (_disableRecord) return;
+    if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
     _interactionDelegate!.onPointerDown(e);
   }
 
   /// Forwards the [PointerMoveEvent] to the [InteractionDelegate].
   void onPointerMove(PointerMoveEvent e) {
-    if (_disableRecord) return;
+    if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
     _interactionDelegate!.onPointerMove(e);
   }
 
   /// Forwards the [PointerUpEvent] to the [InteractionDelegate].
   void onPointerUp(PointerUpEvent e) {
-    if (_disableRecord) return;
+    if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
-    _interactionDelegate!.onPointerUp(e);
+    if (_currentRoute != null) {
+      _interactionDelegate!.onPointerUp(e, _currentRoute!.subtreeContext);
+    }
   }
 
   /// Forwards the [PointerCancelEvent] to the [InteractionDelegate].
   void onPointerCancel(_) {
-    if (_disableRecord) return;
+    if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
     _interactionDelegate!.onPointerCancel();
   }
@@ -511,7 +531,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// Returns `true` if the delegate handled the notification, `false` otherwise.
   bool handleScrollNotification(ScrollNotification s) {
-    if (_disableRecord) return false;
+    if (_disableRecord || !_serviceInitialized) return false;
     _inactivityTimer.onInvokeInactivityTimer();
     return _interactionDelegate!.handleScrollNotification(s);
   }

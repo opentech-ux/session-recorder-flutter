@@ -1,12 +1,4 @@
-import 'package:flutter/material.dart';
-
 class SessionRecorderParams {
-  /// The [GlobalKey] attached to the app’s [Navigator].
-  ///
-  /// Used internally by the recording service to access navigation context
-  /// and capture widget tree snapshots.
-  final GlobalKey<NavigatorState>? key;
-
   /// The backend endpoint (URI) that receives session data.
   ///
   /// This URL is provided by the the __company__ and must support [POST]
@@ -30,8 +22,7 @@ class SessionRecorderParams {
   ///
   /// {@macro session_record}
   ///
-  /// Both fields are required and must not be null. The service will throw
-  /// a [ArgumentError] if the provided key is not yet mounted at initialization
-  /// time.
-  SessionRecorderParams({this.key, this.endpoint, this.disable = false});
+  /// The `endpoint` is required and must not be null. The service will throw
+  /// a [ArgumentError] if the provided `endpoint` is not correct.
+  SessionRecorderParams({this.endpoint, this.disable = false});
 }
