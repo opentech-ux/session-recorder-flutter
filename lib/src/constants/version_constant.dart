@@ -1,2 +1,2 @@
-const String libraryVersion = "1.0.2";
+const String libraryVersion = "1.1.0";
 const String libraryType = "mobile";
