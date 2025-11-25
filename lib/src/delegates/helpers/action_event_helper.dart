@@ -13,11 +13,11 @@ import '../../models/models.dart'
         TapActionEvent;
 
 class ActionEventHelper {
-  /// Detects and creates different [ActionEvent] types like:
+  /// Detects and creates different `[ActionEvent]` types like:
   ///
-  /// - [TapActionEvent]
-  /// - [DoubleTapActionEvent]
-  /// - [LongPressActionEvent]
+  /// - `[TapActionEvent]`
+  /// - `[DoubleTapActionEvent]`
+  /// - `[LongPressActionEvent]`
   static List<ActionEvent> detectActionEvent(
     BuildContext? context,
     PointerTrace pointer,
@@ -47,7 +47,7 @@ class ActionEventHelper {
     }
   }
 
-  /// Creates and returns the [ActionEvent] object with its zone.
+  /// Creates and returns the `[ActionEvent]` object with its zone.
   static ActionEvent? _createActionEvent(
     BuildContext context,
     PointerTrace pointer,
@@ -91,9 +91,9 @@ class ActionEventHelper {
     }
   }
 
-  /// Finds the [Zone] where the user has tapped.
+  /// Finds the `[Zone]` where the user has tapped.
   ///
-  /// Get the [RenderBox] hit test with the `firstPosition` position.
+  /// Get the `[RenderBox]` hit test with the `firstPosition` position.
   static Root? _findZone(
     BuildContext context,
     TimedPosition firstPosition,

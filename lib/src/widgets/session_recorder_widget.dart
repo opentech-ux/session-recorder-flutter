@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/session_recorder.dart';
 
+/// {@template session_recorder_widget}
 /// A wrapper widget that listens to user interactions across the app.
 ///
-/// You should use [SessionRecorderWidget] as a wrapper to [WidgetsApp.builder].
+/// You should use `[SessionRecorderWidget]` as a wrapper to `[WidgetsApp.builder]`.
 ///
 /// The widget itself does not contain heavy logic; instead, it delegates
-/// processing to internal services such as [InteractionDelegate] and
-/// [SessionRecorder].
+/// processing to internal services such as `[InteractionDelegate]` and
+/// `[SessionRecorder]`.
 ///
-/// You can disable the widget layout painter by passing [false] to either
+/// You can disable the widget layout painter by passing `[false]` to either
 /// `showLayout`.
 ///
 /// Also you can disable the capturing gestures data with `disable`
@@ -19,18 +20,22 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 /// Example usage
 /// ```dart
 /// return MaterialApp(
-///   navigatorKey: key,
+///   navigatorObservers: [
+///     SessionRecorderObserver(),
+///   ],
 ///   builder: (context, child) => SessionRecorderWidget(
-///     child: child ?? SizedBox.shrink(),
+///     child: child!,
 ///   ),
 /// );
 /// ```
 ///
 /// __IMPORTANT:__ This widget must be set **only once** in the entire app.
 ///
-/// Adding multiple [SessionRecorderWidget] instances can lead to duplicated
+/// Adding multiple `[SessionRecorderWidget]` instances can lead to duplicated
 /// event captures, inconsistent state, and performance degradation.
+/// {@endtemplate}
 class SessionRecorderWidget extends StatelessWidget {
+  /// {@macro session_recorder_widget}
   const SessionRecorderWidget({
     super.key,
     required this.child,

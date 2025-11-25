@@ -4,7 +4,7 @@ typedef SessionCallback = Future<void> Function();
 
 /// Singleton that manages a periodic session-record timer.
 ///
-/// Use the factory constructor [SessionRecorderTimer()] to obtain the single
+/// Use the factory constructor `[SessionRecorderTimer()]` to obtain the single
 /// shared instance.
 ///
 /// - Call `init()` to start the service and `dispose()` to stop and release
@@ -15,7 +15,7 @@ class SessionRecorderTimer {
   factory SessionRecorderTimer() => _instance;
   SessionRecorderTimer._internal();
 
-  /// The active periodic [Timer], or `null` if no timer is running.
+  /// The active periodic `[Timer]`, or `null` if no timer is running.
   ///
   /// This is the timer returned by `Timer.periodic(...)` and is canceled by
   /// calling `stop()` or `dispose()`. Keep it private to avoid external
@@ -29,13 +29,13 @@ class SessionRecorderTimer {
 
   /// Indicates whether the timer subsystem has been initialized.
   ///
-  /// Prevents double-initialization. `init()` should flip this flag to [true]
-  /// and `dispose()` should set it back to [false].
+  /// Prevents double-initialization. `init()` should flip this flag to `[true]`
+  /// and `dispose()` should set it back to `[false]`.
   bool _initialized = false;
 
   /// Callback invoked on every timer tick.
   ///
-  /// If this is [null], `onInvokeSessionRecorderTimer()` will refuse to start
+  /// If this is `[null]`, `onInvokeSessionRecorderTimer()` will refuse to start
   /// timer.
   /// Assign a callback before calling `init()` or `onInvokeSessionRecorderTimer()`.
   SessionCallback? onSessionRecord;

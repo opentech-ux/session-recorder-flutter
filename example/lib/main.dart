@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 // ignore: depend_on_referenced_packages
 import 'package:session_recorder_flutter/session_recorder.dart';
 
-final navigatorKey = GlobalKey<NavigatorState>();
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -23,8 +21,8 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey,
       home: ExampleApp(),
+      navigatorObservers: [SessionRecorderObserver()],
       builder: (context, child) => SessionRecorderWidget(
         showLayout: true,
         child: child ?? SizedBox.shrink(),

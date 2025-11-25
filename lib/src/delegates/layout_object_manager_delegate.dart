@@ -15,19 +15,21 @@ class LomNotInitializedException implements Exception {
   String toString() => 'LomNotInitializedException: $message';
 }
 
-/// {@template interaction_delegate}
-/// A delegate responsible for managing and processing the [Widget] tree.
+/// {@template lom}
+/// A delegate responsible for managing and processing the `[Widget]` tree.
 ///
-/// The [LomDelegate] manages the entire search of the widget tree and
-/// converts it into instances of [Root], finally putting everything into
-/// a [Lom].
+/// The `[LomDelegate] manages the entire search of the widget tree and
+/// converts it into instances of `[Root]`, finally putting everything into
+/// a `[Lom]`.
 ///
-/// Typically initialized internally by [SessionRecorder] and managed
-/// in [InteractionDelegate].
+/// Typically initialized internally by `[SessionRecorder]` and managed
+/// in `[InteractionDelegate]`.
 /// {@endtemplate}
 class LomDelegate {
   static final LomDelegate _instance = LomDelegate._internal();
   factory LomDelegate() => _instance;
+
+  /// {@macro lom}
   LomDelegate._internal();
 
   Lom? _lom;

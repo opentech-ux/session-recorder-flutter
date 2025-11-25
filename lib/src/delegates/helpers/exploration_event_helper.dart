@@ -18,9 +18,9 @@ import '../../models/models.dart'
         ScrollExplorationEvent;
 
 class ExplorationEventHelper {
-  /// Detects which [ExplorationEvent] gonna create it by the `pointers` type
+  /// Detects which `[ExplorationEvent]` gonna create it by the `pointers` type
   ///
-  /// Could return a [PanExplorationEvent], [ZoomExplorationEvent] list
+  /// Could return a `[PanExplorationEvent]`, `[ZoomExplorationEvent]` list
   static List<ExplorationEvent> detectTouchExplorationEvent(
     List<PointerTrace> pointers,
     Rect viewportScroll,
@@ -49,7 +49,7 @@ class ExplorationEventHelper {
     }
   }
 
-  /// Converts the recorded [PointerTrace] data into a list of [PanExplorationEvent]
+  /// Converts the recorded `[PointerTrace]` data into a list of `[PanExplorationEvent]`
   /// instances.
   static List<PanExplorationEvent> _getPanExploration(
     PointerTrace pointerTrace,
@@ -75,7 +75,7 @@ class ExplorationEventHelper {
     }
   }
 
-  /// Converts the recorded [PointerTrace] data into a list of [ZoomExplorationEvent]
+  /// Converts the recorded `[PointerTrace]` data into a list of `[ZoomExplorationEvent]`
   /// instances.
   static List<ZoomExplorationEvent> _getZoomExploration(
     List<PointerTrace> pointers,
@@ -112,7 +112,7 @@ class ExplorationEventHelper {
   /// This method computes the centroid, mean distances, and directional
   /// vectors between fingers to determine if a scaling motion is occurring.
   ///
-  /// Returns [true] if the average radial distance exceeds the `_scaleSlop`
+  /// Returns `[true]` if the average radial distance exceeds the `_scaleSlop`
   /// threshold and both fingers move consistently in a scaling direction.
   ///
   static bool evaluateZoomGesture(
@@ -173,7 +173,7 @@ class ExplorationEventHelper {
   }
 
   /// Converts the recorded `scrollPanPositions` and `scrollViewportRects` data
-  /// into a list of [ScrollExplorationEvent] and [PanExplorationEvent] instances.
+  /// into a list of `[ScrollExplorationEvent]` and `[PanExplorationEvent]` instances.
   static List<ExplorationEvent> getScrollExploration(
     Map<int, Offset> scrollPanPositions,
     Map<int, Rect> scrollViewportRects,

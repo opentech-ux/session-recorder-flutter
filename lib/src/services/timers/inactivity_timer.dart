@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 /// Singleton that manages a single-shot inactivity timer.
 ///
-/// Use the factory constructor [InactivityTimer()] to obtain the single
+/// Use the factory constructor `[InactivityTimer()]` to obtain the single
 /// shared instance.
 ///
 /// Call `init()` to enable the service and `dispose()` to stop it and release
@@ -14,7 +14,7 @@ class InactivityTimer {
   factory InactivityTimer() => _instance;
   InactivityTimer._internal();
 
-  /// The active single-shot [Timer], or `null` if there is currently no
+  /// The active single-shot `[Timer]`, or `null` if there is currently no
   /// countdown running.
   ///
   /// This timer is created with `Timer(_interval, ...)` and is canceled when
@@ -46,15 +46,15 @@ class InactivityTimer {
 
   /// Whether the timer subsystem has been initialized.
   ///
-  /// Prevents double initialization. `init()` should set this to [true] and
-  /// `dispose()` should set it back to [false].
+  /// Prevents double initialization. `init()` should set this to `[true]` and
+  /// `dispose()` should set it back to `[false]`.
   bool _initialized = false;
 
   /// Current inactivity state.
   ///
-  /// - [true] means the timer completed and the system considers the user
+  /// - `[true]` means the timer completed and the system considers the user
   ///   inactive.
-  /// - [false] means the user is currently considered active.
+  /// - `[false]` means the user is currently considered active.
   bool _isInactive = false;
 
   /// Callback invoked when inactivity is detected (when the timer completes).
@@ -88,7 +88,7 @@ class InactivityTimer {
   /// Starts the inactivity countdown if not already running.
   ///
   /// When the timer completes, the app is considered inactive and
-  /// [onInactive] will be triggered.
+  /// `[onInactive]` will be triggered.
   void _startInactivityTimer() {
     if (_timer != null && _timer!.isActive) return;
 
@@ -100,7 +100,7 @@ class InactivityTimer {
 
   /// Restarts the inactivity timer based on user activity.
   ///
-  /// Resets inactivity state if needed and triggers [onActive].
+  /// Resets inactivity state if needed and triggers `[onActive]`.
   ///
   /// Includes a throttle mechanism to avoid too frequent resets
   /// (e.g., during continuous pointer movement events).
@@ -138,8 +138,8 @@ class InactivityTimer {
 
   /// Disposes all internal resources.
   ///
-  /// After calling [dispose], this timer manager must not be used again
-  /// unless [init] is called to reinitialize.
+  /// After calling `[dispose]`, this timer manager must not be used again
+  /// unless `[init]` is called to reinitialize.
   void dispose() {
     if (!_initialized) return;
     _initialized = false;

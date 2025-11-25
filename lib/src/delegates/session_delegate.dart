@@ -9,17 +9,19 @@ class SessionNotInitializedException implements Exception {
   String toString() => 'SessionNotInitializedException: $message';
 }
 
-/// {@template interaction_delegate}
-/// A delegate responsible for managing and processing a [Session].
+/// {@template session}
+/// A delegate responsible for managing and processing a `[Session]`.
 ///
-/// The [SessionDelegate] is used to initialize a new [Session] with a [Uuid]
+/// The `[SessionDelegate]` is used to initialize a new `[Session]` with a `[Uuid]`
 /// version 4 identifier, as well as the higher-level interaction logic.
 ///
-/// Typically initialized internally by [SessionRecorder].
+/// Typically initialized internally by `[SessionRecorder]`.
 /// {@endtemplate}
 class SessionDelegate {
   static final SessionDelegate _instance = SessionDelegate._internal();
   factory SessionDelegate() => _instance;
+
+  /// {@macro session}
   SessionDelegate._internal();
 
   Session? _session;

@@ -1,5 +1,3 @@
-import 'package:session_recorder_flutter/session_recorder.dart';
-
 import '../models/models.dart'
     show Chunk, LomAbstract, ExplorationEvent, ActionEvent;
 
@@ -10,19 +8,21 @@ class ChunkNotInitializedException implements Exception {
   String toString() => 'ChunkNotInitializedException: $message';
 }
 
-/// {@template interaction_delegate}
+/// {@template chunk}
 /// A delegate responsible for managing and processing a chunk session.
 ///
-/// The [ChunkDelegate] manages all the logic for inserting, initializing, and
-/// deleting the attributes of a [Chunk], as well as the higher-level
+/// The `[ChunkDelegate]` manages all the logic for inserting, initializing, and
+/// deleting the attributes of a `[Chunk]`, as well as the higher-level
 /// interaction logic.
 ///
-/// Typically initialized internally by [SessionRecorder] and managed
-/// in [InteractionDelegate].
+/// Typically initialized internally by `[SessionRecorder]` and managed
+/// in `[InteractionDelegate]`.
 /// {@endtemplate}
 class ChunkDelegate {
   static final ChunkDelegate _instance = ChunkDelegate._internal();
   factory ChunkDelegate() => _instance;
+
+  /// {@macro chunk}
   ChunkDelegate._internal();
 
   Chunk? _chunk;

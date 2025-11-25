@@ -15,18 +15,19 @@ import 'package:session_recorder_flutter/src/services/timers/inactivity_timer.da
 import 'package:session_recorder_flutter/src/services/timers/session_recorder_timer.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
+/// {@template session_record_service}
 /// Main service coordinator for session recording and interaction capture.
 ///
 /// This class is the primary entry point of the package and the only object
-/// consumers are intended to call [init()] method from [main].
+/// consumers are intended to call `[init()]` method from `[main]`.
 ///
-/// It extends [WidgetsBindingObserver] to observe app lifecycle events
+/// It extends `[WidgetsBindingObserver]` to observe app lifecycle events
 /// (pause/resume/etc.) and to manage timers and periodic uploads safely.
 ///
 /// This class centralizes all the following responsibilities:
 ///  - Acts as entry point for the package (singleton).
-///  - Exposes [init()] for setup.
-///  - Forwards pointer and scroll events to [InteractionDelegate].
+///  - Exposes `[init()]` for setup.
+///  - Forwards pointer and scroll events to `[InteractionDelegate]`.
 ///  - Detects UI changes via signature comparison and rebuilds only when needed.
 ///  - Manages timers and lifecycle pauses/resumes safely.
 ///  - Handles periodic upload of recorded session data.
@@ -34,24 +35,25 @@ import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 /// {@template session_record}
 /// Example usage
 /// ```dart
-/// final navigatorKey = GlobalKey<NavigatorState>();
+/// import 'package:flutter/material.dart';
+/// import 'package:session_recorder_flutter/session_recorder.dart';
+///
 /// void main() {
 ///   // Important to add it before calling init method
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
 ///   final params = SessionRecorderParams(
-///     key: navigatorKey,
 ///     endpoint: 'https://api.example.com/session',
 ///   );
 ///
 ///   SessionRecorder.instance.init(params);
 ///
-///   runApp(MyApp(navigatorKey: navigatorKey));
+///   runApp(MyApp());
 /// }
 /// ```
 ///
 /// There is **no need to wrap it inside**
-/// [WidgetsBinding.instance.addPostFrameCallback()], since `[init()]`
+/// `[WidgetsBinding.instance.addPostFrameCallback()]`, since `[init()]`
 ///    already ensures the call is deferred until the first frame is rendered.
 /// {@endtemplate}
 ///
@@ -60,13 +62,15 @@ import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 /// hot path, or frequent callback** — doing so may cause UI freezes
 /// or dropped frames.
 ///
-/// Call [init()] **only once**, and **only after** the app’s root widget
+/// Call `[init()]` **only once**, and **only after** the app’s root widget
 /// (`MaterialApp`, `CupertinoApp`, etc.) has been fully mounted.
 ///
 /// See also
-///  - [InteractionDelegate], chunk/layout processors, which perform the
+///  - `[InteractionDelegate]`: chunk/layout processors, which perform the
 /// low-level traversal and gesture analysis.
+/// {@endtemplate}
 class SessionRecorder extends WidgetsBindingObserver {
+  ///{@macro session_record_service}
   SessionRecorder._internal();
   static final SessionRecorder instance = SessionRecorder._internal();
   factory SessionRecorder() => instance;
@@ -185,22 +189,21 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// This method performs the initial setup required for the widget-tree
   /// capture service:
   ///
-  ///  - Safe to call from application startup (for example, from [main()]
-  ///  after the app's `navigatorKey` is created) or from an initialization
-  ///  phase.
-  ///  - Write [WidgetsFlutterBinding.ensureInitialized();] before this method.
+  ///  - Safe to call from application startup (for example, from `[main()]`)
+  /// or from an initialization phase.
+  ///  - Write `[WidgetsFlutterBinding.ensureInitialized();]` before this method.
   ///  - Make sure to call this with the same navigator key used by your app's
   ///  `MaterialApp` / `CupertinoApp` to ensure the correct `BuildContext` is
   ///  obtained.
-  ///  - The scheduled listeners run after frames; avoid calling [init()] during
-  ///  an unstable [build()] phase where the navigator key has not yet been attached.
+  ///  - The scheduled listeners run after frames; avoid calling `[init()]` during
+  ///  an unstable `[build()]` phase where the navigator key has not yet been attached.
   ///
   /// {@macro session_record}
   ///
   /// See also
-  ///  - [SessionRecorderParams] for more information on what can be shared.
+  ///  - `[SessionRecorderParams]`: More information on what can be shared.
   ///
-  /// Throws [ArgumentError] if [SessionRecorderParams] are invalid.
+  /// Throws `[ArgumentError]` if `[SessionRecorderParams]` are invalid.
   void init(SessionRecorderParams params) {
     _disableRecord = params.disable;
 
@@ -252,7 +255,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// Initializes all services.
   ///
   /// This method constructs late-initialized fields and prepares
-  /// the [InteractionDelegate] with its required dependencies.
+  /// the `[InteractionDelegate]` with its required dependencies.
   ///
   /// Called once during setup to ensure all components are ready.
   void _initServices(SessionRecorderParams params) {
@@ -295,7 +298,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// disposed.
   ///
   /// Once disposed, the service cannot be safely reused unless re-initialized
-  /// with [init()].
+  /// with `[init()]`.
   ///
   /// Example:
   /// ```dart
@@ -314,9 +317,9 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// `_captureId` semantics.
   ///
   /// For the initial capture (right after the first frame), `debounce` is set
-  /// to [false] so the capture runs immediately without waiting.
+  /// to `[false]` so the capture runs immediately without waiting.
   /// For subsequent UI updates (scroll, drawer, dialogs, etc.), `debounce` is
-  /// set to [true] so rapid changes are batched before performing a capture.
+  /// set to `[true]` so rapid changes are batched before performing a capture.
   ///
   /// Each request increments the internal capture id to distinguish versions
   /// and ensure that only the latest snapshot is processed.
@@ -355,7 +358,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// In general terms this traverses the element subtree to produce a compact
   /// textual capture (widget `runtimeType` and `key` when present) in
-  /// [processTreeSignature()], then offloads hashing/heavy String work to a
+  /// `[_processTreeSignature()]`, then offloads hashing/heavy String work to a
   /// background isolate to avoid blocking the UI thread.
   ///
   /// Notes:
@@ -368,7 +371,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// that the computed hash differs from `_lastHash`.
   ///
   /// When a genuine change is detected and the `id` is still valid, call
-  /// [createLomTree()] function to create the first Lom class and their Root's
+  /// `[_createLomTree()]` function to create the first Lom class and their Root's
   /// children.
   ///
   /// Parameter:
@@ -449,7 +452,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// via `Timer.periodic(Duration(seconds: 30), _sendSessionRecord)`).
   ///
   /// If there is no data available in the [Chunk], returns nothing until
-  /// [InactivityTimer] cancels the [SessionRecorderTimer].
+  /// `[InactivityTimer]` cancels the `[SessionRecorderTimer]`.
   Future<void> _sendSessionRecord(SessionRecorderParams params) async {
     if (_chunkDelegate.isChunkEmpty) return;
 
@@ -494,21 +497,21 @@ class SessionRecorder extends WidgetsBindingObserver {
 
   // * ----- POINTER LISTENER ------ * //
 
-  /// Forwards the [PointerDownEvent] to the [InteractionDelegate].
+  /// Forwards the `[PointerDownEvent]` to the `[InteractionDelegate]`.
   void onPointerDown(PointerDownEvent e) {
     if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
     _interactionDelegate!.onPointerDown(e);
   }
 
-  /// Forwards the [PointerMoveEvent] to the [InteractionDelegate].
+  /// Forwards the `[PointerMoveEvent]` to the `[InteractionDelegate]`.
   void onPointerMove(PointerMoveEvent e) {
     if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
     _interactionDelegate!.onPointerMove(e);
   }
 
-  /// Forwards the [PointerUpEvent] to the [InteractionDelegate].
+  /// Forwards the `[PointerUpEvent]` to the `[InteractionDelegate]`.
   void onPointerUp(PointerUpEvent e) {
     if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
@@ -517,7 +520,7 @@ class SessionRecorder extends WidgetsBindingObserver {
     }
   }
 
-  /// Forwards the [PointerCancelEvent] to the [InteractionDelegate].
+  /// Forwards the `[PointerCancelEvent]` to the `[InteractionDelegate]`.
   void onPointerCancel(_) {
     if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
@@ -526,7 +529,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
   // * ----- SCROLL NOTIFICATION ------ * //
 
-  /// Forwards the [ScrollNotification] to the [InteractionDelegate] for
+  /// Forwards the `[ScrollNotification]` to the `[InteractionDelegate]` for
   /// processing.
   ///
   /// Returns `true` if the delegate handled the notification, `false` otherwise.

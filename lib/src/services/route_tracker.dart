@@ -8,27 +8,39 @@ import '../models/models.dart';
 typedef CaptureTreeHandler = void Function();
 typedef InitSessionHandler = bool Function();
 
+/// {@template route_tracker}
+/// Central navigation tracking responsible for analyzing,
+/// registering, updating and removing routes as the user navigates.
+///
+/// Currently, only `[ModalRoute]` instances are accepted, ensuring strict
+/// control over the types of routes being processed and preventing
+/// potential errors in the future.
+///
+/// This behavior guarantees that the navigation tracking system remains
+/// stable and consistent by allowing only compatible routes to enter
+/// the management flow from its contexts.
+/// {@endtemplate}
 class RouteTracker {
+  /// {@macro route_tracker}
   RouteTracker._internal();
   static final RouteTracker instance = RouteTracker._internal();
   factory RouteTracker() => instance;
 
-  ///
+  /// Stack that stores all active routes currently being tracked.
   final Map<Route<dynamic>, RouteRecorded> _routes = {};
 
-  ///
+  /// Indicates whether the `[RouterTracker]` is currently tracking.
   bool isObserving = false;
 
-  ///
+  /// Stores the last detected navigation type.
   NavigationType _lastNavigationType = NavigationType.none;
 
-  ///
+  /// Handler coming from `[SessionRecorder]` to capture the widget tree.
   CaptureTreeHandler? _captureTreeHandler;
 
-  ///
+  /// Handler coming from `[SessionRecorder]` to indicate if it's initialized.
   InitSessionHandler? _isInitializedSession;
 
-  ///
   void registerTreeHandler(CaptureTreeHandler tree) =>
       _captureTreeHandler = tree;
   void registerInitSessionHandler(InitSessionHandler init) =>
@@ -37,7 +49,9 @@ class RouteTracker {
   bool get isSessionServiceInitialized =>
       _isInitializedSession?.call() ?? false;
 
+  /// Gets the top current `[RouteRecorded]` object from the map.
   ///
+  /// If there is only one route, returns the first.
   RouteRecorded? getCurrentRoute() {
     final List<RouteRecorded> routes = _routes.values
         .where((route) => route.rect != null)
@@ -50,7 +64,15 @@ class RouteTracker {
     return routes.last;
   }
 
+  /// Handles a navigation event received from the `[SessionRecorderObserver]`.
   ///
+  /// Validates that the session is initialized, otherwise throws
+  /// a `[FlutterError]`.
+  ///
+  /// Processes the event according to the given `[NavigationType]` and updates
+  /// the internal route registry accordingly.
+  ///
+  /// This method triggers the widget-tree capture through `_captureTreeHandler`.
   void handleRouting(
     Route<dynamic>? route,
     NavigationType type, {
@@ -164,7 +186,9 @@ class RouteTracker {
     });
   }
 
+  /// Add the `route` into the `_routes` map.
   ///
+  /// Creates a new `[RouteRecorded]` instances with some useful values.
   void _addRoute(
     String key,
     Route<dynamic> route,
@@ -185,11 +209,11 @@ class RouteTracker {
     _routes[route] = routeRecorded;
   }
 
-  ///
+  /// Removes the current `route` into the `_routes` map.
   void _removeRoute(String routeKey, Route<dynamic> route) => _routes
       .removeWhere((key, value) => (value.key == routeKey || key == route));
 
-  ///
+  /// Removes all routes after find the current `route` into the `_routes` map.
   void _removeRoutesAfter(String routeKey, Route<dynamic> route) {
     bool isRouteFound = false;
     final List<MapEntry<Route<dynamic>, RouteRecorded>> routesToRemove = [];
@@ -209,7 +233,7 @@ class RouteTracker {
     }
   }
 
-  ///
+  /// Finds the current `route` into the `_routes` map.
   MapEntry<Route<dynamic>, RouteRecorded>? _findRoute(
     String key,
     Route<dynamic> route,
@@ -220,7 +244,7 @@ class RouteTracker {
         orElse: () => null,
       );
 
-  ///
+  /// Validates if the `route` is a `[ModalRoute]`.
   bool _isValidRoute(Route<dynamic>? route) {
     if (route == null) return false;
 
@@ -243,7 +267,7 @@ class RouteTracker {
     }
   }
 
-  ///
+  /// Finds the `[BuildContext]` from the `route`.
   BuildContext? _findRouteContext(Route<dynamic> route) {
     if (route is ModalRoute && route.subtreeContext != null) {
       final BuildContext? context = route.subtreeContext;
@@ -260,7 +284,7 @@ class RouteTracker {
     return null;
   }
 
-  ///
+  /// Calculates and gets the `[Rect]` from the `context`;
   Rect? _getRectFromContext(BuildContext? context) {
     if (context == null) return null;
 
