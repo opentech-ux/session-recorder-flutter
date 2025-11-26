@@ -55,7 +55,7 @@ class SerializeTreeUtils {
     });
   }
 
-  ///
+  /// Validates if the `element` is visible or not.
   static bool isWidgetVisible(Element element) {
     final renderObject = element.renderObject;
 

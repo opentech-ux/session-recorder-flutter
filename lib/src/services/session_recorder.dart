@@ -86,7 +86,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
   final ValueNotifier<List<Rect>> rects = ValueNotifier<List<Rect>>([]);
 
-  ///
+  /// Last current route used to get the top context.
   RouteRecorded? _currentRoute;
 
   /// Stores the last generated hash of the entire widget tree if there is a
@@ -341,7 +341,13 @@ class SessionRecorder extends WidgetsBindingObserver {
     });
   }
 
+  /// Request and capture the Widget Tree coming from `[RouteTracker]`.
   ///
+  /// Each request increments the internal capture id to distinguish versions
+  /// and ensure that only the latest snapshot is processed.
+  ///
+  /// The actual capture routine (`_captureTree`) runs when appropriate,
+  /// validating the id to ignore stale results.
   void _requestTreeCaptureFromRouting() {
     _debounce?.cancel();
     _debounce = Timer(Duration(milliseconds: 16), () {

@@ -1,10 +1,10 @@
-import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/constants/widgets_excluded_constants.dart';
 import 'package:session_recorder_flutter/src/services/session_recorder.dart';
+import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
 import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;
 
