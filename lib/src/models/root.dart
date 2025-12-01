@@ -56,8 +56,23 @@ class Root {
     };
   }
 
+  Map<String, dynamic> toMapIsolate() {
+    final rect = [box.left, box.top, box.width, box.height];
+    return <String, dynamic>{
+      'id': id,
+      'objectId': objectId,
+      'parentId': parentId,
+      'widgetType': widgetType,
+      'renderType': renderType,
+      'box': rect,
+      'children': children.map((x) => x.toMapIsolate()).toList(),
+    };
+  }
+
   factory Root.fromMap(Map<String, dynamic> map) {
-    final List<int> b = map["b"] as List<int>;
+    final List<double> b = (map['box'] as List<dynamic>)
+        .map((e) => (e as num).toDouble())
+        .toList();
 
     return Root(
       id: map['id'] as int,
@@ -65,12 +80,7 @@ class Root {
       parentId: map['parentId'] as int,
       widgetType: map['widgetType'] as String,
       renderType: map['renderType'] as String,
-      box: Rect.fromLTWH(
-        b[0].toDouble(),
-        b[1].toDouble(),
-        b[2].toDouble(),
-        b[3].toDouble(),
-      ),
+      box: Rect.fromLTWH(b[0], b[1], b[2], b[3]),
       children: List<Root>.from(
         map['children'].map<Root>(
           (x) => Root.fromMap(x as Map<String, dynamic>),
@@ -80,6 +90,8 @@ class Root {
   }
 
   String toJson() => json.encode(toMap());
+
+  String toJsonIsolate() => json.encode(toMapIsolate());
 
   factory Root.fromJson(String source) =>
       Root.fromMap(json.decode(source) as Map<String, dynamic>);

@@ -14,6 +14,7 @@ import 'package:session_recorder_flutter/src/services/route_tracker.dart';
 import 'package:session_recorder_flutter/src/services/timers/inactivity_timer.dart';
 import 'package:session_recorder_flutter/src/services/timers/session_recorder_timer.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 /// {@template session_record_service}
 /// Main service coordinator for session recording and interaction capture.
@@ -282,7 +283,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
     _serviceInitialized = true;
 
-    debugPrint("> [ SESSION RECORDER INITIALIZED ]");
+    SessionLogger.mlog("> [ SESSION RECORDER INITIALIZED ]");
   }
 
   /// Coordinates a Widget Tree capture according to `_debounce` and
@@ -397,7 +398,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
       _lomDelegate.clearLom();
 
-      final lom = _lomDelegate.createLomTree(element, signature);
+      final lom = await _lomDelegate.createLomTree(element, signature);
       if (lom == null) return;
 
       /// Captures the first current `context` viewport
@@ -409,7 +410,7 @@ class SessionRecorder extends WidgetsBindingObserver {
       _chunkDelegate.addLom(lom);
       if (_routeTracker.isRouting) _routeTracker.isRouting = false;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       if (_routeTracker.isRouting) _routeTracker.isRouting = false;
       return;
     }
@@ -447,17 +448,17 @@ class SessionRecorder extends WidgetsBindingObserver {
         );
       }
 
-      debugPrint(">> [ Sended Data - SESSION RECORDER ]");
-    } on SocketException catch (e) {
-      debugPrint('!! Network error while sending data: $e');
-    } on TimeoutException catch (e) {
-      debugPrint('!! Request timed out: $e');
-    } on FormatException catch (e) {
-      debugPrint('!! Response format error: $e');
-    } on HttpException catch (e) {
-      debugPrint('!! HTTP exception: $e');
-    } catch (e, st) {
-      debugPrint('!! Unexpected error sending data: $e\n$st');
+      SessionLogger.mlog(">> [ Sended Data - SESSION RECORDER ]");
+    } on SocketException catch (e, s) {
+      SessionLogger.elog("!! Network error while sending data", e, s);
+    } on TimeoutException catch (e, s) {
+      SessionLogger.elog("!! Request timed out", e, s);
+    } on FormatException catch (e, s) {
+      SessionLogger.elog("!! Response format error", e, s);
+    } on HttpException catch (e, s) {
+      SessionLogger.elog("!! HTTP exception", e, s);
+    } catch (e, s) {
+      SessionLogger.elog("!! Unexpected error sending data", e, s);
     }
 
     _lomDelegate.clearLom();

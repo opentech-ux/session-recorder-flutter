@@ -9,6 +9,7 @@ import 'package:session_recorder_flutter/src/delegates/helpers/exploration_event
 import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
 import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../enums/gestures_type_enum.dart';
 import '../models/models.dart' show PointerTrace, ScaleStats, TimedPosition;
@@ -120,7 +121,7 @@ class InteractionDelegate {
         );
       });
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
   }
@@ -159,7 +160,7 @@ class InteractionDelegate {
         _initialScaleStats.centroid!,
       );
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
   }
@@ -244,7 +245,7 @@ class InteractionDelegate {
         }
       }
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
   }
@@ -427,7 +428,7 @@ class InteractionDelegate {
         }
       }
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
   }
@@ -539,7 +540,7 @@ class InteractionDelegate {
 
       return false;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return false;
     }
   }
@@ -582,7 +583,7 @@ class InteractionDelegate {
 
       _lastViewportScroll = rect;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       _lastViewportScroll = Rect.zero;
       return;
     }

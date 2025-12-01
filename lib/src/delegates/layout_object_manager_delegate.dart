@@ -1,8 +1,11 @@
+import 'dart:isolate';
+
 import 'package:uuid/uuid.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import 'package:session_recorder_flutter/src/constants/widgets_excluded_constants.dart';
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 import 'package:session_recorder_flutter/src/services/session_recorder.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
@@ -82,7 +85,7 @@ class LomDelegate {
   /// Avoid rebuilding the Widget tree if the signature already exists in the cache.
   /// Instead, insert a [LomRef] that references the existing [Lom] instance.
   /// Improves performance and prevents data duplication.
-  LomAbstract? createLomTree(Element element, String signature) {
+  Future<LomAbstract?> createLomTree(Element element, String signature) async {
     try {
       if (!element.mounted) return null;
 
@@ -137,33 +140,24 @@ class LomDelegate {
       /// Recursively elements
       element.visitChildElements((child) => _mapRootTree(child));
 
-      /// Re-create a new map based by `rootReference` but with their `children`
-      final Map<int, Root> rootMap = {
-        for (final root in rootReference.values)
-          root.id: root.copyWith(children: List<Root>.from(root.children)),
-      };
+      /// Port to Isolate function
+      final ReceivePort receivePort = ReceivePort();
 
-      /// Delete the first [Root] to avoid duplication of the first same [Root]
-      /// We gonna already used it in `_mapRootTree` and it is set it after
-      /// in the `_lom`
-      rootMap.remove(root.id);
+      final rootToken = RootIsolateToken.instance!;
 
-      final Set<Root> rootsAttached = {};
+      await Isolate.spawn(processTreeMap, [
+        receivePort.sendPort,
+        rootToken,
+        root.id,
+      ]);
 
-      /// Attach every [Root] node that corresponds their `parentId`
-      for (final root in rootMap.values) {
-        final int parentId = root.parentId;
+      final messageIsolate = (await receivePort.first) as List<String>;
 
-        if (parentId == root.id || !rootMap.containsKey(parentId)) {
-          rootsAttached.add(root);
-        } else {
-          rootMap[parentId]!.children.add(root);
-        }
-      }
-
-      _lom = _lom!.copyWith(
-        root: root.copyWith(children: rootsAttached.toList()),
+      final roots = List<Root>.from(
+        messageIsolate.map<Root>((x) => Root.fromJson(x)),
       );
+
+      _lom = _lom!.copyWith(root: root.copyWith(children: roots));
 
       final output = <Rect>[];
       recursiveBox(_lom!.root!, output);
@@ -173,9 +167,43 @@ class LomDelegate {
 
       return _lom;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
+  }
+
+  /// Process the Tree map in an Isolate method.
+  void processTreeMap(List<dynamic> args) {
+    final sendPort = args[0] as SendPort;
+
+    BackgroundIsolateBinaryMessenger.ensureInitialized(args[1]);
+    final int rootId = args[2] as int;
+
+    /// Re-create a new map based by `rootReference` but with their `children`
+    final Map<int, Root> rootMap = {
+      for (final root in rootReference.values)
+        root.id: root.copyWith(children: List<Root>.from(root.children)),
+    };
+
+    /// Delete the first [Root] to avoid duplication of the first same [Root]
+    /// We gonna already used it in `_mapRootTree` and it is set it after
+    /// in the `_lom`
+    rootMap.remove(rootId);
+
+    final Set<Root> rootsAttached = {};
+
+    /// Attach every [Root] node that corresponds their `parentId`
+    for (final root in rootMap.values) {
+      final int parentId = root.parentId;
+
+      if (parentId == root.id || !rootMap.containsKey(parentId)) {
+        rootsAttached.add(root);
+      } else {
+        rootMap[parentId]!.children.add(root);
+      }
+    }
+
+    sendPort.send(rootsAttached.map((r) => r.toJsonIsolate()).toList());
   }
 
   /// Recursively maps the `element` tree widgets into a [Root] instance.
@@ -231,7 +259,7 @@ class LomDelegate {
         }
       }
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
 

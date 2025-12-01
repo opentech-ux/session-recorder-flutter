@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../../enums/gestures_type_enum.dart';
 import '../../models/models.dart'
@@ -44,7 +45,7 @@ class ExplorationEventHelper {
 
       return explorationEvents;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -70,7 +71,7 @@ class ExplorationEventHelper {
 
       return panList;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -101,7 +102,7 @@ class ExplorationEventHelper {
 
       return zoomList;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -167,7 +168,7 @@ class ExplorationEventHelper {
 
       return radialDominates && consistent && maybeScale;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return false;
     }
   }
@@ -261,7 +262,7 @@ class ExplorationEventHelper {
 
       return scrollExplorationEvents;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }

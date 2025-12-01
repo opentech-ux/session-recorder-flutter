@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../models/models.dart';
 
@@ -83,154 +84,165 @@ class RouteTracker {
     NavigationType type, {
     Route<dynamic>? oldRoute,
   }) {
-    assert(() {
-      if (!isSessionServiceInitialized) {
-        throw FlutterError.fromParts(<DiagnosticsNode>[
-          ErrorSummary(
-            'SessionRecorderObserver failed: SessionRecorder not initialized.',
-          ),
-          ErrorHint(
-            'Ensure you pass the SessionRecorder.instance.init() to your app.',
-          ),
-          ErrorHint(
-            'Example in main():\n'
-            '  SessionRecorder.instance.init(params);\n',
-          ),
-          ErrorHint(
-            'This call is blocking and will throw to surface the incorrect'
-            'initialization order immediately.',
-          ),
-        ]);
-      }
+    try {
+      assert(() {
+        if (!isSessionServiceInitialized) {
+          throw FlutterError.fromParts(<DiagnosticsNode>[
+            ErrorSummary(
+              'SessionRecorderObserver failed: SessionRecorder not initialized.',
+            ),
+            ErrorHint(
+              'Ensure you pass the SessionRecorder.instance.init() to your app.',
+            ),
+            ErrorHint(
+              'Example in main():\n'
+              '  SessionRecorder.instance.init(params);\n',
+            ),
+            ErrorHint(
+              'This call is blocking and will throw to surface the incorrect'
+              'initialization order immediately.',
+            ),
+          ]);
+        }
 
-      return true;
-    }());
+        return true;
+      }());
 
-    if (!isSessionServiceInitialized) return;
+      if (!isSessionServiceInitialized) return;
 
-    isRouting = true;
+      isRouting = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // TODO : verify again positions Routes?
-      // TODO : remove every unmounted ?
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // TODO : verify again positions Routes?
+        // TODO : remove every unmounted ?
 
-      BuildContext? routeContext;
-      String routeKey = "";
-      final bool isValidRoute = _isValidRoute(route);
+        BuildContext? routeContext;
+        String routeKey = "";
+        final bool isValidRoute = _isValidRoute(route);
 
-      if (isValidRoute) {
-        routeContext = _findRouteContext(route!);
-        routeKey = SerializeTreeUtils.createKeyRoute(route, routeContext);
-      }
+        if (isValidRoute) {
+          routeContext = _findRouteContext(route!);
+          routeKey = SerializeTreeUtils.createKeyRoute(route, routeContext);
+        }
 
-      String oldRouteKey = "";
-      final bool isValidOldRoute = _isValidRoute(oldRoute);
-      if (isValidOldRoute) {
-        final BuildContext? oldRouteContext = _findRouteContext(oldRoute!);
-        oldRouteKey = SerializeTreeUtils.createKeyRoute(
-          oldRoute,
-          oldRouteContext,
-        );
-      }
+        BuildContext? oldRouteContext;
+        String oldRouteKey = "";
+        final bool isValidOldRoute = _isValidRoute(oldRoute);
+        if (isValidOldRoute) {
+          oldRouteContext = _findRouteContext(oldRoute!);
+          oldRouteKey = SerializeTreeUtils.createKeyRoute(
+            oldRoute,
+            oldRouteContext,
+          );
+        }
 
-      if (isValidRoute) {
-        switch (type) {
-          case NavigationType.push:
-            final routeFound = _findRoute(routeKey, route!);
-            if (routeFound != null) {
-              _removeRoute(routeFound.value.key, routeFound.key);
-            }
-
-            _addRoute(routeKey, route, routeContext!);
-
-            break;
-          case NavigationType.remove:
-            final routeFound = _findRoute(routeKey, route!);
-            if (routeFound != null) {
-              if (_lastNavigationType == NavigationType.push) {
-                _removeRoute(routeFound.value.key, routeFound.key);
-                break;
-              }
-
-              _removeRoutesAfter(routeFound.value.key, routeFound.key);
-              break;
-            }
-
-            break;
-          case NavigationType.pop:
-            final routeFound = _findRoute(routeKey, route!);
-
-            if (routeFound != null) {
-              _removeRoutesAfter(routeFound.value.key, routeFound.key);
-
-              break;
-            }
-
-            _removeRoutesAfter(routeKey, route);
-
-            break;
-          case NavigationType.replace:
-            if (isValidOldRoute) {
-              final routeFound = _findRoute(oldRouteKey, oldRoute!);
+        if (isValidRoute) {
+          switch (type) {
+            case NavigationType.push:
+              final routeFound = _findRoute(routeKey, route!);
               if (routeFound != null) {
                 _removeRoute(routeFound.value.key, routeFound.key);
               }
 
-              _addRoute(routeKey, route!, routeContext!);
-            }
+              _addRoute(routeKey, route, routeContext!);
 
-            break;
-          default:
-            break;
-        }
-      }
+              break;
+            case NavigationType.remove:
+              final routeFound = _findRoute(routeKey, route!);
+              if (routeFound != null) {
+                if (_lastNavigationType == NavigationType.push) {
+                  _removeRoute(routeFound.value.key, routeFound.key);
+                  break;
+                }
 
-      _lastNavigationType = type;
+                _removeRoutesAfter(routeFound.value.key, routeFound.key);
+                break;
+              }
 
-      if (type == NavigationType.push || type == NavigationType.pop) {
-        final RouteRecorded routeRecorded = getCurrentRoute()!;
+              break;
+            case NavigationType.pop:
+              final routeFound = _findRoute(routeKey, route!);
 
-        Duration duration = Durations.short1;
+              if (routeFound != null) {
+                _removeRoutesAfter(routeFound.value.key, routeFound.key);
+              }
 
-        final Animation<double>? animation =
-            (routeRecorded.route as ModalRoute).animation;
+              if (isValidOldRoute) {
+                final routeFound = _findRoute(oldRouteKey, oldRoute!);
+                if (routeFound != null) {
+                  _addRoute(oldRouteKey, oldRoute, oldRouteContext!);
+                }
+              }
 
-        void capture() {
-          _debounceRoute?.cancel();
-          _debounceRoute = Timer(duration, () {
-            _captureTreeHandler?.call();
-          });
-        }
+              break;
+            case NavigationType.replace:
+              if (isValidOldRoute) {
+                final routeFound = _findRoute(oldRouteKey, oldRoute!);
+                if (routeFound != null) {
+                  _removeRoute(routeFound.value.key, routeFound.key);
+                }
 
-        if (animation == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            duration = Durations.short2;
-            capture();
-          });
-          return;
-        }
+                _addRoute(routeKey, route!, routeContext!);
+              }
 
-        void statusListener(AnimationStatus status) {
-          if (status == AnimationStatus.completed) {
-            animation.removeStatusListener(statusListener);
-            duration = Durations.short1;
-
-            WidgetsBinding.instance.addPostFrameCallback((_) => capture());
-            return;
+              break;
+            default:
+              break;
           }
         }
 
-        animation.addStatusListener(statusListener);
+        _lastNavigationType = type;
 
-        if (animation.status == AnimationStatus.completed) {
-          animation.removeStatusListener(statusListener);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            duration = Durations.short2;
-            capture();
-          });
+        final Route<dynamic>? currentRoute = (type == NavigationType.pop)
+            ? (oldRoute != null && oldRoute.isCurrent)
+                  ? oldRoute
+                  : null
+            : (route != null && route.isCurrent)
+            ? route
+            : null;
+
+        if (currentRoute != null && (isValidRoute || isValidOldRoute)) {
+          final ModalRoute routePage = currentRoute as ModalRoute;
+
+          final Animation<double>? animation = routePage.animation;
+
+          void capture(Duration duration) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _debounceRoute?.cancel();
+              _debounceRoute = Timer(duration, () {
+                _captureTreeHandler?.call();
+              });
+            });
+          }
+
+          if (animation == null ||
+              animation.status == AnimationStatus.completed ||
+              animation.value >= 0.999) {
+            final Duration duration = routePage.transitionDuration;
+            if (duration > Duration.zero) {
+              capture(duration);
+            } else {
+              capture(Durations.short3);
+            }
+            return;
+          }
+
+          void statusListener(AnimationStatus status) {
+            if (status == AnimationStatus.completed) {
+              animation.removeStatusListener(statusListener);
+
+              capture(Durations.short1);
+              return;
+            }
+          }
+
+          animation.addStatusListener(statusListener);
         }
-      }
-    });
+      });
+    } catch (e, s) {
+      SessionLogger.elog("!! >> [Some error]", e, s);
+      return;
+    }
   }
 
   /// Add the `route` into the `_routes` map.
@@ -257,8 +269,11 @@ class RouteTracker {
   }
 
   /// Removes the current `route` into the `_routes` map.
-  void _removeRoute(String routeKey, Route<dynamic> route) => _routes
-      .removeWhere((key, value) => (value.key == routeKey || key == route));
+  void _removeRoute(String routeKey, Route<dynamic> route) {
+    _routes.removeWhere(
+      (key, value) => (value.key == routeKey || key == route),
+    );
+  }
 
   /// Removes all routes after find the current `route` into the `_routes` map.
   void _removeRoutesAfter(String routeKey, Route<dynamic> route) {
@@ -316,31 +331,41 @@ class RouteTracker {
 
   /// Finds the `[BuildContext]` from the `route`.
   BuildContext? _findRouteContext(Route<dynamic> route) {
-    if (route is ModalRoute && route.subtreeContext != null) {
-      final BuildContext? context = route.subtreeContext;
-      if (context is Element && context.mounted) return context;
-      if (context is BuildContext) return context;
-    }
+    try {
+      if (route is ModalRoute && route.subtreeContext != null) {
+        final BuildContext? context = route.subtreeContext;
+        if (context is Element && context.mounted) return context;
+        if (context is BuildContext) return context;
+      }
 
-    final BuildContext? navigatorContext = route.navigator?.context;
-    if (navigatorContext is Element && navigatorContext.mounted) {
-      return navigatorContext;
-    }
-    if (navigatorContext is BuildContext) return navigatorContext;
+      final BuildContext? navigatorContext = route.navigator?.context;
+      if (navigatorContext is Element && navigatorContext.mounted) {
+        return navigatorContext;
+      }
+      if (navigatorContext is BuildContext) return navigatorContext;
 
-    return null;
+      return null;
+    } catch (e, s) {
+      SessionLogger.elog("!! >> [Some error]", e, s);
+      return null;
+    }
   }
 
   /// Calculates and gets the `[Rect]` from the `context`;
   Rect? _getRectFromContext(BuildContext? context) {
-    if (context == null) return null;
+    try {
+      if (context == null) return null;
 
-    final RenderObject? render = context.findRenderObject();
-    if (render is RenderBox && render.attached && render.hasSize) {
-      final Offset coordinates = render.localToGlobal(Offset.zero);
-      return coordinates & render.size;
+      final RenderObject? render = context.findRenderObject();
+      if (render is RenderBox && render.attached && render.hasSize) {
+        final Offset coordinates = render.localToGlobal(Offset.zero);
+        return coordinates & render.size;
+      }
+
+      return null;
+    } catch (e, s) {
+      SessionLogger.elog("!! >> [Some error]", e, s);
+      return null;
     }
-
-    return null;
   }
 }

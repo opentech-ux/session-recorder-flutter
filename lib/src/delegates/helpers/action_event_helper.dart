@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+
 import '../../enums/gestures_type_enum.dart';
 import '../../models/models.dart'
     show
@@ -42,7 +44,7 @@ class ActionEventHelper {
 
       return actionEvents;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -86,7 +88,7 @@ class ActionEventHelper {
           );
       }
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
   }
@@ -143,7 +145,7 @@ class ActionEventHelper {
 
       return rootTouched;
     } catch (e, s) {
-      debugPrint(" !! >> [Some error : $e, $s]");
+      SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
   }
