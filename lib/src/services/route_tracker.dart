@@ -1,4 +1,6 @@
-import 'package:flutter/widgets.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
@@ -30,7 +32,7 @@ class RouteTracker {
   final Map<Route<dynamic>, RouteRecorded> _routes = {};
 
   /// Indicates whether the `[RouterTracker]` is currently tracking.
-  bool isObserving = false;
+  bool isRouting = false;
 
   /// Stores the last detected navigation type.
   NavigationType _lastNavigationType = NavigationType.none;
@@ -40,6 +42,9 @@ class RouteTracker {
 
   /// Handler coming from `[SessionRecorder]` to indicate if it's initialized.
   InitSessionHandler? _isInitializedSession;
+
+  /// Timer to debounce every route coming from the [SessionRecorderObserver].
+  Timer? _debounceRoute;
 
   void registerTreeHandler(CaptureTreeHandler tree) =>
       _captureTreeHandler = tree;
@@ -103,7 +108,7 @@ class RouteTracker {
 
     if (!isSessionServiceInitialized) return;
 
-    isObserving = true;
+    isRouting = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // TODO : verify again positions Routes?
@@ -182,7 +187,49 @@ class RouteTracker {
 
       _lastNavigationType = type;
 
-      _captureTreeHandler?.call();
+      if (type == NavigationType.push || type == NavigationType.pop) {
+        final RouteRecorded routeRecorded = getCurrentRoute()!;
+
+        Duration duration = Durations.short1;
+
+        final Animation<double>? animation =
+            (routeRecorded.route as ModalRoute).animation;
+
+        void capture() {
+          _debounceRoute?.cancel();
+          _debounceRoute = Timer(duration, () {
+            _captureTreeHandler?.call();
+          });
+        }
+
+        if (animation == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            duration = Durations.short2;
+            capture();
+          });
+          return;
+        }
+
+        void statusListener(AnimationStatus status) {
+          if (status == AnimationStatus.completed) {
+            animation.removeStatusListener(statusListener);
+            duration = Durations.short1;
+
+            WidgetsBinding.instance.addPostFrameCallback((_) => capture());
+            return;
+          }
+        }
+
+        animation.addStatusListener(statusListener);
+
+        if (animation.status == AnimationStatus.completed) {
+          animation.removeStatusListener(statusListener);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            duration = Durations.short2;
+            capture();
+          });
+        }
+      }
     });
   }
 
@@ -258,7 +305,7 @@ class RouteTracker {
       }
 
       if (route.settings.name != null && route.settings.name!.isNotEmpty) {
-        return true;
+        return false;
       }
 
       return false;

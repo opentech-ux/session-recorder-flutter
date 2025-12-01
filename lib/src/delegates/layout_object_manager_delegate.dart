@@ -189,48 +189,44 @@ class LomDelegate {
   /// hashCode id.
   void _mapRootTree(Element element) {
     try {
-      final Widget widgetElement = element.widget;
+      if (SerializeTreeUtils.hasRender(element)) {
+        if (SerializeTreeUtils.isVisibleElement(element)) {
+          if (SerializeTreeUtils.hasRenderWidget(element.widget)) {
+            final RenderObjectWidget widget =
+                element.widget as RenderObjectWidget;
+            if (SerializeTreeUtils.shouldInclude(widget)) {
+              final RenderBox renderObject = element.renderObject as RenderBox;
+              final Offset offset = renderObject.localToGlobal(Offset.zero);
+              final Rect rect = Rect.fromLTWH(
+                offset.dx,
+                offset.dy,
+                renderObject.size.width,
+                renderObject.size.height,
+              );
 
-      final RenderObject? renderObject = element.renderObject;
+              Root root = _createRootFromElement(
+                widgetType: widget.runtimeType.toString(),
+                renderObject: renderObject,
+                box: rect,
+              );
 
-      if (renderObject == null) {
-        element.visitChildren((child) => _mapRootTree(child));
-        return;
-      }
+              /// Visit `element`'s ancestor to set the `parentId` attribute
+              if (element.mounted) {
+                element.visitAncestorElements((parent) {
+                  final RenderObject? parentRender = parent.renderObject;
+                  if (parentRender == null) return true;
 
-      if (widgetElement is RenderObjectWidget && renderObject is RenderBox) {
-        if (_shouldInclude(widgetElement, renderObject)) {
-          if (SerializeTreeUtils.isWidgetVisible(element)) {
-            final Offset offset = renderObject.localToGlobal(Offset.zero);
-            final Rect rect = Rect.fromLTWH(
-              offset.dx,
-              offset.dy,
-              renderObject.size.width,
-              renderObject.size.height,
-            );
+                  final parentNode = rootReference[parentRender.hashCode];
+                  if (parentNode == null) return true;
 
-            Root root = _createRootFromElement(
-              widgetType: widgetElement.runtimeType.toString(),
-              renderObject: renderObject,
-              box: rect,
-            );
+                  root = root.copyWith(parentId: parentNode.id);
 
-            /// Visit `element`'s ancestor to set the `parentId` attribute
-            if (element.mounted) {
-              element.visitAncestorElements((parent) {
-                final RenderObject? parentRender = parent.renderObject;
-                if (parentRender == null) return true;
+                  return false;
+                });
+              }
 
-                final parentNode = rootReference[parentRender.hashCode];
-                if (parentNode == null) return true;
-
-                root = root.copyWith(parentId: parentNode.id);
-
-                return false;
-              });
+              rootReference[root.objectId] = root;
             }
-
-            rootReference[root.objectId] = root;
           }
         }
       }
@@ -256,30 +252,4 @@ class LomDelegate {
     box: box,
     children: [],
   );
-
-  /// Determines whether a [Widget] should be included in the [Root] tree mapping.
-  ///
-  /// This method applies filtering rules to skip irrelevant or non-visual widgets.
-  /// It checks multiple conditions such as:
-  /// - The widget type (e.g., excludes internal/private widgets starting with `_`)
-  /// - The presence of a valid [RenderBox] with a measurable size
-  /// - Any additional criteria defined for visibility or interaction relevance
-  ///
-  /// Returns [true] if the widget is considered valid and should be part of the
-  /// mapped tree; otherwise, returns [false].
-  bool _shouldInclude(Widget widget, RenderBox renderBox) {
-    final String widgetType = widget.runtimeType.toString();
-
-    if (!renderBox.hasSize || renderBox.size == Size.zero) return false;
-
-    if (widgetsToIgnore.contains(widgetType)) return false;
-
-    for (final widget in widgetsToIgnoreIfContains) {
-      if (widgetType.contains(widget)) return false;
-    }
-
-    if (widgetType.startsWith('_')) return false;
-
-    return true;
-  }
 }

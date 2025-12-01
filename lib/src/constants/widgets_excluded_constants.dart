@@ -5,20 +5,10 @@ const Set<String> widgetsToIgnore = {
   'LimitedBox',
   'TapRegion',
   'DecoratedBox',
-  'SizeChangedLayoutNotifier',
   'RepaintBoundary',
   'CustomPaint',
-  'CustomMultiChildLayout',
-  // 'Padding',
-  // 'LayoutBuilder',
-  // 'Center',
-  // 'Align',
-  // 'RichText',
-  // 'Padding',
-  // 'Stack',
-  // 'Row',
-  // 'Column',
-  // 'SizedBox',
+  'MetaData',
+  'ColoredBox',
 };
 
 const List<String> widgetsToIgnoreIfContains = [
@@ -37,4 +27,9 @@ const List<String> widgetsToIgnoreIfContains = [
   'Mouse',
   'TextField',
   'Transform',
+  'Image',
+  'Viewport',
+  'Layout',
+  'Overflow',
+  'Align',
 ];

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:session_recorder_flutter/src/constants/widgets_excluded_constants.dart';
+
 /// Top-level compute hash
 String _computeBufferHash(String buffer) => buffer.hashCode.toString();
 
@@ -44,28 +46,51 @@ class SerializeTreeUtils {
   /// "<RichText,visible:false>"
   /// ```
   static void _buildElementTreeBuffer(Element element, StringBuffer buffer) {
-    final Widget widget = element.widget;
+    if (hasRender(element)) {
+      if (isVisibleElement(element)) {
+        if (hasRenderWidget(element.widget)) {
+          final RenderObjectWidget widget =
+              element.widget as RenderObjectWidget;
+          if (shouldInclude(widget)) {
+            buffer.write('<${widget.runtimeType}>');
+          }
+        }
+      }
+    }
 
-    final isVisible = isWidgetVisible(element);
-
-    buffer.write('<${widget.runtimeType},visible:$isVisible>');
-
-    element.visitChildElements((child) {
-      _buildElementTreeBuffer(child, buffer);
-    });
+    element.visitChildren((child) => _buildElementTreeBuffer(child, buffer));
   }
 
-  /// Validates if the `element` is visible or not.
-  static bool isWidgetVisible(Element element) {
+  /// Validates if the `element` is a `[RenderBox]` and has a size.
+  static bool hasRender(Element element) {
     final renderObject = element.renderObject;
 
     if (renderObject == null || !renderObject.attached) return false;
 
     if (renderObject is RenderBox &&
-        (!renderObject.hasSize || renderObject.size.isEmpty)) {
+        (!renderObject.hasSize ||
+            renderObject.size.isEmpty ||
+            renderObject.size == Size.zero)) {
       return false;
     }
 
+    if (renderObject is RenderBox &&
+        (renderObject.hasSize || renderObject.size != Size.zero)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Validates if the `widget` is a `[RenderObjectWidget]`
+  static bool hasRenderWidget(Widget widget) {
+    if (widget is RenderObjectWidget) return true;
+
+    return false;
+  }
+
+  /// Validates if the `element` is visible or not.
+  static bool isVisibleElement(Element element) {
     bool isHidden = false;
     element.visitAncestorElements((ancestor) {
       if (ancestor.widget is Offstage &&
@@ -87,6 +112,30 @@ class SerializeTreeUtils {
     });
 
     return !isHidden;
+  }
+
+  /// Determines whether a [Widget] should be included in the [Root] tree mapping.
+  ///
+  /// This method applies filtering rules to skip irrelevant or non-visual widgets.
+  /// It checks multiple conditions such as:
+  /// - The widget type (e.g., excludes internal/private widgets starting with `_`)
+  /// - The presence of a valid [RenderBox] with a measurable size
+  /// - Any additional criteria defined for visibility or interaction relevance
+  ///
+  /// Returns [true] if the widget is considered valid and should be part of the
+  /// mapped tree; otherwise, returns [false].
+  static bool shouldInclude(Widget widget) {
+    final String widgetType = widget.runtimeType.toString();
+
+    if (widgetsToIgnore.contains(widgetType)) return false;
+
+    for (final widget in widgetsToIgnoreIfContains) {
+      if (widgetType.contains(widget)) return false;
+    }
+
+    if (widgetType.startsWith('_')) return false;
+
+    return true;
   }
 
   /// Returns the current value of the provided `key` if exist.

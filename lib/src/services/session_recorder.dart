@@ -240,16 +240,10 @@ class SessionRecorder extends WidgetsBindingObserver {
     /// we traverse the tree.
     buildOwner.onBuildScheduled = () {
       onBuildScheduled?.call();
+      if (_routeTracker.isRouting) return;
 
-      if (_routeTracker.isObserving) return;
-
-      _requestTreeCapture(debounce: true);
-    };
-
-    /// Request the initial tree capture
-    WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestTreeCapture();
-    });
+    };
   }
 
   /// Initializes all services.
@@ -291,28 +285,6 @@ class SessionRecorder extends WidgetsBindingObserver {
     debugPrint("> [ SESSION RECORDER INITIALIZED ]");
   }
 
-  /// Releases all resources held by this service.
-  ///
-  /// This method should be called when the service is no longer needed,
-  /// typically during application shutdown or when the owning widget is
-  /// disposed.
-  ///
-  /// Once disposed, the service cannot be safely reused unless re-initialized
-  /// with `[init()]`.
-  ///
-  /// Example:
-  /// ```dart
-  /// @override
-  /// void dispose() {
-  ///   SessionRecorder.instance.dispose();
-  ///   super.dispose();
-  /// }
-  /// ```
-  // void dispose() {
-  //   _debounce?.cancel();
-  //   WidgetsBinding.instance.removeObserver(this);
-  // }
-
   /// Coordinates a Widget Tree capture according to `_debounce` and
   /// `_captureId` semantics.
   ///
@@ -326,16 +298,11 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// The actual capture routine (`_captureTree`) runs when appropriate,
   /// validating the id to ignore stale results.
-  void _requestTreeCapture({bool debounce = false}) {
-    if (!debounce) {
-      _debounce?.cancel();
-      _captureId++;
-      _captureTree(id: _captureId);
-      return;
-    }
-
+  void _requestTreeCapture() {
     _debounce?.cancel();
     _debounce = Timer(Durations.short3, () {
+      if (_routeTracker.isRouting) return;
+
       _captureId++;
       _captureTree(id: _captureId);
     });
@@ -349,14 +316,8 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// The actual capture routine (`_captureTree`) runs when appropriate,
   /// validating the id to ignore stale results.
   void _requestTreeCaptureFromRouting() {
-    _debounce?.cancel();
-    _debounce = Timer(Duration(milliseconds: 16), () {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _captureId++;
-        _routeTracker.isObserving = false;
-        _captureTree(id: _captureId);
-      });
-    });
+    _captureId++;
+    _captureTree(id: _captureId);
   }
 
   /// Captures the Widget Tree rooted at the navigator key's context and triggers
@@ -446,8 +407,10 @@ class SessionRecorder extends WidgetsBindingObserver {
       }
 
       _chunkDelegate.addLom(lom);
+      if (_routeTracker.isRouting) _routeTracker.isRouting = false;
     } catch (e, s) {
       debugPrint(" !! >> [Some error : $e, $s]");
+      if (_routeTracker.isRouting) _routeTracker.isRouting = false;
       return;
     }
   }
