@@ -89,6 +89,8 @@ class LomDelegate {
     try {
       if (!element.mounted) return null;
 
+      LomRef? lomRef;
+
       if (_cacheLom.keys.contains(signature)) {
         final Lom lomFound = _cacheLom[signature]!;
 
@@ -97,7 +99,7 @@ class LomDelegate {
 
         SessionRecorder().rects.value = List.unmodifiable(output);
 
-        return LomRef(
+        lomRef = LomRef(
           id: lomFound.id,
           timestamp: DateTime.now().millisecondsSinceEpoch,
         );
@@ -137,6 +139,12 @@ class LomDelegate {
 
       /// Recursively elements
       element.visitChildElements((child) => _mapRootTree(child));
+
+      /// Wait to return the [LomRef] object found here after process again
+      /// the rootReference.
+      ///
+      /// This is needed cause' the [ActionEvent].
+      if (lomRef != null) return lomRef;
 
       /// Port to Isolate function
       final ReceivePort receivePort = ReceivePort();

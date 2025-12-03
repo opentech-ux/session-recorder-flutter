@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:session_recorder_flutter/src/utils/session_logger.dart';
@@ -21,24 +20,18 @@ class ActionEventHelper {
   /// - `[DoubleTapActionEvent]`
   /// - `[LongPressActionEvent]`
   static List<ActionEvent> detectActionEvent(
-    BuildContext? context,
     PointerTrace pointer,
     Rect viewportScroll,
     Map<int, Root> rootReference,
   ) {
     try {
-      if (context == null) return [];
-
       final List<ActionEvent> actionEvents = [];
 
-      final ActionEvent? actionEvent = _createActionEvent(
-        context,
+      final ActionEvent actionEvent = _createActionEvent(
         pointer,
         viewportScroll,
         rootReference,
       );
-
-      if (actionEvent == null) return [];
 
       actionEvents.add(actionEvent);
 
@@ -50,8 +43,7 @@ class ActionEventHelper {
   }
 
   /// Creates and returns the `[ActionEvent]` object with its zone.
-  static ActionEvent? _createActionEvent(
-    BuildContext context,
+  static ActionEvent _createActionEvent(
     PointerTrace pointer,
     Rect viewportScroll,
     Map<int, Root> rootReference,
@@ -59,9 +51,7 @@ class ActionEventHelper {
     try {
       final TimedPosition firstPosition = pointer.first ?? pointer.last!;
 
-      final root = _findZone(context, firstPosition, rootReference);
-
-      if (root == null) return null;
+      final root = _findZone(firstPosition, rootReference);
 
       switch (pointer.type) {
         case GesturesType.longPress:
@@ -89,32 +79,32 @@ class ActionEventHelper {
       }
     } catch (e, s) {
       SessionLogger.elog("!! >> [Some error]", e, s);
-      return null;
+      final root = rootReference.values.first;
+      return TapActionEvent(
+        zone: "z${root.id}",
+        timestampRelative: pointer.firstTimestamp ?? pointer.lastTimestamp!,
+        viewport: viewportScroll,
+        position: pointer.firstPosition ?? pointer.lastPosition!,
+      );
     }
   }
 
   /// Finds the `[Zone]` where the user has tapped.
   ///
   /// Get the `[RenderBox]` hit test with the `firstPosition` position.
-  static Root? _findZone(
-    BuildContext context,
+  static Root _findZone(
     TimedPosition firstPosition,
     Map<int, Root> rootReference,
   ) {
     try {
-      if (!context.mounted) return null;
+      final HitTestResult boxHitTestResult = HitTestResult();
 
-      final RenderObject? rootRender = context.findRenderObject();
+      final RenderView rootView = RendererBinding.instance.renderViews.first;
 
-      if (rootRender == null || rootRender is! RenderBox) return null;
-
-      final RenderBox rootBox = rootRender;
-
-      final BoxHitTestResult boxHitTestResult = BoxHitTestResult();
-
-      rootBox.hitTest(
+      RendererBinding.instance.hitTestInView(
         boxHitTestResult,
-        position: rootBox.globalToLocal(firstPosition.position),
+        firstPosition.position,
+        rootView.flutterView.viewId,
       );
 
       Root? rootTouched;
@@ -136,17 +126,17 @@ class ActionEventHelper {
 
         if (!renderExists) continue;
 
-        rootTouched = rootReference[target.hashCode]!;
+        rootTouched = rootReference[renderBox.hashCode]!;
 
         break;
       }
 
-      if (rootTouched == null) return null;
+      if (rootTouched == null) return rootReference.values.first;
 
       return rootTouched;
     } catch (e, s) {
       SessionLogger.elog("!! >> [Some error]", e, s);
-      return null;
+      return rootReference.values.first;
     }
   }
 }

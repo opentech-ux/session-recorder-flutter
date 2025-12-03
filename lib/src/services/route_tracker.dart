@@ -218,11 +218,16 @@ class RouteTracker {
           if (animation == null ||
               animation.status == AnimationStatus.completed ||
               animation.value >= 0.999) {
-            final Duration duration = routePage.transitionDuration;
+            Duration duration = routePage.transitionDuration;
+
+            if (type == NavigationType.pop) {
+              duration = routePage.reverseTransitionDuration;
+            }
+
             if (duration > Duration.zero) {
-              capture(duration + Durations.short4);
+              capture(duration * 2);
             } else {
-              capture(Durations.short3);
+              capture(Durations.short4);
             }
             return;
           }

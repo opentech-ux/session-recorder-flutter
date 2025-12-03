@@ -12,7 +12,8 @@ import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../enums/gestures_type_enum.dart';
-import '../models/models.dart' show PointerTrace, ScaleStats, TimedPosition;
+import '../models/models.dart'
+    show PointerTrace, ScaleStats, TimedPosition, ActionEvent;
 
 /// {@template interaction_delegate}
 /// A delegate responsible for managing and processing user interactions
@@ -275,7 +276,7 @@ class InteractionDelegate {
   ///
   /// Doing nothing if `_didScroll` is [true].
   ///
-  void onPointerUp(PointerUpEvent details, BuildContext? context) {
+  void onPointerUp(PointerUpEvent details) {
     try {
       final int pointer = details.pointer;
       final PointerTrace? pointerTrace = _pointers[pointer];
@@ -305,7 +306,6 @@ class InteractionDelegate {
             pointerTrace.add(details.position, timestampNow);
 
             final actionList = ActionEventHelper.detectActionEvent(
-              context,
               pointerTrace,
               _lastViewportScroll,
               _lomDelegate.rootReference,
@@ -363,15 +363,10 @@ class InteractionDelegate {
           case GesturesType.doubleTap:
             _doubleTapPointers[pointer] = pointerTrace;
 
+            List<ActionEvent> actionList = [];
+
             pointerTrace.timer = Timer(doubleTapTimeout, () {
               pointerTrace.setType(GesturesType.tap);
-
-              final actionList = ActionEventHelper.detectActionEvent(
-                context,
-                pointerTrace,
-                _lastViewportScroll,
-                _lomDelegate.rootReference,
-              );
 
               if (actionList.isNotEmpty) {
                 for (final action in actionList) {
@@ -385,6 +380,15 @@ class InteractionDelegate {
             });
 
             final PointerTrace? lastPointer = _doubleTapPointers[pointer - 1];
+
+            /// Only once to detect the [ActionEvent]
+            if (pointerType == GesturesType.tap) {
+              actionList = ActionEventHelper.detectActionEvent(
+                pointerTrace,
+                _lastViewportScroll,
+                _lomDelegate.rootReference,
+              );
+            }
 
             /// If the last pointer is not [null], we can assume in advance that
             /// there may be some double tapping.
@@ -405,8 +409,7 @@ class InteractionDelegate {
                 pointerTrace.setType(GesturesType.doubleTap);
                 lastPointer.setType(GesturesType.doubleTap);
 
-                final actionList = ActionEventHelper.detectActionEvent(
-                  context,
+                actionList = ActionEventHelper.detectActionEvent(
                   pointerTrace,
                   _lastViewportScroll,
                   _lomDelegate.rootReference,

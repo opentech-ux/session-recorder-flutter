@@ -322,7 +322,6 @@ class SessionRecorder extends WidgetsBindingObserver {
 
       _captureId++;
 
-      SessionLogger.mlog(">> CAPTURE INSTANT");
       _captureTree(id: _captureId);
       return;
     }
@@ -335,7 +334,6 @@ class SessionRecorder extends WidgetsBindingObserver {
 
       _captureId++;
 
-      SessionLogger.mlog(">> CAPTURE WITH TIMER");
       _captureTree(id: _captureId);
     });
   }
@@ -381,8 +379,6 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// Throw `FlutterError` if no navigator context is found.
   Future<void> _captureTree({int id = 0}) async {
-    SessionLogger.mlog("_isCapturing: $_isCapturing");
-
     if (_isCapturing) return;
 
     _isCapturing = true;
@@ -431,9 +427,6 @@ class SessionRecorder extends WidgetsBindingObserver {
           element,
         );
 
-        SessionLogger.mlog(">> SIGN : $signature");
-        SessionLogger.mlog(">> _lastHash : $_lastHash");
-
         /// If the stable structure did not change, no additional processing is
         /// performed.
         if (signature == _lastHash) return;
@@ -476,8 +469,6 @@ class SessionRecorder extends WidgetsBindingObserver {
     }
 
     await isCaptured();
-
-    SessionLogger.mlog(">> TREE CAPTURED");
 
     _isCapturing = false;
   }
@@ -551,9 +542,7 @@ class SessionRecorder extends WidgetsBindingObserver {
   void onPointerUp(PointerUpEvent e) {
     if (_disableRecord || !_serviceInitialized) return;
     _inactivityTimer.onInvokeInactivityTimer();
-    if (_currentRoute != null) {
-      _interactionDelegate!.onPointerUp(e, _currentRoute!.subtreeContext);
-    }
+    _interactionDelegate!.onPointerUp(e);
   }
 
   /// Forwards the `[PointerCancelEvent]` to the `[InteractionDelegate]`.
