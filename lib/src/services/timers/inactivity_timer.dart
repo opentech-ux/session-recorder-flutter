@@ -55,7 +55,7 @@ class InactivityTimer {
   /// - `[true]` means the timer completed and the system considers the user
   ///   inactive.
   /// - `[false]` means the user is currently considered active.
-  bool _isInactive = false;
+  bool isInactive = false;
 
   /// Callback invoked when inactivity is detected (when the timer completes).
   ///
@@ -93,7 +93,7 @@ class InactivityTimer {
     if (_timer != null && _timer!.isActive) return;
 
     _timer = Timer(_interval, () {
-      _isInactive = true;
+      isInactive = true;
       onInactive?.call();
     });
   }
@@ -113,14 +113,14 @@ class InactivityTimer {
 
     _lastReset = now;
 
-    if (_isInactive) {
-      _isInactive = false;
+    if (isInactive) {
+      isInactive = false;
       onActive?.call();
     }
 
     _timer?.cancel();
     _timer = Timer(_interval, () {
-      _isInactive = true;
+      isInactive = true;
       onInactive?.call();
     });
   }

@@ -151,6 +151,12 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// Disable the session recording behavior and gestures.
   bool _disableRecord = false;
 
+  ///
+  bool _isCapturing = false;
+
+  ///
+  int _consecutiveBuilds = 0;
+
   /// Creates and returns a new [HttpClient] instance.
   ///
   /// This client is configured to **ignore SSL certificate validation** by
@@ -241,7 +247,8 @@ class SessionRecorder extends WidgetsBindingObserver {
     /// we traverse the tree.
     buildOwner.onBuildScheduled = () {
       onBuildScheduled?.call();
-      if (_routeTracker.isRouting) return;
+
+      if (_inactivityTimer.isInactive) return;
 
       _requestTreeCapture();
     };
@@ -300,11 +307,35 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// The actual capture routine (`_captureTree`) runs when appropriate,
   /// validating the id to ignore stale results.
   void _requestTreeCapture() {
-    _debounce?.cancel();
-    _debounce = Timer(Durations.short3, () {
+    if (_routeTracker.isRouting) {
+      _consecutiveBuilds = 0;
+      return;
+    }
+
+    _consecutiveBuilds++;
+
+    if (_consecutiveBuilds > 60 && (_debounce != null && _debounce!.isActive)) {
+      _debounce?.cancel();
+      _consecutiveBuilds = 0;
+
       if (_routeTracker.isRouting) return;
 
       _captureId++;
+
+      SessionLogger.mlog(">> CAPTURE INSTANT");
+      _captureTree(id: _captureId);
+      return;
+    }
+
+    _debounce?.cancel();
+    _debounce = Timer(Durations.short3, () {
+      _consecutiveBuilds = 0;
+
+      if (_routeTracker.isRouting) return;
+
+      _captureId++;
+
+      SessionLogger.mlog(">> CAPTURE WITH TIMER");
       _captureTree(id: _captureId);
     });
   }
@@ -317,6 +348,9 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// The actual capture routine (`_captureTree`) runs when appropriate,
   /// validating the id to ignore stale results.
   void _requestTreeCaptureFromRouting() {
+    _consecutiveBuilds = 0;
+    _debounce?.cancel();
+    _isCapturing = false;
     _captureId++;
     _captureTree(id: _captureId);
   }
@@ -347,73 +381,105 @@ class SessionRecorder extends WidgetsBindingObserver {
   ///
   /// Throw `FlutterError` if no navigator context is found.
   Future<void> _captureTree({int id = 0}) async {
-    try {
-      _currentRoute = _routeTracker.getCurrentRoute();
+    SessionLogger.mlog("_isCapturing: $_isCapturing");
 
-      if (_currentRoute == null) return;
+    if (_isCapturing) return;
 
-      final BuildContext? context = _currentRoute!.subtreeContext;
+    _isCapturing = true;
 
-      assert(() {
-        if (context == null) {
-          throw FlutterError.fromParts(<DiagnosticsNode>[
-            ErrorSummary('SessionRecorder.init failed: context not found.'),
-            ErrorHint(
-              'Ensure you pass the SessionRecorderObserver to your app.',
-            ),
-            ErrorHint(
-              'Example:\n'
-              '  runApp(MaterialApp(observers: [SessionRecorderObserver()], ...));\n',
-            ),
-            ErrorHint(
-              'This call is blocking and will throw to surface the incorrect'
-              'initialization order immediately.',
-            ),
-          ]);
+    Future<void> isCaptured() async {
+      try {
+        _currentRoute = _routeTracker.getCurrentRoute();
+
+        if (_currentRoute == null) return;
+
+        final BuildContext? context = _currentRoute!.subtreeContext;
+
+        assert(() {
+          if (context == null) {
+            throw FlutterError.fromParts(<DiagnosticsNode>[
+              ErrorSummary('SessionRecorder.init failed: context not found.'),
+              ErrorHint(
+                'Ensure you pass the SessionRecorderObserver to your app.',
+              ),
+              ErrorHint(
+                'Example:\n'
+                '  runApp(MaterialApp(observers: [SessionRecorderObserver()], ...));\n',
+              ),
+              ErrorHint(
+                'This call is blocking and will throw to surface the incorrect'
+                'initialization order immediately.',
+              ),
+            ]);
+          }
+
+          return true;
+        }());
+
+        if (context == null) return;
+
+        if (!context.mounted) return;
+
+        /// If a newer capture was requested while this one was running, abort
+        /// processing.
+        if (id != _captureId) return;
+
+        final Element element = context as Element;
+
+        /// Signs the `element` Tree Widgets
+        final String signature = await SerializeTreeUtils.processTreeSignature(
+          element,
+        );
+
+        SessionLogger.mlog(">> SIGN : $signature");
+        SessionLogger.mlog(">> _lastHash : $_lastHash");
+
+        /// If the stable structure did not change, no additional processing is
+        /// performed.
+        if (signature == _lastHash) return;
+
+        /// If a newer capture was requested while this one was running, abort
+        /// processing.
+        if (id != _captureId) return;
+
+        _lastHash = signature;
+
+        _lomDelegate.clearLom();
+
+        final lom = await _lomDelegate.createLomTree(element, signature);
+        if (lom == null) return;
+
+        /// If a newer capture was requested while this one was running, abort
+        /// processing.
+        if (id != _captureId) return;
+
+        /// Captures the first current `context` viewport
+        if (context.mounted) {
+          // ignore: use_build_context_synchronously
+          _interactionDelegate!.captureViewportGeometry(context, null);
         }
 
-        return true;
-      }());
+        _chunkDelegate.addLom(lom);
 
-      if (context == null) return;
+        _isCapturing = false;
+        if (_routeTracker.isRouting) _routeTracker.isRouting = false;
 
-      if (!context.mounted) return;
+        return;
+      } catch (e, s) {
+        SessionLogger.elog("!! >> [Some error]", e, s);
 
-      /// If a newer capture was requested while this one was running, abort
-      /// processing.
-      if (id != _captureId) return;
+        _isCapturing = false;
+        if (_routeTracker.isRouting) _routeTracker.isRouting = false;
 
-      final Element element = context as Element;
-
-      /// Signs the `element` Tree Widgets
-      final String signature = await SerializeTreeUtils.processTreeSignature(
-        element,
-      );
-
-      /// If the stable structure did not change, no additional processing is
-      /// performed.
-      if (signature == _lastHash) return;
-
-      _lastHash = signature;
-
-      _lomDelegate.clearLom();
-
-      final lom = await _lomDelegate.createLomTree(element, signature);
-      if (lom == null) return;
-
-      /// Captures the first current `context` viewport
-      if (context.mounted) {
-        // ignore: use_build_context_synchronously
-        _interactionDelegate!.captureViewportGeometry(context, null);
+        return;
       }
-
-      _chunkDelegate.addLom(lom);
-      if (_routeTracker.isRouting) _routeTracker.isRouting = false;
-    } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
-      if (_routeTracker.isRouting) _routeTracker.isRouting = false;
-      return;
     }
+
+    await isCaptured();
+
+    SessionLogger.mlog(">> TREE CAPTURED");
+
+    _isCapturing = false;
   }
 
   /// Periodic callback that sends the pending session record to the server.

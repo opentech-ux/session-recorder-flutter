@@ -116,8 +116,6 @@ class LomDelegate {
 
       if (rootSize.width == 0 && rootSize.height == 0) return null;
 
-      _init(rootSize);
-
       /// Resets the count zones
       _zoneId = 1;
 
@@ -156,6 +154,8 @@ class LomDelegate {
       final roots = List<Root>.from(
         messageIsolate.map<Root>((x) => Root.fromJson(x)),
       );
+
+      _lom ?? _init(rootSize);
 
       _lom = _lom!.copyWith(root: root.copyWith(children: roots));
 

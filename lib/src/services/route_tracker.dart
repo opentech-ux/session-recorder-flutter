@@ -220,7 +220,7 @@ class RouteTracker {
               animation.value >= 0.999) {
             final Duration duration = routePage.transitionDuration;
             if (duration > Duration.zero) {
-              capture(duration);
+              capture(duration + Durations.short4);
             } else {
               capture(Durations.short3);
             }
