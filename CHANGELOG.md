@@ -1,3 +1,10 @@
+## 1.1.1
+
+- **FIXED** the bug that captured the tree too early.
+- **FIXED** the bug that did not capture the tree during an animation.
+- **FIXED** the bug that did not capture the tap action event.
+- **FIXED** the bug that did not correctly send a session during tree capture.
+
 ## 1.1.0
 
 > Note: This release has breaking changes.
@@ -9,8 +16,10 @@ It replaces the old `NavigatorKey` in the `SessionRecorderParams`, which has bee
 Check the `README.md` for more information.
 
 ## 1.0.2
+
 - **ADD** library_type in chunk
 - **ADD** try-catch handle in http
 
 ## 1.0.1
+
 - **INIT** beta release
