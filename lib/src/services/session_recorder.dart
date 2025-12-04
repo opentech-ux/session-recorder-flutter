@@ -151,10 +151,10 @@ class SessionRecorder extends WidgetsBindingObserver {
   /// Disable the session recording behavior and gestures.
   bool _disableRecord = false;
 
-  ///
+  /// Indicates if we are currently capturing the Tree Widget.
   bool _isCapturing = false;
 
-  ///
+  /// Counter to indicates how many times we are calling the build scheduled.
   int _consecutiveBuilds = 0;
 
   /// Creates and returns a new [HttpClient] instance.
@@ -418,7 +418,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
         /// If a newer capture was requested while this one was running, abort
         /// processing.
-        if (id != _captureId) return;
+        //if (id != _captureId) return;
 
         final Element element = context as Element;
 
@@ -433,7 +433,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
         /// If a newer capture was requested while this one was running, abort
         /// processing.
-        if (id != _captureId) return;
+        //  if (id != _captureId) return;
 
         _lastHash = signature;
 
@@ -444,7 +444,7 @@ class SessionRecorder extends WidgetsBindingObserver {
 
         /// If a newer capture was requested while this one was running, abort
         /// processing.
-        if (id != _captureId) return;
+        //  if (id != _captureId) return;
 
         /// Captures the first current `context` viewport
         if (context.mounted) {
@@ -454,7 +454,6 @@ class SessionRecorder extends WidgetsBindingObserver {
 
         _chunkDelegate.addLom(lom);
 
-        _isCapturing = false;
         if (_routeTracker.isRouting) _routeTracker.isRouting = false;
 
         return;
@@ -484,6 +483,8 @@ class SessionRecorder extends WidgetsBindingObserver {
     if (_chunkDelegate.isChunkEmpty) return;
 
     final chunk = _chunkDelegate.chunk;
+
+    final List<LomAbstract> lastLoms = _chunkDelegate.chunk.loms;
 
     final body = chunk.toJson();
 
@@ -518,8 +519,20 @@ class SessionRecorder extends WidgetsBindingObserver {
       SessionLogger.elog("!! Unexpected error sending data", e, s);
     }
 
+    final List<LomAbstract> currentLoms = _chunkDelegate.chunk.loms;
+
+    currentLoms.removeWhere(
+      (lom) => lastLoms.any((lastLom) => lom.id == lastLom.id),
+    );
+
     _lomDelegate.clearLom();
     _chunkDelegate.init(_sessionDelegate.getId());
+
+    if (currentLoms.isNotEmpty) {
+      for (LomAbstract lom in currentLoms) {
+        _chunkDelegate.addLom(lom);
+      }
+    }
   }
 
   // * ----- POINTER LISTENER ------ * //
