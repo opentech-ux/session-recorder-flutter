@@ -1,40 +1,45 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import 'models.dart';
 
 class Chunk {
+  String sId;
+
   final int timestamp;
-  final String sId;
   final List<LomAbstract> loms;
   final List<ExplorationEvent> explorationEvents;
   final List<ActionEvent> actionsEvents;
 
-  Chunk({
-    required this.timestamp,
-    required this.sId,
-    required this.loms,
-    required this.explorationEvents,
-    required this.actionsEvents,
-  });
+  Chunk()
+    : timestamp = DateTime.now().millisecondsSinceEpoch,
+      sId = "",
+      actionsEvents = [],
+      explorationEvents = [],
+      loms = [];
 
-  Chunk copyWith({
-    int? timestamp,
-    String? sId,
-    List<LomAbstract>? loms,
-    List<ExplorationEvent>? explorationEvents,
-    List<ActionEvent>? actionsEvents,
-  }) {
-    return Chunk(
-      timestamp: timestamp ?? this.timestamp,
-      sId: sId ?? this.sId,
-      loms: loms ?? this.loms,
-      explorationEvents: explorationEvents ?? this.explorationEvents,
-      actionsEvents: actionsEvents ?? this.actionsEvents,
-    );
+  bool get isChunkEmpty =>
+      loms.isEmpty && explorationEvents.isEmpty && actionsEvents.isEmpty;
+
+  /// Add a [LomAbstract] to the [Chunk].
+  ///
+  /// Could be a [Lom] or [LomRef] classes.
+  void addLom(LomAbstract lom) {
+    loms.add(lom);
   }
+
+  /// Add a [ExplorationEvent] list to the [Chunk]
+  void addExplorationEvents(List<ExplorationEvent> explorationEvents) {
+    explorationEvents.addAll(explorationEvents);
+  }
+
+  /// Add a [ActionEvent] to the [Chunk]
+  void addActionEvent(ActionEvent actionEvent) {
+    actionsEvents.add(actionEvent);
+  }
+
+  String toJson() => json.encode(toMap());
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -49,8 +54,6 @@ class Chunk {
     };
   }
 
-  String toJson() => json.encode(toMap());
-
   @override
   String toString() {
     return 'Chunk('
@@ -62,25 +65,5 @@ class Chunk {
         'explorationEvents: $explorationEvents, '
         'actionsEvents: $actionsEvents, '
         ')';
-  }
-
-  @override
-  bool operator ==(covariant Chunk other) {
-    if (identical(this, other)) return true;
-
-    return other.timestamp == timestamp &&
-        other.sId == sId &&
-        listEquals(other.loms, loms) &&
-        listEquals(other.explorationEvents, explorationEvents) &&
-        listEquals(other.actionsEvents, actionsEvents);
-  }
-
-  @override
-  int get hashCode {
-    return timestamp.hashCode ^
-        sId.hashCode ^
-        loms.hashCode ^
-        explorationEvents.hashCode ^
-        actionsEvents.hashCode;
   }
 }

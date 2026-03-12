@@ -18,34 +18,34 @@ class SessionNotInitializedException implements Exception {
 /// Typically initialized internally by `[SessionRecorder]`.
 /// {@endtemplate}
 class SessionDelegate {
-  static final SessionDelegate _instance = SessionDelegate._internal();
-  factory SessionDelegate() => _instance;
+  // static final SessionDelegate _instance = SessionDelegate._internal();
+  // factory SessionDelegate() => _instance;
 
-  /// {@macro session}
-  SessionDelegate._internal();
+  // /// {@macro session}
+  // SessionDelegate._internal();
 
-  Session? _session;
+  // Session? _session;
 
-  bool get hasSession => _session != null;
+  // bool get hasSession => _session != null;
 
-  Session get session {
-    final session = _session;
-    if (session == null) throw SessionNotInitializedException();
-    return session;
-  }
+  // Session get session {
+  //   final session = _session;
+  //   if (session == null) throw SessionNotInitializedException();
+  //   return session;
+  // }
 
-  void init() {
-    final String sId = Uuid().v4();
-    _session = Session(id: sId);
-  }
+  // void init() {
+  //   final String sId = Uuid().v4();
+  //   _session = Session(id: sId);
+  // }
 
-  void _ensureInitialized() {
-    if (_session == null) throw SessionNotInitializedException();
-  }
+  // void _ensureInitialized() {
+  //   if (_session == null) throw SessionNotInitializedException();
+  // }
 
-  String getId() {
-    _ensureInitialized();
+  // String getId() {
+  //   _ensureInitialized();
 
-    return _session!.id;
-  }
+  //   return _session!.id;
+  // }
 }

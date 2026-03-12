@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:session_recorder_flutter/src/utils/session_logger.dart';
-import 'package:session_recorder_flutter/src/services/session_recorder.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
 import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;

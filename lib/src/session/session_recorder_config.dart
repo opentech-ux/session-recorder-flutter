@@ -1,19 +1,14 @@
-class SessionRecorderParams {
+class SessionRecorderConfig {
   /// The backend endpoint (URI) that receives session data.
   ///
   /// This URL is provided by the the __company__ and must support [POST]
   /// requests for session uploads.
-  final String? endpoint;
+  final String endpoint;
 
-  /// Whether to completely disable the session recording behavior.
+  /// Whether to show the debug logs.
   ///
-  /// When set to [true], all internal logic for behavior tracking and
-  /// network communication is bypassed.
-  /// This is useful for development, testing, or when you need to temporarily
-  /// stop analytics without removing the widget or service initialization.
-  ///
-  /// __Defaults to [false]__
-  final bool disable;
+  /// __Only used for debug purpose.__
+  final bool debugLog;
 
   /// Configuration object required by [SessionRecorder.init].
   ///
@@ -24,5 +19,5 @@ class SessionRecorderParams {
   ///
   /// The `endpoint` is required and must not be null. The service will throw
   /// a [ArgumentError] if the provided `endpoint` is not correct.
-  SessionRecorderParams({this.endpoint, this.disable = false});
+  const SessionRecorderConfig({this.endpoint = "", this.debugLog = false});
 }

@@ -6,6 +6,6 @@ export 'package:session_recorder_flutter/src/models/root.dart';
 export 'package:session_recorder_flutter/src/models/pointer_trace.dart';
 export 'package:session_recorder_flutter/src/models/route_recorded.dart';
 export 'package:session_recorder_flutter/src/models/scale_stats.dart';
-export 'package:session_recorder_flutter/src/models/session_recorder_params.dart';
-export 'package:session_recorder_flutter/src/models/session.dart';
+export 'package:session_recorder_flutter/src/session/session_recorder_config.dart';
+export 'package:session_recorder_flutter/src/session/session.dart';
 export 'package:session_recorder_flutter/src/models/zoom_stats.dart';

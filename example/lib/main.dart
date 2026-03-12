@@ -6,7 +6,7 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final params = SessionRecorderParams(
+  final params = SessionRecorderConfig(
     endpoint: 'https://api.example.com/session',
   );
 
