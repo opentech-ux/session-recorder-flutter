@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
-import 'package:session_recorder_flutter/src/delegates/helpers/action_event_helper.dart';
-import 'package:session_recorder_flutter/src/delegates/helpers/exploration_event_helper.dart';
+import 'package:session_recorder_flutter/src/helpers/action_event_helper.dart';
+import 'package:session_recorder_flutter/src/helpers/exploration_event_helper.dart';
 import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
 import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';

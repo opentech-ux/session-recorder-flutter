@@ -7,11 +7,11 @@ abstract class ExplorationEvent {
   final Rect viewport;
   final GesturesType explorationType;
 
-  ExplorationEvent(
-    this.timestamp,
-    this.viewport,
-    this.explorationType,
-  );
+  ExplorationEvent({
+    required this.timestamp,
+    required this.viewport,
+    required this.explorationType,
+  });
 
   String concatenateString();
 
@@ -41,11 +41,7 @@ abstract class ExplorationEvent {
           timestamp: map['timestamp'] as int,
           endTimestamp: map['endTimestamp'] as int,
           viewport: rectViewport,
-          positions: pos
-              .map(
-                (p) => Offset(p["dx"], p["dy"]),
-              )
-              .toList(),
+          positions: pos.map((p) => Offset(p["dx"], p["dy"])).toList(),
         );
       case GesturesType.scroll:
         final String phaseName = map['phase'] as String;
@@ -75,27 +71,21 @@ abstract class ExplorationEvent {
     }
   }
 
-  static List<double> rectToList(Rect r) => [
-        r.left,
-        r.top,
-        r.width,
-        r.height,
-      ].map((r) => r.toDouble()).toList();
+  static List<double> rectToList(Rect r) =>
+      [r.left, r.top, r.width, r.height].map((r) => r.toDouble()).toList();
 
-  static List<double> offsetToList(Offset o) => [
-        o.dx,
-        o.dy,
-      ].map((o) => o.toDouble()).toList();
+  static List<double> offsetToList(Offset o) =>
+      [o.dx, o.dy].map((o) => o.toDouble()).toList();
 }
 
 class PanExplorationEvent extends ExplorationEvent {
   final Offset position;
 
   PanExplorationEvent({
-    required int timestamp,
-    required Rect viewport,
+    required super.timestamp,
+    required super.viewport,
     required this.position,
-  }) : super(timestamp, viewport, GesturesType.pan);
+  }) : super(explorationType: GesturesType.pan);
 
   @override
   String concatenateString() {
@@ -129,11 +119,11 @@ class ZoomExplorationEvent extends ExplorationEvent {
   final List<Offset> positions;
 
   ZoomExplorationEvent({
-    required int timestamp,
-    required Rect viewport,
+    required super.timestamp,
+    required super.viewport,
     required this.endTimestamp,
     required this.positions,
-  }) : super(timestamp, viewport, GesturesType.zoom);
+  }) : super(explorationType: GesturesType.zoom);
 
   @override
   String concatenateString() {
@@ -141,9 +131,7 @@ class ZoomExplorationEvent extends ExplorationEvent {
       timestamp.toString(),
       explorationType.name,
       '${viewport.left.toInt()},${viewport.top.toInt()}',
-      ...positions.map(
-        (p) => '${p.dx.toInt()},${p.dy.toInt()}',
-      ),
+      ...positions.map((p) => '${p.dx.toInt()},${p.dy.toInt()}'),
       endTimestamp.toString(),
     ];
 
@@ -170,10 +158,10 @@ class ScrollExplorationEvent extends ExplorationEvent {
   final ScrollPhase phase;
 
   ScrollExplorationEvent({
-    required int timestamp,
-    required Rect viewport,
+    required super.timestamp,
+    required super.viewport,
     required this.phase,
-  }) : super(timestamp, viewport, GesturesType.scroll);
+  }) : super(explorationType: GesturesType.scroll);
 
   @override
   String concatenateString() {

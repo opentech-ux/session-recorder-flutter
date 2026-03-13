@@ -82,6 +82,12 @@ class SessionRecorder {
   // * CHUNK
   late Chunk _currentChunk;
 
+  // * LOM
+  late Lom _currentLom;
+
+  // * FINDER
+  final _finder = const TapTreeFinder();
+
   // // * DELEGATES
   // late final ChunkDelegate _chunkDelegate;
   // late final LomDelegate _lomDelegate;
@@ -99,6 +105,9 @@ class SessionRecorder {
   late final _SessionRecorderReporter _reporter = _SessionRecorderReporter(
     this,
   );
+
+  // * OBSERVER
+  SessionRecorderObserver? observer;
 
   final ValueNotifier<List<Rect>> rects = ValueNotifier<List<Rect>>([]);
 
@@ -295,13 +304,26 @@ class SessionRecorder {
     SessionLogger.mlog("> [ SESSION RECORDER INITIALIZED ]");
   }
 
-  void _recordEvent() {}
-
-  /// Records the [Lom] into the [Chunk]
   void _recordLom(Lom lom) {
+    _currentLom = lom;
     _currentChunk.addLom(lom);
 
     SessionLogger.mlog("> [ LOM SAVED - ${lom.id} sign=${lom.signature}]");
+  }
+
+  void _recordAction(ActionEvent action) {
+    _currentChunk.addActionEvent(action);
+    _inactivity.ping();
+  }
+
+  void _recordExploration(ExplorationEvent exploration) {
+    _currentChunk.addExplorationEvent(exploration);
+    _inactivity.ping();
+  }
+
+  Root? _findRoot(Offset position) {
+    final tapTreeResult = _finder.find(_currentLom, position);
+    return tapTreeResult.didTap ? tapTreeResult.target : null;
   }
 
   /// Initializes all services.
@@ -588,32 +610,32 @@ class SessionRecorder {
   // * ----- POINTER LISTENER ------ * //
 
   /// Forwards the `[PointerDownEvent]` to the `[InteractionDelegate]`.
-  void onPointerDown(PointerDownEvent e) {
-    if (_disableRecord || !_serviceInitialized) return;
-    _inactivityTimer.onInvokeInactivityTimer();
-    _interactionDelegate!.onPointerDown(e);
-  }
+  // void onPointerDown(PointerDownEvent e) {
+  //   if (_disableRecord || !_serviceInitialized) return;
+  //   _inactivityTimer.onInvokeInactivityTimer();
+  //   _interactionDelegate!.onPointerDown(e);
+  // }
 
-  /// Forwards the `[PointerMoveEvent]` to the `[InteractionDelegate]`.
-  void onPointerMove(PointerMoveEvent e) {
-    if (_disableRecord || !_serviceInitialized) return;
-    _inactivityTimer.onInvokeInactivityTimer();
-    _interactionDelegate!.onPointerMove(e);
-  }
+  // /// Forwards the `[PointerMoveEvent]` to the `[InteractionDelegate]`.
+  // void onPointerMove(PointerMoveEvent e) {
+  //   if (_disableRecord || !_serviceInitialized) return;
+  //   _inactivityTimer.onInvokeInactivityTimer();
+  //   _interactionDelegate!.onPointerMove(e);
+  // }
 
-  /// Forwards the `[PointerUpEvent]` to the `[InteractionDelegate]`.
-  void onPointerUp(PointerUpEvent e) {
-    if (_disableRecord || !_serviceInitialized) return;
-    _inactivityTimer.onInvokeInactivityTimer();
-    _interactionDelegate!.onPointerUp(e);
-  }
+  // /// Forwards the `[PointerUpEvent]` to the `[InteractionDelegate]`.
+  // void onPointerUp(PointerUpEvent e) {
+  //   if (_disableRecord || !_serviceInitialized) return;
+  //   _inactivityTimer.onInvokeInactivityTimer();
+  //   _interactionDelegate!.onPointerUp(e);
+  // }
 
-  /// Forwards the `[PointerCancelEvent]` to the `[InteractionDelegate]`.
-  void onPointerCancel(_) {
-    if (_disableRecord || !_serviceInitialized) return;
-    _inactivityTimer.onInvokeInactivityTimer();
-    _interactionDelegate!.onPointerCancel();
-  }
+  // /// Forwards the `[PointerCancelEvent]` to the `[InteractionDelegate]`.
+  // void onPointerCancel(_) {
+  //   if (_disableRecord || !_serviceInitialized) return;
+  //   _inactivityTimer.onInvokeInactivityTimer();
+  //   _interactionDelegate!.onPointerCancel();
+  // }
 
   // * ----- SCROLL NOTIFICATION ------ * //
 
@@ -621,11 +643,11 @@ class SessionRecorder {
   /// processing.
   ///
   /// Returns `true` if the delegate handled the notification, `false` otherwise.
-  bool handleScrollNotification(ScrollNotification s) {
-    if (_disableRecord || !_serviceInitialized) return false;
-    _inactivityTimer.onInvokeInactivityTimer();
-    return _interactionDelegate!.handleScrollNotification(s);
-  }
+  // bool handleScrollNotification(ScrollNotification s) {
+  //   if (_disableRecord || !_serviceInitialized) return false;
+  //   _inactivityTimer.onInvokeInactivityTimer();
+  //   return _interactionDelegate!.handleScrollNotification(s);
+  // }
 }
 
 class _SessionRecorderReporter {
@@ -638,7 +660,7 @@ class _SessionRecorderReporter {
 
   /// The interval used for the periodic timer ticks.
   ///
-  /// __Defaults to 10 seconds in this implementation.__
+  /// __Defaults to 10 seconds__
   final Duration _interval = Duration(seconds: 10);
 
   final IOClient _httpClient = IOClient(

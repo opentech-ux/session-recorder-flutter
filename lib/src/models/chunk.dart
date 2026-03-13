@@ -30,8 +30,8 @@ class Chunk {
   }
 
   /// Add a [ExplorationEvent] list to the [Chunk]
-  void addExplorationEvents(List<ExplorationEvent> explorationEvents) {
-    explorationEvents.addAll(explorationEvents);
+  void addExplorationEvent(ExplorationEvent exploration) {
+    explorationEvents.add(exploration);
   }
 
   /// Add a [ActionEvent] to the [Chunk]

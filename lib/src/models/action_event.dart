@@ -9,13 +9,13 @@ abstract class ActionEvent {
   final Rect viewport;
   final Offset position;
 
-  ActionEvent(
-    this.timestampRelative,
-    this.zone,
-    this.actionType,
-    this.viewport,
-    this.position,
-  );
+  ActionEvent({
+    required this.timestampRelative,
+    required this.zone,
+    required this.actionType,
+    required this.viewport,
+    required this.position,
+  });
 
   String concatenateString();
 
@@ -83,32 +83,20 @@ abstract class ActionEvent {
     }
   }
 
-  static List<double> rectToList(Rect r) => [
-        r.left,
-        r.top,
-        r.width,
-        r.height,
-      ].map((r) => r.toDouble()).toList();
+  static List<double> rectToList(Rect r) =>
+      [r.left, r.top, r.width, r.height].map((r) => r.toDouble()).toList();
 
-  static List<double> offsetToList(Offset o) => [
-        o.dx,
-        o.dy,
-      ].map((o) => o.toDouble()).toList();
+  static List<double> offsetToList(Offset o) =>
+      [o.dx, o.dy].map((o) => o.toDouble()).toList();
 }
 
 class TapActionEvent extends ActionEvent {
   TapActionEvent({
-    required int timestampRelative,
-    required String zone,
-    required Rect viewport,
-    required Offset position,
-  }) : super(
-          timestampRelative,
-          zone,
-          GesturesType.tap,
-          viewport,
-          position,
-        );
+    required super.timestampRelative,
+    required super.zone,
+    required super.viewport,
+    required super.position,
+  }) : super(actionType: GesturesType.tap);
 
   @override
   String concatenateString() {
@@ -137,17 +125,11 @@ class TapActionEvent extends ActionEvent {
 
 class DoubleTapActionEvent extends ActionEvent {
   DoubleTapActionEvent({
-    required int timestampRelative,
-    required String zone,
-    required Rect viewport,
-    required Offset position,
-  }) : super(
-          timestampRelative,
-          zone,
-          GesturesType.doubleTap,
-          viewport,
-          position,
-        );
+    required super.timestampRelative,
+    required super.zone,
+    required super.viewport,
+    required super.position,
+  }) : super(actionType: GesturesType.doubleTap);
 
   @override
   String concatenateString() {
@@ -178,18 +160,12 @@ class LongPressActionEvent extends ActionEvent {
   final Duration duration;
 
   LongPressActionEvent({
-    required int timestampRelative,
-    required String zone,
-    required Rect viewport,
-    required Offset position,
+    required super.timestampRelative,
+    required super.zone,
+    required super.viewport,
+    required super.position,
     required this.duration,
-  }) : super(
-          timestampRelative,
-          zone,
-          GesturesType.longPress,
-          viewport,
-          position,
-        );
+  }) : super(actionType: GesturesType.longPress);
 
   @override
   String concatenateString() {

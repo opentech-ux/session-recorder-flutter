@@ -27,7 +27,7 @@ class LomTreeInspector {
 
     final Root root = Root(
       id: counter.next(),
-      objectId: rootElement.renderObject.hashCode,
+      objectId: rootElement.renderObject.hashCode.toRadixString(16),
       parentId: 0,
       widgetType: rootElement.widget.runtimeType.toString(),
       renderType: rootElement.renderObject.runtimeType.toString(),
@@ -93,7 +93,7 @@ class LomTreeInspector {
     return [
       Root(
         id: counter.next(),
-        objectId: renderObject.hashCode,
+        objectId: renderObject.hashCode.toRadixString(16),
         parentId: 0,
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),

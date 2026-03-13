@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class Root {
   final int id;
-  final int objectId;
+  final String objectId;
   final int parentId;
   final String widgetType;
   final String renderType;
@@ -20,26 +20,6 @@ class Root {
     required this.box,
     required this.children,
   });
-
-  Root copyWith({
-    int? id,
-    int? objectId,
-    int? parentId,
-    String? widgetType,
-    String? renderType,
-    Rect? box,
-    List<Root>? children,
-  }) {
-    return Root(
-      id: id ?? this.id,
-      objectId: objectId ?? this.objectId,
-      parentId: parentId ?? this.parentId,
-      widgetType: widgetType ?? this.widgetType,
-      renderType: renderType ?? this.renderType,
-      box: box ?? this.box,
-      children: children ?? this.children,
-    );
-  }
 
   Map<String, dynamic> toMap() {
     final List<int> b = [
@@ -76,7 +56,7 @@ class Root {
 
     return Root(
       id: map['id'] as int,
-      objectId: map['objectId'] as int,
+      objectId: map['objectId'] as String,
       parentId: map['parentId'] as int,
       widgetType: map['widgetType'] as String,
       renderType: map['renderType'] as String,
@@ -99,20 +79,4 @@ class Root {
   @override
   String toString() =>
       'Root(id: $id, objectId: $objectId, parentId: $parentId, widgetType: $widgetType, renderType: $renderType, box: $box, children: $children)';
-
-  @override
-  bool operator ==(covariant Root other) {
-    if (identical(this, other)) return true;
-
-    return other.id == id &&
-        other.objectId == objectId &&
-        other.parentId == parentId &&
-        other.widgetType == widgetType &&
-        other.renderType == renderType &&
-        other.box == box &&
-        other.children == children;
-  }
-
-  @override
-  int get hashCode => id.hashCode ^ box.hashCode;
 }

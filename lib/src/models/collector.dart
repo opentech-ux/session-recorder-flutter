@@ -18,14 +18,16 @@ class PointerTrace {
     Timer? timer,
   }) : positions = positions ?? [];
 
-  TimedPosition? get first => positions.isNotEmpty ? positions.first : null;
-  TimedPosition? get last => positions.isNotEmpty ? positions.last : null;
+  TimedPosition get first =>
+      positions.isNotEmpty ? positions.first : TimedPosition(Offset.zero);
+  TimedPosition get last =>
+      positions.isNotEmpty ? positions.last : TimedPosition(Offset.zero);
 
-  Offset? get firstPosition => first?.position;
-  Offset? get lastPosition => last?.position;
+  Offset get firstPosition => first.position;
+  Offset get lastPosition => last.position;
 
-  int? get firstTimestamp => first?.timestamp;
-  int? get lastTimestamp => last?.timestamp;
+  int get firstTimestamp => first.timestamp;
+  int get lastTimestamp => last.timestamp;
 
   bool get isEmpty => positions.isEmpty;
   int get length => positions.length;
@@ -34,15 +36,15 @@ class PointerTrace {
     if (positions.isEmpty) return Duration.zero;
     if (positions.length < 2) {
       return Duration(
-        milliseconds: DateTime.now().millisecondsSinceEpoch - firstTimestamp!,
+        milliseconds: DateTime.now().millisecondsSinceEpoch - firstTimestamp,
       );
     }
 
-    return Duration(milliseconds: lastTimestamp! - firstTimestamp!);
+    return Duration(milliseconds: lastTimestamp - firstTimestamp);
   }
 
   double get distance =>
-      isEmpty ? 0.0 : (lastPosition! - firstPosition!).distance;
+      isEmpty ? 0.0 : (lastPosition - firstPosition).distance;
 
   void dispose() {
     timer?.cancel();
@@ -52,8 +54,8 @@ class PointerTrace {
     this.type = type;
   }
 
-  void add(Offset position, int timestamp) {
-    positions.add(TimedPosition(timestamp, position));
+  void add(Offset position) {
+    positions.add(TimedPosition(position));
   }
 
   void clear() {
@@ -69,7 +71,8 @@ class TimedPosition {
   final int timestamp;
   final Offset position;
 
-  TimedPosition(this.timestamp, this.position);
+  TimedPosition(this.position)
+    : timestamp = DateTime.now().millisecondsSinceEpoch;
 
   @override
   String toString() =>
@@ -85,4 +88,13 @@ class ViewportPosition {
   @override
   String toString() =>
       'ViewportPosition(timestamp: $timestamp, viewport: $viewport)';
+}
+
+class ScrollSession {
+  final String id;
+  final List<double> positions;
+
+  ScrollSession({required double startPixel})
+    : id = DateTime.now().millisecondsSinceEpoch.toRadixString(36),
+      positions = [startPixel];
 }

@@ -7,13 +7,6 @@ import '../models/models.dart' show PointerTrace, ZoomStats;
 class MathUtils {
   /// Calculates the centroid (average of positions) of all active fingers.
   ///
-  /// The pointer events are captured with a Listener and the centroid of
-  /// the touches and the average distance to the center are calculated
-  /// explicitly. The centroid of `N` fingers is the average of their
-  /// coordinates:
-  /// ```
-  /// Centroid = ((∑i ​xi) / 𝑁,(∑i ​yi) / 𝑁​​)
-  /// ```
   /// __Example :__
   ///
   /// ```
@@ -25,54 +18,32 @@ class MathUtils {
   /// ```
   ///
   static Offset getCentroid(Map<int, PointerTrace> pointers) {
-    double x = 0, y = 0;
-
-    for (PointerTrace p in pointers.values) {
-      x += p.lastPosition!.dx;
-      y += p.lastPosition!.dy;
-    }
-
-    return Offset(
-      x / pointers.length,
-      y / pointers.length,
-    );
+    final positions = pointers.values
+        .map((pointer) => pointer.lastPosition)
+        .toList();
+    final sum = positions.fold(Offset.zero, (last, current) => last + current);
+    return sum / positions.length.toDouble();
   }
 
   /// Calculates the average distance of all fingers to the given centroid.
   ///
-  /// The average distance is the arithmetic mean of the distances
-  /// from each finger to that centroid. When the fingers move, the scale
-  /// factor is obtained as the ratio between the current and initial
-  /// average distances
-  /// ```
-  /// d = 1/N ​∑i​ ∥ pi ​− C ∥
-  /// ```
-  ///
-  /// Add up all the distances and divide by the number of fingers
-  ///
-  /// ```
-  /// " ∥ pi ​− C ∥ " : take the length of that vector
-  /// ```
-  static double getAverageDistance(
-    Map<int, PointerTrace> pointers,
-    Offset center,
-  ) {
-    if (pointers.isEmpty) return 0.0;
+  static double getAverageDistance(Map<int, PointerTrace> pointers) {
+    if (pointers.length < 2) return 0;
 
-    double sum = 0;
+    final positions = pointers.values
+        .map((pointer) => pointer.lastPosition)
+        .toList();
 
-    for (PointerTrace p in pointers.values) {
-      sum += (p.lastPosition! - center).distance;
-    }
+    final centroid = getCentroid(pointers);
 
-    return sum / pointers.length;
+    return positions
+            .map((p) => (p - centroid).distance)
+            .reduce((a, b) => a + b) /
+        positions.length;
   }
 
   /// Get the scale divide by the `secondDistance` and `firstDistance`
-  static double getScale(
-    double firstDistance,
-    double secondDistance,
-  ) =>
+  static double getScale(double firstDistance, double secondDistance) =>
       secondDistance / firstDistance;
 
   /// Analyzes the movement of each finger to measure [Radial] and [Tangential],
@@ -97,10 +68,10 @@ class MathUtils {
       if (!pointers.containsKey(pointer)) continue;
 
       /// Initial position
-      final p0 = initialPointers[pointer]!.lastPosition!;
+      final p0 = initialPointers[pointer]!.lastPosition;
 
       /// Current position
-      final pNow = pointers[pointer]!.lastPosition!;
+      final pNow = pointers[pointer]!.lastPosition;
 
       /// Vector pointing from the initial center to the initial position
       /// of the finger.
