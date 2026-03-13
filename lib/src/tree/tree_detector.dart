@@ -75,23 +75,25 @@ class TreeDetector {
     }
 
     /// Capture queued
-    Future.microtask(_captureTree);
+    captureTree(null);
   }
 
   ///
-  void _captureTree() {
-    final lom = LomTreeInspector.captureLom(config: config);
+  void captureTree(Element? rootElement) {
+    Future.microtask(() {
+      final lom = LomTreeInspector.captureLom(rootElement, config: config);
 
-    if (lom == null) return;
+      if (lom == null) return;
 
-    /// If the stable structure did not change, no additional processing is
-    /// performed.
-    if (lom.signature == _lastSignature) return;
+      /// If the stable structure did not change, no additional processing is
+      /// performed.
+      if (lom.signature == _lastSignature) return;
 
-    _lastSignature = lom.signature;
-    _lastCaptureTime = DateTime.now();
+      _lastSignature = lom.signature;
+      _lastCaptureTime = DateTime.now();
 
-    _emit(lom);
+      _emit(lom);
+    });
   }
 
   ///

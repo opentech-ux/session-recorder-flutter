@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 
 import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/src/models/models.dart';
 
 class SessionLogger {
   static final SessionRecorderConfig _config = SessionRecorder.instance.config;

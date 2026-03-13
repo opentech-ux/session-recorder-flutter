@@ -129,25 +129,25 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget> {
   }
 }
 
-class _BoundsPainter extends CustomPainter {
-  final List<Rect> rects;
+// class _BoundsPainter extends CustomPainter {
+//   final List<Rect> rects;
 
-  _BoundsPainter(this.rects);
+//   _BoundsPainter(this.rects);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+//   @override
+//   void paint(Canvas canvas, Size size) {
+//     final paint = Paint()
+//       ..color = Colors.red
+//       ..style = PaintingStyle.stroke
+//       ..strokeWidth = 1.5;
 
-    for (final rect in rects) {
-      canvas.drawRect(rect, paint);
-    }
-  }
+//     for (final rect in rects) {
+//       canvas.drawRect(rect, paint);
+//     }
+//   }
 
-  @override
-  bool shouldRepaint(covariant _BoundsPainter oldDelegate) {
-    return oldDelegate.rects != rects;
-  }
-}
+//   @override
+//   bool shouldRepaint(covariant _BoundsPainter oldDelegate) {
+//     return oldDelegate.rects != rects;
+//   }
+// }

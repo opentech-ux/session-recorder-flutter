@@ -97,8 +97,8 @@ class SessionRecorder {
 
   // * INACTIVITY DETECTOR
   late final InactivityDetector _inactivity = InactivityDetector(
-    onActive: () => _reporter.start(),
-    onInactive: () => _reporter.stop(),
+    onActive: () => _reporter._start(),
+    onInactive: () => _reporter._stop(),
   );
 
   // * SESSION REPORTER
@@ -107,7 +107,7 @@ class SessionRecorder {
   );
 
   // * OBSERVER
-  SessionRecorderObserver? observer;
+  SessionNavigatorObserver? observer;
 
   final ValueNotifier<List<Rect>> rects = ValueNotifier<List<Rect>>([]);
 
@@ -298,10 +298,14 @@ class SessionRecorder {
     _detector = TreeDetector(recorder: this);
     _detector!.detect();
 
-    _reporter.start();
+    _reporter._start();
     _inactivity.start();
 
     SessionLogger.mlog("> [ SESSION RECORDER INITIALIZED ]");
+  }
+
+  void _captureTree(Element? rootElement) {
+    _detector!.captureTree(rootElement);
   }
 
   void _recordLom(Lom lom) {
@@ -324,6 +328,16 @@ class SessionRecorder {
   Root? _findRoot(Offset position) {
     final tapTreeResult = _finder.find(_currentLom, position);
     return tapTreeResult.didTap ? tapTreeResult.target : null;
+  }
+
+  void _startReporting() {
+    _reporter._start();
+    _inactivity.start();
+  }
+
+  void _stopReporting() {
+    _reporter._stop();
+    _inactivity.stop();
   }
 
   /// Initializes all services.
@@ -670,7 +684,7 @@ class _SessionRecorderReporter {
   );
 
   /// Starts the session record timer subsystem.
-  void start() {
+  void _start() {
     if (_recorder.config.endpoint == '') return;
     if (_timer?.isActive ?? false) return;
 
@@ -678,7 +692,7 @@ class _SessionRecorderReporter {
   }
 
   /// Stops the periodic timer and clears its reference.
-  void stop() {
+  void _stop() {
     if (_timer == null) return;
 
     _timer?.cancel();

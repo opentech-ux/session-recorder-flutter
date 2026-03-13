@@ -6,8 +6,8 @@ import 'package:uuid/uuid.dart';
 class LomTreeInspector {
   const LomTreeInspector._();
 
-  static Lom? captureLom({
-    Element? element,
+  static Lom? captureLom(
+    Element? element, {
     LomTreeConfig config = const LomTreeConfig(),
   }) {
     final rootElement = element ?? WidgetsBinding.instance.rootElement;
