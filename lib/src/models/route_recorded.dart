@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+@immutable
 class RouteRecorded {
   final String key;
   final Route<dynamic> route;
@@ -7,7 +8,7 @@ class RouteRecorded {
   final BuildContext? subtreeContext;
   final Rect? rect;
 
-  RouteRecorded({
+  const RouteRecorded({
     required this.key,
     required this.route,
     required this.name,

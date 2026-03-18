@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../enums/gestures_type_enum.dart';
 
+@immutable
 abstract class ExplorationEvent {
   final int timestamp;
   final Rect viewport;
   final GesturesType explorationType;
 
-  ExplorationEvent({
+  const ExplorationEvent({
     required this.timestamp,
     required this.viewport,
     required this.explorationType,
@@ -81,7 +82,7 @@ abstract class ExplorationEvent {
 class PanExplorationEvent extends ExplorationEvent {
   final Offset position;
 
-  PanExplorationEvent({
+  const PanExplorationEvent({
     required super.timestamp,
     required super.viewport,
     required this.position,
@@ -118,7 +119,7 @@ class ZoomExplorationEvent extends ExplorationEvent {
   final int endTimestamp;
   final List<Offset> positions;
 
-  ZoomExplorationEvent({
+  const ZoomExplorationEvent({
     required super.timestamp,
     required super.viewport,
     required this.endTimestamp,
@@ -157,7 +158,7 @@ class ZoomExplorationEvent extends ExplorationEvent {
 class ScrollExplorationEvent extends ExplorationEvent {
   final ScrollPhase phase;
 
-  ScrollExplorationEvent({
+  const ScrollExplorationEvent({
     required super.timestamp,
     required super.viewport,
     required this.phase,

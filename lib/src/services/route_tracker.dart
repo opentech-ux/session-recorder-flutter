@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
-import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../models/models.dart';
 
@@ -245,7 +245,7 @@ class RouteTracker {
         }
       });
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
   }
@@ -351,7 +351,7 @@ class RouteTracker {
 
       return null;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
   }
@@ -369,7 +369,7 @@ class RouteTracker {
 
       return null;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
   }

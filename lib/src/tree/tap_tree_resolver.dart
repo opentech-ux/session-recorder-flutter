@@ -9,18 +9,21 @@ class TapTreeResult {
   bool get didTap => target != null;
 }
 
-typedef _Match = ({Root root, int depth});
+typedef _DeepRoot = ({Root root, int depth});
 
 class TapTreeFinder {
   const TapTreeFinder();
 
+  ///
   TapTreeResult find(Lom lom, Offset position) {
     final paths = _getHitPaths(position);
     if (paths.isEmpty) return TapTreeResult(null);
 
     final hitsId = {
       for (int i = 0; i < paths.length; i++)
-        paths[i].target.hashCode.toRadixString(16): i,
+        if (paths[i].target case final RenderBox target
+            when target.hasSize && target.size != Size.zero)
+          target.hashCode.toRadixString(16): i,
     };
 
     final match = _findDeepest(hitsId, [lom.root!]);
@@ -32,6 +35,7 @@ class TapTreeFinder {
     return TapTreeResult(match.root);
   }
 
+  ///
   List<HitTestEntry> _getHitPaths(Offset position) {
     final HitTestResult hitTestResult = HitTestResult();
     final RenderView renderView = RendererBinding.instance.renderViews.first;
@@ -45,20 +49,20 @@ class TapTreeFinder {
     return hitTestResult.path.toList();
   }
 
-  _Match? _findDeepest(Map<String, int> hitsId, List<Root> roots) {
-    _Match? found;
-
+  ///
+  _DeepRoot? _findDeepest(
+    Map<String, int> hitsId,
+    List<Root> roots, {
+    _DeepRoot? found,
+  }) {
     for (Root root in roots) {
       final depth = hitsId[root.objectId];
-      if (depth != null && (found == null || depth > found.depth)) {
+
+      if (depth != null && (found == null || depth < found.depth)) {
         found = (root: root, depth: depth);
       }
 
-      final foundChild = _findDeepest(hitsId, root.children);
-      if (foundChild != null &&
-          (found == null || foundChild.depth > foundChild.depth)) {
-        found = foundChild;
-      }
+      found = _findDeepest(hitsId, root.children, found: found);
     }
 
     return found;

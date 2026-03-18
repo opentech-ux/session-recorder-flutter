@@ -79,11 +79,12 @@ class TimedPosition {
       'TimedPosition(timestamp: $timestamp, position: $position)';
 }
 
+@immutable
 class ViewportPosition {
   final int timestamp;
   final Rect viewport;
 
-  ViewportPosition(this.timestamp, this.viewport);
+  const ViewportPosition(this.timestamp, this.viewport);
 
   @override
   String toString() =>

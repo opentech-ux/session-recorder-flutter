@@ -1,7 +1,3 @@
-import 'package:flutter/widgets.dart';
-import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
-import 'package:session_recorder_flutter/src/services/route_tracker.dart';
-
 /// {@template session_observer}
 /// A lightweight navigation observer used to capture navigation events
 /// and delegate them to the internal `[RouteTracker]`.
@@ -47,46 +43,48 @@ import 'package:session_recorder_flutter/src/services/route_tracker.dart';
 ///   - `[RouteTracker]`: Central navigation tracking engine used internally
 /// by the package.
 /// {@endtemplate}
-class SessionRecorderObserver extends RouteObserver<PageRoute<dynamic>> {
-  /// {@macro session_observer}
-  SessionRecorderObserver();
+// class SessionRecorderObserver extends RouteObserver<PageRoute<dynamic>> {
+//   /// {@macro session_observer}
+//   SessionRecorderObserver();
 
-  @override
-  void didPush(Route route, Route? previousRoute) {
-    super.didPush(route, previousRoute);
-    RouteTracker.instance.handleRouting(route, NavigationType.push);
-  }
+//   @override
+//   void didPush(Route route, Route? previousRoute) {
+//     super.didPush(route, previousRoute);
+//     RouteTracker.instance.handleRouting(route, NavigationType.push);
+//   }
 
-  @override
-  void didPop(Route route, Route? previousRoute) {
-    RouteTracker.instance.handleRouting(
-      route,
-      NavigationType.pop,
-      oldRoute: previousRoute,
-    );
+//   @override
+//   void didPop(Route route, Route? previousRoute) {
+//     RouteTracker.instance.handleRouting(
+//       route,
+//       NavigationType.pop,
+//       oldRoute: previousRoute,
+//     );
 
-    super.didPop(route, previousRoute);
-  }
+//     super.didPop(route, previousRoute);
+//   }
 
-  @override
-  void didReplace({Route? newRoute, Route? oldRoute}) {
-    RouteTracker.instance.handleRouting(
-      newRoute,
-      NavigationType.replace,
-      oldRoute: oldRoute,
-    );
+//   @override
+//   void didReplace({Route? newRoute, Route? oldRoute}) {
+//     RouteTracker.instance.handleRouting(
+//       newRoute,
+//       NavigationType.replace,
+//       oldRoute: oldRoute,
+//     );
 
-    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-  }
+//     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+//   }
 
-  @override
-  void didRemove(Route route, Route? previousRoute) {
-    RouteTracker.instance.handleRouting(
-      route,
-      NavigationType.remove,
-      oldRoute: previousRoute,
-    );
+//   @override
+//   void didRemove(Route route, Route? previousRoute) {
+//     RouteTracker.instance.handleRouting(
+//       route,
+//       NavigationType.remove,
+//       oldRoute: previousRoute,
+//     );
 
-    super.didRemove(route, previousRoute);
-  }
-}
+// ignore_for_file: dangling_library_doc_comments
+
+//     super.didRemove(route, previousRoute);
+//   }
+// }

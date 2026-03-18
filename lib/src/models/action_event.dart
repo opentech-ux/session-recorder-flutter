@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../enums/gestures_type_enum.dart';
 
+@immutable
 abstract class ActionEvent {
   final int timestampRelative;
   final GesturesType actionType;
@@ -9,7 +10,7 @@ abstract class ActionEvent {
   final Rect viewport;
   final Offset position;
 
-  ActionEvent({
+  const ActionEvent({
     required this.timestampRelative,
     required this.zone,
     required this.actionType,
@@ -91,7 +92,7 @@ abstract class ActionEvent {
 }
 
 class TapActionEvent extends ActionEvent {
-  TapActionEvent({
+  const TapActionEvent({
     required super.timestampRelative,
     required super.zone,
     required super.viewport,
@@ -124,7 +125,7 @@ class TapActionEvent extends ActionEvent {
 }
 
 class DoubleTapActionEvent extends ActionEvent {
-  DoubleTapActionEvent({
+  const DoubleTapActionEvent({
     required super.timestampRelative,
     required super.zone,
     required super.viewport,
@@ -159,7 +160,7 @@ class DoubleTapActionEvent extends ActionEvent {
 class LongPressActionEvent extends ActionEvent {
   final Duration duration;
 
-  LongPressActionEvent({
+  const LongPressActionEvent({
     required super.timestampRelative,
     required super.zone,
     required super.viewport,

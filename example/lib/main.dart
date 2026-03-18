@@ -6,11 +6,9 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final params = SessionRecorderConfig(
-    endpoint: 'https://api.example.com/session',
-  );
-
-  SessionRecorder.instance.init(params);
+  SessionRecorder.instance
+    ..configure(SessionRecorderConfig(debugLog: true, endpoint: ""))
+    ..init();
 
   runApp(const MainApp());
 }
@@ -20,12 +18,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: ExampleApp(),
-      navigatorObservers: [SessionRecorderObserver()],
-      builder: (context, child) => SessionRecorderWidget(
-        showLayout: true,
-        child: child ?? SizedBox.shrink(),
+    return SessionRecorderWidget.observer(
+      builder: (observer) => MaterialApp(
+        home: ExampleApp(),
+        navigatorObservers: [observer],
+        builder: (context, child) => child ?? SizedBox.shrink(),
       ),
     );
   }

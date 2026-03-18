@@ -1,3 +1,6 @@
+import 'package:meta/meta.dart';
+
+@immutable
 class SessionRecorderConfig {
   /// The backend endpoint (URI) that receives session data.
   ///

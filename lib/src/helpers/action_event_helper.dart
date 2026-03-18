@@ -1,6 +1,6 @@
 import 'package:flutter/rendering.dart';
 
-import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../enums/gestures_type_enum.dart';
 import '../models/models.dart'
@@ -37,7 +37,7 @@ class ActionEventHelper {
 
       return actionEvents;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -78,7 +78,7 @@ class ActionEventHelper {
           );
       }
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       final root = rootReference.values.first;
       return TapActionEvent(
         zone: "z${root.id}",
@@ -135,7 +135,7 @@ class ActionEventHelper {
 
       return rootTouched;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return rootReference.values.first;
     }
   }

@@ -1,9 +1,10 @@
-part of '../session_recorder_core.dart';
+import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/session/session_controller_internal.dart';
 
 /// Mixin that pauses and resumes the tracker based on [AppLifecycleState].
 mixin SessionLifecycleObserver<T extends StatefulWidget>
     on State<T>, WidgetsBindingObserver {
-  SessionRecorder get _recorder => SessionRecorder.instance;
+  SessionControllerInternal get _controller;
 
   @override
   void initState() {
@@ -21,12 +22,12 @@ mixin SessionLifecycleObserver<T extends StatefulWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
-        _recorder._startReporting();
+        _controller.startReporting();
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
-        _recorder._stopReporting();
+        _controller.stopReporting();
     }
 
     super.didChangeAppLifecycleState(state);

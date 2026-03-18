@@ -1,4 +1,6 @@
-part of '../session_recorder_core.dart';
+import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/session/session_controller_internal.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_observer}
 /// A lightweight navigation observer used to capture navigation events
@@ -46,43 +48,63 @@ part of '../session_recorder_core.dart';
 /// by the package.
 /// {@endtemplate}
 class SessionNavigatorObserver extends NavigatorObserver {
-  final SessionRecorder _recorder;
+  final SessionControllerInternal _controller;
 
   SessionNavigatorObserver({SessionRecorder? recorder})
-    : _recorder = recorder ?? SessionRecorder.instance {
-    _recorder.observer = this;
+    : _controller = (recorder ?? SessionRecorder.instance).controller {
+    _controller.registerObserver(this);
   }
+
+  bool _isAttached = false;
+  bool get isDisposed => _isAttached && navigator == null;
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    if (route is! PageRoute) return;
+    _setAttached();
     _handleCapture(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
+    _setAttached();
     if (previousRoute == null) return;
-    if (previousRoute is! PageRoute) return;
     _handleCapture(previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    _setAttached();
     if (newRoute == null) return;
-    if (newRoute is! PageRoute) return;
     _handleCapture(newRoute);
   }
 
-  void _handleCapture(PageRoute<dynamic> route) {
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    _setAttached();
+  }
+
+  void _setAttached() => _isAttached = true;
+
+  void _handleCapture(Route<dynamic> route) {
+    _controller.captureCurrentNavigation();
+
     final animation = (route as TransitionRoute).animation;
 
     void capture() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final elementFromContext = _contextOf(route);
-        _recorder._captureTree(elementFromContext);
+
+        _controller.setCurrentRouteElement(elementFromContext);
+
+        if (elementFromContext == null) return;
+
+        debugPrint(">> OBSERVER CAPTURE");
+
+        _controller.captureTree(true);
       });
     }
 

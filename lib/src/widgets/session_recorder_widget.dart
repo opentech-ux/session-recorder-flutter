@@ -1,4 +1,9 @@
-part of '../session_recorder_core.dart';
+import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/collectors/gestures_collector.dart';
+import 'package:session_recorder_flutter/src/collectors/scroll_collector.dart';
+import 'package:session_recorder_flutter/src/observers/session_lifecycle_observer.dart';
+import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_recorder_widget}
 /// A wrapper widget that listens to user interactions across the app.
@@ -45,9 +50,9 @@ class SessionRecorderWidget extends StatefulWidget {
 
   static Widget observer({
     Key? key,
-    required Widget Function(SessionRecorderObserver observer) builder,
+    required Widget Function(SessionNavigatorObserver observer) builder,
   }) {
-    final observer = SessionRecorderObserver();
+    final observer = SessionNavigatorObserver();
     return SessionRecorderWidget(child: builder(observer));
   }
 
@@ -55,17 +60,18 @@ class SessionRecorderWidget extends StatefulWidget {
   State<SessionRecorderWidget> createState() => _SessionRecorderWidgetState();
 }
 
-class _SessionRecorderWidgetState extends State<SessionRecorderWidget> {
+class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
+    with WidgetsBindingObserver, SessionLifecycleObserver {
   late final GestureCollector _gestures;
   late final ScrollCollector _explorations;
-  late final SessionRecorder _recorder;
+
+  SessionRecorder get _session => SessionRecorder.instance;
 
   @override
   void initState() {
     super.initState();
-    _recorder = SessionRecorder.instance;
-    _gestures = GestureCollector(_recorder);
-    _explorations = ScrollCollector(_recorder);
+    _gestures = GestureCollector(_session.recorder);
+    _explorations = ScrollCollector(_session.recorder);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyObserver();
@@ -74,23 +80,33 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget> {
 
   ///
   void _verifyObserver() {
-    if (_recorder.observer?.navigator != null) return;
+    if (_session.controller.isNavigationAttached) return;
 
     FlutterError.reportError(
       FlutterErrorDetails(
         exception: FlutterError(
-          'SessionRecorderObserver was not attached to any Navigator.\n'
+          'SessionNavigatorObserver was not attached to any Navigator.\n'
           'Pass the observer to MaterialApp.navigatorObservers:\n\n'
           '  SessionRecorder.wrapApp(\n'
           '    builder: (observer) => MaterialApp(\n'
           '      navigatorObservers: [observer],  // ← required\n'
           '      home: ...,\n'
           '    ),\n'
+          '  );\n'
+          'Or if you are using GoRouter Navigator.\n'
+          'Pass the observer to GoRouter.observers:\n\n'
+          '  SessionRecorderWidget(\n'
+          '    child: MaterialApp.router(\n'
+          '      routeConfig: GoRouter('
+          '         observers: [SessionNavigatorObserver()]\n' // ← required\n'
+          '      ),\n'
+          '      home: ...,\n'
+          '    ),\n'
           '  );\n',
         ),
         library: 'session_recorder_flutter',
         context: ErrorDescription(
-          'checking SessionRecorderObserver attachment',
+          'checking SessionNavigatorObserver attachment',
         ),
       ),
     );
@@ -98,34 +114,45 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        NotificationListener<ScrollNotification>(
-          onNotification: _explorations.handleScrollNotification,
-          child: Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerDown: _gestures.onPointerDown,
-            onPointerMove: _gestures.onPointerMove,
-            onPointerUp: _gestures.onPointerUp,
-            child: widget.child,
-          ),
-        ),
-
-        // if (widget.showLayout)
-        //   ValueListenableBuilder<List<Rect>>(
-        //     valueListenable: SessionRecorder.instance.rects,
-        //     builder: (context, rects, child) {
-        //       return IgnorePointer(
-        //         ignoring: true,
-        //         child: CustomPaint(
-        //           painter: _BoundsPainter(rects),
-        //           size: Size.infinite,
-        //         ),
-        //       );
-        //     },
-        //   ),
-      ],
+    return NotificationListener<ScrollNotification>(
+      onNotification: _explorations.handleScrollNotification,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _gestures.onPointerDown,
+        onPointerMove: _gestures.onPointerMove,
+        onPointerUp: _gestures.onPointerUp,
+        child: widget.child,
+      ),
     );
+
+    // return Stack(
+    //   children: [
+    //     NotificationListener<ScrollNotification>(
+    //       onNotification: _explorations.handleScrollNotification,
+    //       child: Listener(
+    //         behavior: HitTestBehavior.translucent,
+    //         onPointerDown: _gestures.onPointerDown,
+    //         onPointerMove: _gestures.onPointerMove,
+    //         onPointerUp: _gestures.onPointerUp,
+    //         child: widget.child,
+    //       ),
+    //     ),
+
+    //     // if (widget.showLayout)
+    //     //   ValueListenableBuilder<List<Rect>>(
+    //     //     valueListenable: SessionRecorder.instance.rects,
+    //     //     builder: (context, rects, child) {
+    //     //       return IgnorePointer(
+    //     //         ignoring: true,
+    //     //         child: CustomPaint(
+    //     //           painter: _BoundsPainter(rects),
+    //     //           size: Size.infinite,
+    //     //         ),
+    //     //       );
+    //     //     },
+    //     //   ),
+    //   ],
+    // );
   }
 }
 

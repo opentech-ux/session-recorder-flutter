@@ -11,6 +11,8 @@ class LomTreeInspector {
     LomTreeConfig config = const LomTreeConfig(),
   }) {
     final rootElement = element ?? WidgetsBinding.instance.rootElement;
+    debugPrint('rootElement.runtimeType');
+    debugPrint(rootElement.runtimeType.toString());
     if (rootElement == null) return null;
 
     final counter = _RootCounter();
@@ -20,6 +22,11 @@ class LomTreeInspector {
       counter: counter,
     );
     final signature = _signatureRoots(children);
+
+    debugPrint("signature");
+    debugPrint(signature.toString());
+
+    // _printTree(children, 0);
 
     final Rect? rect = _transformRect(rootElement.renderObject);
 
@@ -44,6 +51,13 @@ class LomTreeInspector {
       root: root,
     );
   }
+
+  // static void _printTree(List<Root> nodes, int indent) {
+  //   for (final node in nodes) {
+  //     debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
+  //     _printTree(node.children, indent + 1);
+  //   }
+  // }
 
   static String computeTreeSignature(Element? rootElement) {
     final root = rootElement ?? WidgetsBinding.instance.rootElement;
@@ -72,16 +86,19 @@ class LomTreeInspector {
     final Widget widget = element.widget;
     final String widgetType = widget.runtimeType.toString();
 
-    if (widgetType.startsWith('_')) return const [];
-    if (config.pruneAt.contains(widgetType)) return const [];
-    for (final type in config.ignoreAt) {
-      if (widgetType.contains(type)) return const [];
-    }
-
     final children = <Root>[];
     element.visitChildren((child) {
-      children.addAll(_visitElement(element, config: config, counter: counter));
+      children.addAll(_visitElement(child, config: config, counter: counter));
     });
+
+    if (widgetType.startsWith('_')) return children;
+
+    if (widget is! RenderObjectWidget) return children;
+
+    if (config.pruneAt.contains(widgetType)) return children;
+    if (config.ignoreAt.any((widget) => widgetType.contains(widget))) {
+      return children;
+    }
 
     final renderObject = element.renderObject;
     final Rect? rect = _transformRect(renderObject);

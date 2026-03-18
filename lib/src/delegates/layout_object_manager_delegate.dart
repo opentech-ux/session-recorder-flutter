@@ -5,8 +5,8 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:session_recorder_flutter/src/utils/session_logger.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
 import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;
@@ -59,233 +59,233 @@ class LomDelegate {
   void clearLom() => _lom = null;
 
   /// Creates and assigns a new [Lom] instance using a given `size` viewport.
-  void _init(Size size) {
-    _lom = Lom(
-      id: Uuid().v4(),
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-      width: size.width.toInt(),
-      height: size.height.toInt(),
-    );
-  }
+  // void _init(Size size) {
+  //   _lom = Lom(
+  //     id: Uuid().v4(),
+  //     timestamp: DateTime.now().millisecondsSinceEpoch,
+  //     width: size.width.toInt(),
+  //     height: size.height.toInt(),
+  //   );
+  // }
 
-  void recursiveBox(Root root, List<Rect> output) {
-    output.add(root.box);
-    for (var child in root.children) {
-      recursiveBox(child, output);
-    }
-  }
+  // void recursiveBox(Root root, List<Rect> output) {
+  //   output.add(root.box);
+  //   for (var child in root.children) {
+  //     recursiveBox(child, output);
+  //   }
+  // }
 
-  /// Builds and returns a [Lom] tree bases on the widget hierarchy
-  /// starting from the given `element`.
-  ///
-  /// This methods is the most important cause the [Element] recursively visits
-  /// its child elements, creating a [Root] node for each one and storing them
-  /// in the `rootReference` map with their `hashCode` key.
-  ///
-  /// Avoid rebuilding the Widget tree if the signature already exists in the cache.
-  /// Instead, insert a [LomRef] that references the existing [Lom] instance.
-  /// Improves performance and prevents data duplication.
-  Future<LomAbstract?> createLomTree(Element element, String signature) async {
-    try {
-      if (!element.mounted) return null;
+  // /// Builds and returns a [Lom] tree bases on the widget hierarchy
+  // /// starting from the given `element`.
+  // ///
+  // /// This methods is the most important cause the [Element] recursively visits
+  // /// its child elements, creating a [Root] node for each one and storing them
+  // /// in the `rootReference` map with their `hashCode` key.
+  // ///
+  // /// Avoid rebuilding the Widget tree if the signature already exists in the cache.
+  // /// Instead, insert a [LomRef] that references the existing [Lom] instance.
+  // /// Improves performance and prevents data duplication.
+  // Future<LomAbstract?> createLomTree(Element element, String signature) async {
+  //   try {
+  //     if (!element.mounted) return null;
 
-      LomRef? lomRef;
+  //     LomRef? lomRef;
 
-      if (_cacheLom.keys.contains(signature)) {
-        final Lom lomFound = _cacheLom[signature]!;
+  //     if (_cacheLom.keys.contains(signature)) {
+  //       final Lom lomFound = _cacheLom[signature]!;
 
-        final output = <Rect>[];
-        recursiveBox(lomFound.root!, output);
+  //       final output = <Rect>[];
+  //       recursiveBox(lomFound.root!, output);
 
-        SessionRecorder().rects.value = List.unmodifiable(output);
+  //       SessionRecorder().rects.value = List.unmodifiable(output);
 
-        lomRef = LomRef(
-          id: lomFound.id,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-        );
-      }
+  //       lomRef = LomRef(
+  //         id: lomFound.id,
+  //         timestamp: DateTime.now().millisecondsSinceEpoch,
+  //       );
+  //     }
 
-      if (rootReference.isNotEmpty) rootReference.clear();
+  //     if (rootReference.isNotEmpty) rootReference.clear();
 
-      final RenderObject? rootRenderObject = element.renderObject;
+  //     final RenderObject? rootRenderObject = element.renderObject;
 
-      if (rootRenderObject == null) return null;
-      if (!rootRenderObject.attached) return null;
-      if (rootRenderObject is! RenderBox) return null;
+  //     if (rootRenderObject == null) return null;
+  //     if (!rootRenderObject.attached) return null;
+  //     if (rootRenderObject is! RenderBox) return null;
 
-      final RenderBox renderBox = rootRenderObject;
-      final Size rootSize = renderBox.size;
+  //     final RenderBox renderBox = rootRenderObject;
+  //     final Size rootSize = renderBox.size;
 
-      if (rootSize.width == 0 && rootSize.height == 0) return null;
+  //     if (rootSize.width == 0 && rootSize.height == 0) return null;
 
-      /// Resets the count zones
-      _zoneId = 1;
+  //     /// Resets the count zones
+  //     _zoneId = 1;
 
-      final Offset rootOffset = renderBox.localToGlobal(Offset.zero);
+  //     final Offset rootOffset = renderBox.localToGlobal(Offset.zero);
 
-      /// First [Root] node
-      final Root root = _createRootFromElement(
-        widgetType: element.widget.runtimeType.toString(),
-        renderObject: rootRenderObject,
-        box: Rect.fromLTWH(
-          rootOffset.dx,
-          rootOffset.dy,
-          rootSize.width,
-          rootSize.height,
-        ),
-      );
+  //     /// First [Root] node
+  //     final Root root = _createRootFromElement(
+  //       widgetType: element.widget.runtimeType.toString(),
+  //       renderObject: rootRenderObject,
+  //       box: Rect.fromLTWH(
+  //         rootOffset.dx,
+  //         rootOffset.dy,
+  //         rootSize.width,
+  //         rootSize.height,
+  //       ),
+  //     );
 
-      rootReference[root.objectId] = root;
+  //     rootReference[root.objectId] = root;
 
-      /// Recursively elements
-      element.visitChildElements((child) => _mapRootTree(child));
+  //     /// Recursively elements
+  //     element.visitChildElements((child) => _mapRootTree(child));
 
-      /// Wait to return the [LomRef] object found here after process again
-      /// the rootReference.
-      ///
-      /// This is needed cause' the [ActionEvent].
-      if (lomRef != null) return lomRef;
+  //     /// Wait to return the [LomRef] object found here after process again
+  //     /// the rootReference.
+  //     ///
+  //     /// This is needed cause' the [ActionEvent].
+  //     if (lomRef != null) return lomRef;
 
-      /// Port to Isolate function
-      final ReceivePort receivePort = ReceivePort();
+  //     /// Port to Isolate function
+  //     final ReceivePort receivePort = ReceivePort();
 
-      final rootToken = RootIsolateToken.instance!;
+  //     final rootToken = RootIsolateToken.instance!;
 
-      await Isolate.spawn(processTreeMap, [
-        receivePort.sendPort,
-        rootToken,
-        root.id,
-      ]);
+  //     await Isolate.spawn(processTreeMap, [
+  //       receivePort.sendPort,
+  //       rootToken,
+  //       root.id,
+  //     ]);
 
-      final messageIsolate = (await receivePort.first) as List<String>;
+  //     final messageIsolate = (await receivePort.first) as List<String>;
 
-      final roots = List<Root>.from(
-        messageIsolate.map<Root>((x) => Root.fromJson(x)),
-      );
+  //     final roots = List<Root>.from(
+  //       messageIsolate.map<Root>((x) => Root.fromJson(x)),
+  //     );
 
-      _lom ?? _init(rootSize);
+  //     _lom ?? _init(rootSize);
 
-      _lom = _lom!.copyWith(root: root.copyWith(children: roots));
+  //     _lom = _lom!.copyWith(root: root.copyWith(children: roots));
 
-      final output = <Rect>[];
-      recursiveBox(_lom!.root!, output);
-      SessionRecorder().rects.value = List.unmodifiable(output);
+  //     final output = <Rect>[];
+  //     recursiveBox(_lom!.root!, output);
+  //     SessionRecorder().rects.value = List.unmodifiable(output);
 
-      _cacheLom[signature] = _lom!;
+  //     _cacheLom[signature] = _lom!;
 
-      return _lom;
-    } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
-      return null;
-    }
-  }
+  //     return _lom;
+  //   } catch (e, s) {
+  //     SessionLogger.elog("!! >> [Some error]", e, s);
+  //     return null;
+  //   }
+  // }
 
-  /// Process the Tree map in an Isolate method.
-  void processTreeMap(List<dynamic> args) {
-    final sendPort = args[0] as SendPort;
+  // /// Process the Tree map in an Isolate method.
+  // void processTreeMap(List<dynamic> args) {
+  //   final sendPort = args[0] as SendPort;
 
-    BackgroundIsolateBinaryMessenger.ensureInitialized(args[1]);
-    final int rootId = args[2] as int;
+  //   BackgroundIsolateBinaryMessenger.ensureInitialized(args[1]);
+  //   final int rootId = args[2] as int;
 
-    /// Re-create a new map based by `rootReference` but with their `children`
-    final Map<int, Root> rootMap = {
-      for (final root in rootReference.values)
-        root.id: root.copyWith(children: List<Root>.from(root.children)),
-    };
+  //   /// Re-create a new map based by `rootReference` but with their `children`
+  //   final Map<int, Root> rootMap = {
+  //     for (final root in rootReference.values)
+  //       root.id: root.copyWith(children: List<Root>.from(root.children)),
+  //   };
 
-    /// Delete the first [Root] to avoid duplication of the first same [Root]
-    /// We gonna already used it in `_mapRootTree` and it is set it after
-    /// in the `_lom`
-    rootMap.remove(rootId);
+  //   /// Delete the first [Root] to avoid duplication of the first same [Root]
+  //   /// We gonna already used it in `_mapRootTree` and it is set it after
+  //   /// in the `_lom`
+  //   rootMap.remove(rootId);
 
-    final Set<Root> rootsAttached = {};
+  //   final Set<Root> rootsAttached = {};
 
-    /// Attach every [Root] node that corresponds their `parentId`
-    for (final root in rootMap.values) {
-      final int parentId = root.parentId;
+  //   /// Attach every [Root] node that corresponds their `parentId`
+  //   for (final root in rootMap.values) {
+  //     final int parentId = root.parentId;
 
-      if (parentId == root.id || !rootMap.containsKey(parentId)) {
-        rootsAttached.add(root);
-      } else {
-        rootMap[parentId]!.children.add(root);
-      }
-    }
+  //     if (parentId == root.id || !rootMap.containsKey(parentId)) {
+  //       rootsAttached.add(root);
+  //     } else {
+  //       rootMap[parentId]!.children.add(root);
+  //     }
+  //   }
 
-    sendPort.send(rootsAttached.map((r) => r.toJsonIsolate()).toList());
-  }
+  //   sendPort.send(rootsAttached.map((r) => r.toJsonIsolate()).toList());
+  // }
 
-  /// Recursively maps the `element` tree widgets into a [Root] instance.
-  ///
-  /// This method inspects every [Element]'s child and it meets the configured
-  /// criteria __(e.g., has a valid [RenderBox], `shouldInclude()` method, ect)__,
-  /// it creates a corresponding [Root] node.
-  ///
-  /// Then, it calls itself on each child element to continue building the tree
-  /// from top to bottom, but also finds its ancestor [Element] to add its
-  /// hashCode id.
-  void _mapRootTree(Element element) {
-    try {
-      if (SerializeTreeUtils.hasRender(element)) {
-        if (SerializeTreeUtils.isVisibleElement(element)) {
-          if (SerializeTreeUtils.hasRenderWidget(element.widget)) {
-            final RenderObjectWidget widget =
-                element.widget as RenderObjectWidget;
-            if (SerializeTreeUtils.shouldInclude(widget)) {
-              final RenderBox renderObject = element.renderObject as RenderBox;
-              final Offset offset = renderObject.localToGlobal(Offset.zero);
-              final Rect rect = Rect.fromLTWH(
-                offset.dx,
-                offset.dy,
-                renderObject.size.width,
-                renderObject.size.height,
-              );
+  // /// Recursively maps the `element` tree widgets into a [Root] instance.
+  // ///
+  // /// This method inspects every [Element]'s child and it meets the configured
+  // /// criteria __(e.g., has a valid [RenderBox], `shouldInclude()` method, ect)__,
+  // /// it creates a corresponding [Root] node.
+  // ///
+  // /// Then, it calls itself on each child element to continue building the tree
+  // /// from top to bottom, but also finds its ancestor [Element] to add its
+  // /// hashCode id.
+  // void _mapRootTree(Element element) {
+  //   try {
+  //     if (SerializeTreeUtils.hasRender(element)) {
+  //       if (SerializeTreeUtils.isVisibleElement(element)) {
+  //         if (SerializeTreeUtils.hasRenderWidget(element.widget)) {
+  //           final RenderObjectWidget widget =
+  //               element.widget as RenderObjectWidget;
+  //           if (SerializeTreeUtils.shouldInclude(widget)) {
+  //             final RenderBox renderObject = element.renderObject as RenderBox;
+  //             final Offset offset = renderObject.localToGlobal(Offset.zero);
+  //             final Rect rect = Rect.fromLTWH(
+  //               offset.dx,
+  //               offset.dy,
+  //               renderObject.size.width,
+  //               renderObject.size.height,
+  //             );
 
-              Root root = _createRootFromElement(
-                widgetType: widget.runtimeType.toString(),
-                renderObject: renderObject,
-                box: rect,
-              );
+  //             Root root = _createRootFromElement(
+  //               widgetType: widget.runtimeType.toString(),
+  //               renderObject: renderObject,
+  //               box: rect,
+  //             );
 
-              /// Visit `element`'s ancestor to set the `parentId` attribute
-              if (element.mounted) {
-                element.visitAncestorElements((parent) {
-                  final RenderObject? parentRender = parent.renderObject;
-                  if (parentRender == null) return true;
+  //             /// Visit `element`'s ancestor to set the `parentId` attribute
+  //             if (element.mounted) {
+  //               element.visitAncestorElements((parent) {
+  //                 final RenderObject? parentRender = parent.renderObject;
+  //                 if (parentRender == null) return true;
 
-                  final parentNode = rootReference[parentRender.hashCode];
-                  if (parentNode == null) return true;
+  //                 final parentNode = rootReference[parentRender.hashCode];
+  //                 if (parentNode == null) return true;
 
-                  root = root.copyWith(parentId: parentNode.id);
+  //                 root = root.copyWith(parentId: parentNode.id);
 
-                  return false;
-                });
-              }
+  //                 return false;
+  //               });
+  //             }
 
-              rootReference[root.objectId] = root;
-            }
-          }
-        }
-      }
-    } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
-      return;
-    }
+  //             rootReference[root.objectId] = root;
+  //           }
+  //         }
+  //       }
+  //     }
+  //   } catch (e, s) {
+  //     SessionLogger.elog("!! >> [Some error]", e, s);
+  //     return;
+  //   }
 
-    element.visitChildren((child) => _mapRootTree(child));
-  }
+  //   element.visitChildren((child) => _mapRootTree(child));
+  // }
 
-  /// Creates a [Root] object from the `renderObject`.
-  Root _createRootFromElement({
-    required String widgetType,
-    required RenderObject renderObject,
-    required Rect box,
-  }) => Root(
-    id: _zoneId++,
-    objectId: renderObject.hashCode,
-    parentId: 0,
-    widgetType: widgetType,
-    renderType: renderObject.runtimeType.toString(),
-    box: box,
-    children: [],
-  );
+  // /// Creates a [Root] object from the `renderObject`.
+  // Root _createRootFromElement({
+  //   required String widgetType,
+  //   required RenderObject renderObject,
+  //   required Rect box,
+  // }) => Root(
+  //   id: _zoneId++,
+  //   objectId: renderObject.hashCode,
+  //   parentId: 0,
+  //   widgetType: widgetType,
+  //   renderType: renderObject.runtimeType.toString(),
+  //   box: box,
+  //   children: [],
+  // );
 }

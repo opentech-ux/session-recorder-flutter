@@ -1,8 +1,13 @@
-part of '../session_recorder_core.dart';
+import 'package:flutter/material.dart';
+
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
+import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
+import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
 
 /// Detects scroll gestures from [ScrollNotification] bubbled up the widget tree.
 class ScrollCollector {
-  final SessionRecorder _recorder;
+  final SessionRecorderInternal _recorder;
 
   ScrollCollector(this._recorder);
 
@@ -27,7 +32,7 @@ class ScrollCollector {
 
     if (notification is ScrollStartNotification) {
       _scrollSession = ScrollSession(startPixel: scrollPosition.pixels);
-      _recorder._recordExploration(
+      _recorder.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: Rect.zero,
@@ -57,7 +62,7 @@ class ScrollCollector {
         scrollSession.positions.add(pixel);
       }
 
-      _recorder._recordExploration(
+      _recorder.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: Rect.zero,

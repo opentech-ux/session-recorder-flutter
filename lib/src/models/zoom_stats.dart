@@ -1,3 +1,6 @@
+import 'package:meta/meta.dart';
+
+@immutable
 class ZoomStats {
   /// Average radial movement (in pixels).
   ///
@@ -21,17 +24,14 @@ class ZoomStats {
   /// - 0.5 = half move away and half move closer.
   final double consistency;
 
-  ZoomStats({
+  const ZoomStats({
     required this.avgRadial,
     required this.tangentialRms,
     required this.consistency,
   });
 
-  factory ZoomStats.zero() => ZoomStats(
-        avgRadial: 0,
-        tangentialRms: 0,
-        consistency: 0,
-      );
+  factory ZoomStats.zero() =>
+      ZoomStats(avgRadial: 0, tangentialRms: 0, consistency: 0);
 
   @override
   String toString() =>

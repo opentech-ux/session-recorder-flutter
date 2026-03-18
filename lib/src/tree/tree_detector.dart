@@ -1,7 +1,11 @@
-part of '../session_recorder_core.dart';
+import 'package:flutter/material.dart';
+
+import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
+import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
+import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 
 class TreeDetector {
-  final SessionRecorder recorder;
+  final SessionRecorderInternal recorder;
   final LomTreeConfig config;
 
   TreeDetector({required this.recorder, this.config = const LomTreeConfig()});
@@ -12,6 +16,7 @@ class TreeDetector {
   bool _isPendingCapture = false;
   bool _isPostFrameQueued = false;
   bool _isBuilded = false;
+  bool _isPendingNavigation = false;
 
   String _lastSignature = '';
   DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
@@ -63,41 +68,63 @@ class TreeDetector {
   void _onRequestCapture(Duration _) {
     _isPostFrameQueued = false;
 
+    debugPrint(">> _onRequestCapture");
+
     if (!_isRunning || !_isPendingCapture) return;
 
     _isPendingCapture = false;
 
+    debugPrint(">> _onRequestCapture 2");
+
+    debugPrint(">> _isPendingNavigation : $_isPendingNavigation");
+
+    if (_isPendingNavigation) return;
+
     final DateTime now = DateTime.now();
 
     /// Minimum [200] ms between consecutive captures
-    if (now.difference(_lastCaptureTime).inMilliseconds < 200) {
+    if (now.difference(_lastCaptureTime).inMilliseconds < 500) {
+      debugPrint(">> multiple 3");
+
       return;
     }
 
+    debugPrint(">> REQUEST CAPTURE");
+
     /// Capture queued
-    captureTree(null);
+    captureTree(false);
   }
 
   ///
-  void captureTree(Element? rootElement) {
+  void currentlyNavigation() => _isPendingNavigation = true;
+
+  ///
+  void captureTree(bool comesFromNavigation) {
+    if (comesFromNavigation) _isPendingNavigation = true;
+
     Future.microtask(() {
-      final lom = LomTreeInspector.captureLom(rootElement, config: config);
+      if (!comesFromNavigation) if (_isPendingCapture) return;
 
-      if (lom == null) return;
+      try {
+        final lom = LomTreeInspector.captureLom(
+          recorder.currentRouteElement,
+          config: config,
+        );
 
-      /// If the stable structure did not change, no additional processing is
-      /// performed.
-      if (lom.signature == _lastSignature) return;
+        if (lom == null) return;
 
-      _lastSignature = lom.signature;
-      _lastCaptureTime = DateTime.now();
+        /// If the stable structure did not change, no additional processing is
+        /// performed.
+        if (lom.signature == _lastSignature) return;
 
-      _emit(lom);
+        _lastSignature = lom.signature;
+
+        recorder.recordLom(lom);
+
+        _lastCaptureTime = DateTime.now();
+      } finally {
+        if (comesFromNavigation) _isPendingNavigation = false;
+      }
     });
-  }
-
-  ///
-  void _emit(LomAbstract lom) {
-    recorder._recordLom(lom as Lom);
   }
 }

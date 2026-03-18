@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
-import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../enums/gestures_type_enum.dart';
 import '../models/models.dart'
@@ -45,7 +45,7 @@ class ExplorationEventHelper {
 
       return explorationEvents;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -71,7 +71,7 @@ class ExplorationEventHelper {
 
       return panList;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -102,7 +102,7 @@ class ExplorationEventHelper {
 
       return zoomList;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }
@@ -130,8 +130,8 @@ class ExplorationEventHelper {
       /// Avoid divided by 0
       if (d0 <= 1e-6) return false;
 
-      final cNow = MathUtils.getCentroid(scaleStats.scalePointers!);
-      final dNow = MathUtils.getAverageDistance(pointers, cNow);
+      // final cNow = MathUtils.getCentroid(scaleStats.scalePointers!);
+      final dNow = MathUtils.getAverageDistance(pointers);
 
       final scale = MathUtils.getScale(d0, dNow);
       final scaleSensitivity = (scale - 1.0).abs();
@@ -160,7 +160,7 @@ class ExplorationEventHelper {
       /// must exceed the more demanding one.
       final bool radialDominates =
           stats.avgRadial.abs() >
-          math.max(scaleSlop, radialToTang * stats.tangentialRms);
+          math.max(pinchSlop, radialToTang * stats.tangentialRms);
 
       /// Requires that the fraction of fingers pointing in the same radial
       /// direction be ≥ `consistencyFraction`
@@ -168,7 +168,7 @@ class ExplorationEventHelper {
 
       return radialDominates && consistent && maybeScale;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return false;
     }
   }
@@ -180,11 +180,12 @@ class ExplorationEventHelper {
     Map<int, Rect> scrollViewportRects,
   ) {
     try {
-      final List<TimedPosition> positions = List<TimedPosition>.from(
-        scrollPanPositions.entries
-            .map((p) => TimedPosition(p.key, p.value))
-            .toList(),
-      );
+      // final List<TimedPosition> positions = List<TimedPosition>.from(
+      //   scrollPanPositions.entries
+      //       .map((p) => TimedPosition(p.key, p.value))
+      //       .toList(),
+      // );
+      final List<TimedPosition> positions = [];
 
       if (positions.isEmpty) return [];
 
@@ -262,7 +263,7 @@ class ExplorationEventHelper {
 
       return scrollExplorationEvents;
     } catch (e, s) {
-      SessionLogger.elog("!! >> [Some error]", e, s);
+      // SessionLogger.elog("!! >> [Some error]", e, s);
       return [];
     }
   }

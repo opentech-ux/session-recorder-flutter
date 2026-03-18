@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+@immutable
 class Root {
   final int id;
   final String objectId;
@@ -11,7 +12,7 @@ class Root {
   final Rect box;
   final List<Root> children;
 
-  Root({
+  const Root({
     required this.id,
     required this.objectId,
     required this.parentId,
