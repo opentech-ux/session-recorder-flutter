@@ -16,38 +16,51 @@ import 'package:session_recorder_flutter/src/tree/tap_tree_resolver.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC FACADE
+// Only configure() and init() are exposed to end users.
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// {@template session_record_service}
-/// Main service coordinator for session recording and interaction capture.
+/// Main tracker coordinator for session interaction recording and tree capture.
 ///
 /// This class is the primary entry point of the package and the only object
-/// consumers are intended to call `[init()]` method from `[main]`.
-///
-/// It extends `[WidgetsBindingObserver]` to observe app lifecycle events
-/// (pause/resume/etc.) and to manage timers and periodic uploads safely.
-///
-/// This class centralizes all the following responsibilities:
-///  - Acts as entry point for the package (singleton).
-///  - Exposes `[init()]` for setup.
-///  - Forwards pointer and scroll events to `[InteractionDelegate]`.
-///  - Detects UI changes via signature comparison and rebuilds only when needed.
-///  - Manages timers and lifecycle pauses/resumes safely.
-///  - Handles periodic upload of recorded session data.
+/// consumers are intended to call `[init()]` and `[configure()]` method from
+/// `[main()]`.
 ///
 /// {@template session_record}
-/// Example usage
+/// ### Example usage
 /// ```dart
-/// import 'package:flutter/material.dart';
-/// import 'package:session_recorder_flutter/session_recorder.dart';
-///
 /// void main() {
 ///   // Important to add it before calling init method
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
-///   final params = SessionRecorderConfig(
-///     endpoint: 'https://api.example.com/session',
+///   final config = SessionRecorderConfig(
+///     endpoint: 'https://api.example.com/endpoint',
+///     debugLog: true,
 ///   );
 ///
-///   SessionRecorder.instance.init(params);
+///   SessionRecorder.instance.configure(config);
+///   SessionRecorder.instance.init();
+///
+///   runApp(MyApp());
+/// }
+/// ```
+///
+/// Or also could be as :
+/// ```dart
+/// void main() {
+///   // Important to add it before calling init method
+///   WidgetsFlutterBinding.ensureInitialized();
+///
+///   SessionRecorder.instance
+///     ..configure(
+///       SessionRecorderConfig(
+///         endpoint: 'https://api.example.com/endpoint',
+///         debugLog: true,
+///       ),
+///     )
+///     ..init();
 ///
 ///   runApp(MyApp());
 /// }
@@ -60,15 +73,12 @@ import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 ///
 /// This method performs several heavy operations.
 /// Therefore, it **must not be called from any widget build method,
-/// hot path, or frequent callback** — doing so may cause UI freezes
+/// hot path, or frequent callback**, doing so may cause UI freezes
 /// or dropped frames.
 ///
 /// Call `[init()]` **only once**, and **only after** the app’s root widget
 /// (`MaterialApp`, `CupertinoApp`, etc.) has been fully mounted.
 ///
-/// See also
-///  - `[InteractionDelegate]`: chunk/layout processors, which perform the
-/// low-level traversal and gesture analysis.
 /// {@endtemplate}
 @sealed
 class SessionRecorder {
@@ -100,6 +110,7 @@ class SessionRecorder {
 
   Element? _currentRouteElement;
 
+  @internal
   final ValueNotifier<List<Rect>> rects = ValueNotifier<List<Rect>>([]);
 
   InactivityDetector? _inactivity;
@@ -107,7 +118,7 @@ class SessionRecorder {
 
   bool get _isDetectorRunning => _detector?.isRunning == true;
 
-  ///
+  /// Configures the Session Recorder with the given `[SessionRecorderConfig]`
   void configure(SessionRecorderConfig config) {
     // TODO uncomment this :
     // if (!endpointRegExp.hasMatch(config.endpoint)) {
@@ -124,11 +135,11 @@ class SessionRecorder {
   /// This method performs the initial setup required for the widget-tree
   /// capture service:
   ///
-  ///  - Safe to call from application startup (for example, from `[main()]`)
-  /// or from an initialization phase.
+  ///  - Ensure to call it from application startup in `[main()]`.
   ///  - Write `[WidgetsFlutterBinding.ensureInitialized();]` before this method.
   ///  - The scheduled listeners run after frames; avoid calling `[init()]` during
-  ///  an unstable `[build()]` phase where the navigator key has not yet been attached.
+  ///  an unstable `[build()]`.
+  ///  - Only set it **once**.
   ///
   /// {@macro session_record}
   ///
@@ -174,7 +185,7 @@ class _RecorderImpl implements SessionRecorderInternal {
     debugPrint("_currentLom.toString()");
     debugPrint(_recorder._currentLom.toString());
     _recorder._currentChunk.addLom(lom);
-    debugPrint(_recorder._currentChunk.toString());
+    debugPrint(_recorder._currentChunk.loms.length.toString());
 
     SessionLogger.mlog("> [ LOM SAVED - ${lom.id} sign=${lom.signature}]");
   }

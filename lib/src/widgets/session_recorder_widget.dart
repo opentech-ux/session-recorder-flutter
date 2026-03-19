@@ -6,28 +6,35 @@ import 'package:session_recorder_flutter/src/observers/session_navigator_observe
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_recorder_widget}
-/// A wrapper widget that listens to user interactions across the app.
+/// Root widget that activates behavior tracking for the whole app.
 ///
-/// You should use `[SessionRecorderWidget]` as a wrapper to `[WidgetsApp.builder]`.
+/// You should use `[SessionRecorderWidget]` as a wrapper to `[MaterialApp]`.
 ///
-/// The widget itself does not contain heavy logic; instead, it delegates
-/// processing to internal services such as `[InteractionDelegate]` and
-/// `[SessionRecorder]`.
+/// The widget itself does not contain heavy logic; instead, it collects the
+/// data to internal collectors such as `[GestureCollector]` and
+/// `[ScrollCollector]`.
 ///
-/// You can disable the widget layout painter by passing `[false]` to either
-/// `showLayout`.
+/// ## Setup — choose one based on your router
 ///
-/// Also you can disable the capturing gestures data with `disable`
-/// __only for testing__ purpose.
+/// ### 1. Standard Flutter Navigator
 ///
-/// Example usage
+/// Wrap the `[MaterialApp]` with the `.observer` method to has already the
+/// `[SessionNavigatorObserver]` instance and pass it to `navigatorObservers`
 /// ```dart
-/// return MaterialApp(
-///   navigatorObservers: [
-///     SessionRecorderObserver(),
-///   ],
-///   builder: (context, child) => SessionRecorderWidget(
-///     child: child!,
+/// return SessionRecorder.observer(
+///   builder: (observer) => MaterialApp(
+///     navigatorObservers: [observer],
+///     home: const HomeScreen(),
+///   ),
+/// );
+/// ```
+/// ### 2. No factory method
+///
+/// ```dart
+/// return SessionRecorder(
+///   child: MaterialApp(
+///     navigatorObservers: [SessionNavigatorObserver()],
+///     home: const HomeScreen(),
 ///   ),
 /// );
 /// ```
@@ -78,7 +85,8 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     });
   }
 
-  ///
+  /// Verifies that at least one `[SessionNavigatorObserver]` is attached
+  /// to a Navigator after the first frame.
   void _verifyObserver() {
     if (_session.controller.isNavigationAttached) return;
 
@@ -87,7 +95,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
         exception: FlutterError(
           'SessionNavigatorObserver was not attached to any Navigator.\n'
           'Pass the observer to MaterialApp.navigatorObservers:\n\n'
-          '  SessionRecorder.wrapApp(\n'
+          '  SessionRecorder.observer(\n'
           '    builder: (observer) => MaterialApp(\n'
           '      navigatorObservers: [observer],  // ← required\n'
           '      home: ...,\n'

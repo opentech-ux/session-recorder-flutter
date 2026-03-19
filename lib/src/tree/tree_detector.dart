@@ -4,6 +4,8 @@ import 'package:session_recorder_flutter/src/session/session_recorder_internal.d
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 
+/// Watches for widget tree structural changes and captures snapshots.
+
 class TreeDetector {
   final SessionRecorderInternal recorder;
   final LomTreeConfig config;
@@ -20,10 +22,9 @@ class TreeDetector {
 
   String _lastSignature = '';
   DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
-
   VoidCallback? _lastOnBuildScheduled;
 
-  ///
+  /// Starts watching for tree changes.
   void detect() {
     if (_isRunning) return;
 
@@ -31,7 +32,6 @@ class TreeDetector {
     _buildOrDefer();
   }
 
-  ///
   void _buildOrDefer() {
     final buildOwner = WidgetsBinding.instance.buildOwner;
 
@@ -42,17 +42,16 @@ class TreeDetector {
       return;
     }
 
-    /// Already builded the [BuildOwner] (e.g detect() called twice across a hot
-    /// restart).
     if (_isBuilded) return;
 
     _lastOnBuildScheduled = buildOwner.onBuildScheduled;
-
     buildOwner.onBuildScheduled = () {
       _lastOnBuildScheduled?.call();
 
       if (!_isRunning) return;
 
+      // Multiple dirty elements in the same frame set this flag once and
+      // register a single postFrameCallback.
       _isPendingCapture = true;
 
       if (!_isPostFrameQueued) {
@@ -64,7 +63,6 @@ class TreeDetector {
     _isBuilded = true;
   }
 
-  ///
   void _onRequestCapture(Duration _) {
     _isPostFrameQueued = false;
 
@@ -78,6 +76,7 @@ class TreeDetector {
 
     debugPrint(">> _isPendingNavigation : $_isPendingNavigation");
 
+    // Navigation has priority, suppress auto-captures during animations.
     if (_isPendingNavigation) return;
 
     final DateTime now = DateTime.now();
@@ -95,10 +94,8 @@ class TreeDetector {
     captureTree(false);
   }
 
-  ///
   void currentlyNavigation() => _isPendingNavigation = true;
 
-  ///
   void captureTree(bool comesFromNavigation) {
     if (comesFromNavigation) _isPendingNavigation = true;
 
@@ -113,8 +110,8 @@ class TreeDetector {
 
         if (lom == null) return;
 
-        /// If the stable structure did not change, no additional processing is
-        /// performed.
+        // If the stable structure did not change, no additional processing is
+        // performed.
         if (lom.signature == _lastSignature) return;
 
         _lastSignature = lom.signature;

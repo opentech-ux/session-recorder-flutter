@@ -5,7 +5,8 @@ import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
 
-/// Detects scroll gestures from [ScrollNotification] bubbled up the widget tree.
+/// Collects scroll position data and emits one [ScrollSessionEndEvent] per
+/// gesture.
 class ScrollCollector {
   final SessionRecorderInternal _recorder;
 
@@ -73,4 +74,6 @@ class ScrollCollector {
 
     return false;
   }
+
+  // TODO : viewport rect
 }

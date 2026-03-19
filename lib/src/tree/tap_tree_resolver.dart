@@ -1,6 +1,7 @@
 import 'package:flutter/rendering.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 
+/// The result of resolving a tap position against a `[Lom]`.
 class TapTreeResult {
   final Root? target;
 
@@ -11,10 +12,14 @@ class TapTreeResult {
 
 typedef _DeepRoot = ({Root root, int depth});
 
+/// Resolves a tap screen position to a `[Root]` in a `[Lom]`.
+///
+/// A single depth-first traversal finds the deepest matching root and its
+/// ancestor path simultaneously.
 class TapTreeFinder {
   const TapTreeFinder();
 
-  ///
+  /// Resolves `position` against `lom` and returns the deepest root.
   TapTreeResult find(Lom lom, Offset position) {
     final paths = _getHitPaths(position);
     if (paths.isEmpty) return TapTreeResult(null);
@@ -35,7 +40,7 @@ class TapTreeFinder {
     return TapTreeResult(match.root);
   }
 
-  ///
+  /// Runs Flutter's own hit test and returns all entries in the hit path.
   List<HitTestEntry> _getHitPaths(Offset position) {
     final HitTestResult hitTestResult = HitTestResult();
     final RenderView renderView = RendererBinding.instance.renderViews.first;
@@ -49,7 +54,7 @@ class TapTreeFinder {
     return hitTestResult.path.toList();
   }
 
-  ///
+  /// Walks `roots` depth-first, returning the root with the lowest depth index.
   _DeepRoot? _findDeepest(
     Map<String, int> hitsId,
     List<Root> roots, {

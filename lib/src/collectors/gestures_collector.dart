@@ -6,6 +6,8 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
+/// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
+///
 class GestureCollector {
   final SessionRecorderInternal _recorder;
 
@@ -52,8 +54,6 @@ class GestureCollector {
     final Offset position = details.position;
 
     final PointerTrace? pointerTrace = _pointers[pointer];
-
-    // final int timestampNow = DateTime.now().millisecondsSinceEpoch;
 
     /// If for some reason the current `pointer` not exist in `_pointers`, we
     /// add it

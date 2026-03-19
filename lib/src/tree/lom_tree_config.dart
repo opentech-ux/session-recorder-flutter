@@ -1,6 +1,5 @@
+/// Controls which widget types appear in the captured tree.
 class LomTreeConfig {
-  // TODO : more configuration in the future
-
   final Set<String> pruneAt;
   final Set<String> ignoreAt;
 

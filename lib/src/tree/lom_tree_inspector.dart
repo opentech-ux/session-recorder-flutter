@@ -3,9 +3,11 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/models/models.dart' show Lom, Root;
 import 'package:uuid/uuid.dart';
 
+/// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
   const LomTreeInspector._();
 
+  /// Captures the widget tree starting from `[Element]`.
   static Lom? captureLom(
     Element? element, {
     LomTreeConfig config = const LomTreeConfig(),
@@ -59,25 +61,6 @@ class LomTreeInspector {
   //   }
   // }
 
-  static String computeTreeSignature(Element? rootElement) {
-    final root = rootElement ?? WidgetsBinding.instance.rootElement;
-    if (root == null) return '';
-    return _computeTreeSignature(root);
-  }
-
-  static String _computeTreeSignature(Element element) {
-    final StringBuffer buffer = StringBuffer();
-    _buildElement(element, buffer);
-    return buffer.toString().hashCode.toRadixString(16);
-  }
-
-  static _buildElement(Element element, StringBuffer buffer) {
-    final Widget widget = element.widget;
-    final String widgetType = widget.runtimeType.toString();
-
-    if (widgetType.startsWith('_')) return null;
-  }
-
   static List<Root> _visitElement(
     Element element, {
     required LomTreeConfig config,
@@ -86,14 +69,16 @@ class LomTreeInspector {
     final Widget widget = element.widget;
     final String widgetType = widget.runtimeType.toString();
 
+    // Always visit children first, even skipped roots may have valid children.
     final children = <Root>[];
     element.visitChildren((child) {
       children.addAll(_visitElement(child, config: config, counter: counter));
     });
 
-    if (widgetType.startsWith('_')) return children;
-
+    // Only capture RenderObjectWidgets, skips all StatelessWidget wrappers.
     if (widget is! RenderObjectWidget) return children;
+
+    if (widgetType.startsWith('_')) return children;
 
     if (config.pruneAt.contains(widgetType)) return children;
     if (config.ignoreAt.any((widget) => widgetType.contains(widget))) {
@@ -120,6 +105,7 @@ class LomTreeInspector {
     ];
   }
 
+  /// Computes the screen rect of `render` in global coordinates.
   static Rect? _transformRect(RenderObject? render) {
     if (render == null || !render.attached || render is! RenderBox) return null;
     try {

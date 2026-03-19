@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+
 import 'package:session_recorder_flutter/src/session/session_controller_internal.dart';
 
-/// Mixin that pauses and resumes the tracker based on [AppLifecycleState].
+/// Mixin that pauses and resumes the tracker based on `[AppLifecycleState]`.
+///
+/// It extends `[WidgetsBindingObserver]` to observe app lifecycle events
+/// (pause/resume/etc.) and to manage timers and periodic uploads safely.
 mixin SessionLifecycleObserver<T extends StatefulWidget>
     on State<T>, WidgetsBindingObserver {
   SessionControllerInternal get _controller;
