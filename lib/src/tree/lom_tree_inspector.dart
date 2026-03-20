@@ -1,14 +1,18 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
-import 'package:session_recorder_flutter/src/models/models.dart' show Lom, Root;
+import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:uuid/uuid.dart';
 
 /// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
   const LomTreeInspector._();
 
+  static final LinkedHashMap<String, Lom> _cache = LinkedHashMap();
+
   /// Captures the widget tree starting from `[Element]`.
-  static Lom? captureLom(
+  static LomAbstract? captureLom(
     Element? element, {
     LomTreeConfig config = const LomTreeConfig(),
   }) {
@@ -23,12 +27,6 @@ class LomTreeInspector {
       config: config,
       counter: counter,
     );
-    final signature = _signatureRoots(children);
-
-    debugPrint("signature");
-    debugPrint(signature.toString());
-
-    // _printTree(children, 0);
 
     final Rect? rect = _transformRect(rootElement.renderObject);
 
@@ -44,14 +42,36 @@ class LomTreeInspector {
       children: children,
     );
 
-    return Lom(
-      id: Uuid().v4(),
+    // _printTree(children, 0);
+
+    final signature = _signatureRoots([root]);
+
+    debugPrint("signature");
+    debugPrint(signature.toString());
+
+    if (_cache.containsKey(signature)) {
+      final Lom cacheLom = _cache[signature]!;
+
+      return LomRef(
+        id: cacheLom.id,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        signature: cacheLom.signature,
+        root: cacheLom.root,
+      );
+    }
+
+    final Lom lom = Lom(
+      id: Uuid().v7(),
       timestamp: DateTime.now().millisecondsSinceEpoch,
       width: root.box.width.toInt(),
       height: root.box.height.toInt(),
       signature: signature,
       root: root,
     );
+
+    _cache[signature] = lom;
+
+    return lom;
   }
 
   // static void _printTree(List<Root> nodes, int indent) {

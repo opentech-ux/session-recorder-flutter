@@ -1,6 +1,3 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
@@ -9,19 +6,21 @@ class PointerTrace {
   final int pointer;
   final List<TimedPosition> positions;
   GesturesType type;
-  Timer? timer;
+  // Timer? timer;
 
   PointerTrace({
     required this.pointer,
     List<TimedPosition>? positions,
     required this.type,
-    Timer? timer,
+    // Timer? timer,
   }) : positions = positions ?? [];
 
-  TimedPosition get first =>
-      positions.isNotEmpty ? positions.first : TimedPosition(Offset.zero);
-  TimedPosition get last =>
-      positions.isNotEmpty ? positions.last : TimedPosition(Offset.zero);
+  TimedPosition get first => positions.isNotEmpty
+      ? positions.first
+      : TimedPosition(Offset.zero, viewport: Rect.zero);
+  TimedPosition get last => positions.isNotEmpty
+      ? positions.last
+      : TimedPosition(Offset.zero, viewport: Rect.zero);
 
   Offset get firstPosition => first.position;
   Offset get lastPosition => last.position;
@@ -46,16 +45,16 @@ class PointerTrace {
   double get distance =>
       isEmpty ? 0.0 : (lastPosition - firstPosition).distance;
 
-  void dispose() {
-    timer?.cancel();
-  }
+  // void dispose() {
+  //   timer?.cancel();
+  // }
 
   void setType(GesturesType type) {
     this.type = type;
   }
 
-  void add(Offset position) {
-    positions.add(TimedPosition(position));
+  void add(Offset position, {required Rect viewport}) {
+    positions.add(TimedPosition(position, viewport: viewport));
   }
 
   void clear() {
@@ -70,13 +69,14 @@ class PointerTrace {
 class TimedPosition {
   final int timestamp;
   final Offset position;
+  final Rect viewport;
 
-  TimedPosition(this.position)
+  TimedPosition(this.position, {required this.viewport})
     : timestamp = DateTime.now().millisecondsSinceEpoch;
 
   @override
   String toString() =>
-      'TimedPosition(timestamp: $timestamp, position: $position)';
+      'TimedPosition(timestamp: $timestamp, position: $position, viewport: $viewport)';
 }
 
 @immutable

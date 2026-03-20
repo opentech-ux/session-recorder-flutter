@@ -106,7 +106,8 @@ class SessionRecorder {
 
   late Session _currentSession = Session();
   late Chunk _currentChunk;
-  late Lom _currentLom;
+  late LomAbstract _currentLom;
+  late Rect _viewport = Rect.zero;
 
   Element? _currentRouteElement;
 
@@ -116,9 +117,10 @@ class SessionRecorder {
   InactivityDetector? _inactivity;
   TreeDetector? _detector;
 
-  bool get _isDetectorRunning => _detector?.isRunning == true;
-
   /// Configures the Session Recorder with the given `[SessionRecorderConfig]`
+  ///
+  /// Throws `[FormatException]` if the given `endpoint` from `[SessionRecorderConfig]`
+  /// is not correct.
   void configure(SessionRecorderConfig config) {
     // TODO uncomment this :
     // if (!endpointRegExp.hasMatch(config.endpoint)) {
@@ -148,7 +150,7 @@ class SessionRecorder {
   ///
   /// Throws `[ArgumentError]` if `[SessionRecorderConfig]` are invalid.
   void init() {
-    if (_isDetectorRunning) return;
+    if (_detector?.isRunning == true) return;
 
     _detector = TreeDetector(recorder: _recorder);
     _detector!.detect();
@@ -163,6 +165,15 @@ class _RecorderImpl implements SessionRecorderInternal {
   _RecorderImpl(this._recorder);
 
   final TapTreeFinder _finder = const TapTreeFinder();
+
+  @override
+  Rect get viewport => _recorder._viewport;
+
+  @override
+  void setViewport(Rect viewport) {
+    debugPrint("viewport: $viewport");
+    _recorder._viewport = viewport;
+  }
 
   @override
   Element? get currentRouteElement => _recorder._currentRouteElement;
@@ -180,7 +191,7 @@ class _RecorderImpl implements SessionRecorderInternal {
   }
 
   @override
-  void recordLom(Lom lom) {
+  void recordLom(LomAbstract lom) {
     _recorder._currentLom = lom;
     debugPrint("_currentLom.toString()");
     debugPrint(_recorder._currentLom.toString());

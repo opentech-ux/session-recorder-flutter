@@ -1,4 +1,4 @@
-const String libraryVersion = "1.1.1";
+const String libraryVersion = "1.2.0";
 const String libraryType = "mobile";
 
 final RegExp endpointRegExp = RegExp(

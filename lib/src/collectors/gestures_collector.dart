@@ -7,7 +7,6 @@ import 'package:session_recorder_flutter/src/session/session_recorder_internal.d
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
-///
 class GestureCollector {
   final SessionRecorderInternal _recorder;
 
@@ -64,7 +63,12 @@ class GestureCollector {
       return;
     }
 
-    pointerTrace.add(position);
+    pointerTrace.add(
+      position,
+      viewport: _recorder.viewport.contains(position)
+          ? _recorder.viewport
+          : Rect.zero,
+    );
 
     if (_pointers.length < 2 || _pinchInitialAverage == null) return;
 
@@ -73,7 +77,7 @@ class GestureCollector {
 
     if (avgAbsolute >= pinchSlop) {
       for (var p in _pointers.values) {
-        p.setType(GesturesType.zoom);
+        p.setType(GesturesType.pinch);
       }
     }
 
@@ -94,9 +98,13 @@ class GestureCollector {
     int pointer,
     Offset position, [
     GesturesType type = GesturesType.tap,
-  ]) =>
-      _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-        ..add(position);
+  ]) => _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
+    ..add(
+      position,
+      viewport: _recorder.viewport.contains(position)
+          ? _recorder.viewport
+          : Rect.zero,
+    );
 
   /// Called when the pointer is lifted from the screen.
   ///
@@ -118,50 +126,56 @@ class GestureCollector {
     //   _pinchFingerCount = 0;
     // }
 
-    if (pointerTrace.type == GesturesType.zoom) {
-      pointerTrace.setType(GesturesType.zoom);
-      final explorations = _createExplorationEvent(pointerTrace, Rect.zero);
+    // * pinch
+    if (pointerTrace.type == GesturesType.pinch) {
+      pointerTrace.setType(GesturesType.pinch);
+      final explorations = _createExplorationEvent(pointerTrace);
       _recorder.recordExploration(explorations.first);
       return;
     }
 
+    // * DRAG
     if (pointerTrace.distance >= touchSlop) {
-      pointerTrace.setType(GesturesType.pan);
-      final explorations = _createExplorationEvent(pointerTrace, Rect.zero);
+      pointerTrace.setType(GesturesType.drag);
+      final explorations = _createExplorationEvent(pointerTrace);
       for (ExplorationEvent exploration in explorations) {
         _recorder.recordExploration(exploration);
       }
       return;
     }
 
-    // * DOUBLE TAP
+    // * LONG PRESS
     if (pointerTrace.duration >= longPressTimeout) {
-      pointerTrace.setType(GesturesType.doubleTap);
-      final action = _createActionEvent(pointerTrace, Rect.zero);
+      pointerTrace.setType(GesturesType.longPress);
+      final action = _createActionEvent(pointerTrace);
       _recorder.recordAction(action);
       _lastTapTime = null;
       _lastTapPosition = null;
       return;
     }
 
+    // * DOUBLE TAP
     final now = DateTime.now();
     if (_lastTapTime != null &&
-        now.difference(_lastTapTime!) < doubleTapTimeout &&
+        now.difference(_lastTapTime!).inMilliseconds <
+            doubleTapTimeout.inMilliseconds &&
         _lastTapPosition != null &&
         (pointerTrace.lastPosition - _lastTapPosition!).distance < 40) {
-      pointerTrace.setType(GesturesType.longPress);
-      final action = _createActionEvent(pointerTrace, Rect.zero);
+      pointerTrace.setType(GesturesType.doubleTap);
+      final action = _createActionEvent(pointerTrace);
       _recorder.recordAction(action);
       _lastTapPosition = null;
       _lastTapTime = null;
       return;
     }
 
+    // * TAP
     pointerTrace.setType(GesturesType.tap);
-    final action = _createActionEvent(pointerTrace, Rect.zero);
+    final action = _createActionEvent(pointerTrace);
     _recorder.recordAction(action);
-    _lastTapPosition = null;
-    _lastTapTime = null;
+
+    _lastTapPosition = pointerTrace.lastPosition;
+    _lastTapTime = now;
   }
 
   /// Creates and returns the `[ActionEvent]` object with its zone.
@@ -169,8 +183,7 @@ class GestureCollector {
   /// - `[TapActionEvent]`
   /// - `[DoubleTapActionEvent]`
   /// - `[LongPressActionEvent]`
-  ActionEvent _createActionEvent(PointerTrace pointer, Rect viewportScroll) {
-    // try {
+  ActionEvent _createActionEvent(PointerTrace pointer) {
     final TimedPosition firstPosition = pointer.first;
 
     final root = _recorder.findRoot(firstPosition.position);
@@ -182,21 +195,21 @@ class GestureCollector {
           zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
           duration: pointer.duration,
-          viewport: viewportScroll,
+          viewport: firstPosition.viewport,
           position: firstPosition.position,
         );
       case GesturesType.doubleTap:
         return DoubleTapActionEvent(
           zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
-          viewport: viewportScroll,
+          viewport: firstPosition.viewport,
           position: firstPosition.position,
         );
       default:
         return TapActionEvent(
           zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
-          viewport: viewportScroll,
+          viewport: firstPosition.viewport,
           position: firstPosition.position,
         );
     }
@@ -204,19 +217,16 @@ class GestureCollector {
 
   /// Creates a `[ExplorationEvent]` gonna create it by the `pointers` type
   ///
-  /// Could return a `[PanExplorationEvent]`, `[ZoomExplorationEvent]` list
-  List<ExplorationEvent> _createExplorationEvent(
-    PointerTrace pointer,
-    Rect viewportScroll,
-  ) {
+  /// Could return a `[DragExplorationEvent]`, `[PinchExplorationEvent]` list
+  List<ExplorationEvent> _createExplorationEvent(PointerTrace pointer) {
     List<ExplorationEvent> explorationEvents = [];
 
     switch (pointer.type) {
-      case GesturesType.pan:
-        explorationEvents = _getPanExploration(pointer, viewportScroll);
+      case GesturesType.drag:
+        explorationEvents = _getDragExploration(pointer.positions);
         break;
-      case GesturesType.zoom:
-        explorationEvents = [_getZoomExploration(pointer, viewportScroll)];
+      case GesturesType.pinch:
+        explorationEvents = [_getPinchExploration(pointer)];
 
         break;
 
@@ -226,19 +236,20 @@ class GestureCollector {
     return explorationEvents;
   }
 
-  /// Converts the recorded `[PointerTrace]` data into a list of `[PanExplorationEvent]`
+  /// Converts the recorded `[PointerTrace]` data into a list of `[DragExplorationEvent]`
   /// instances.
-  List<PanExplorationEvent> _getPanExploration(
-    PointerTrace pointerTrace,
-    Rect viewportScroll,
+  List<DragExplorationEvent> _getDragExploration(
+    List<TimedPosition> positions,
   ) {
-    if (pointerTrace.isEmpty) return [];
+    if (positions.isEmpty) return [];
 
-    List<PanExplorationEvent> panList = List.from(
-      pointerTrace.positions.map(
-        (touchDrag) => PanExplorationEvent(
+    final sampledPositions = _samplePositions(positions);
+
+    List<DragExplorationEvent> panList = List.from(
+      sampledPositions.map(
+        (touchDrag) => DragExplorationEvent(
           timestamp: touchDrag.timestamp,
-          viewport: viewportScroll,
+          viewport: touchDrag.viewport,
           position: touchDrag.position,
         ),
       ),
@@ -247,19 +258,34 @@ class GestureCollector {
     return panList;
   }
 
-  /// Converts the recorded `[PointerTrace]` data into a list of `[ZoomExplorationEvent]`
+  /// Converts the recorded `[PointerTrace]` data into a list of `[PinchExplorationEvent]`
   /// instances.
-  ZoomExplorationEvent _getZoomExploration(
-    PointerTrace pointer,
-    Rect viewportScroll,
-  ) {
-    final zoom = ZoomExplorationEvent(
+  PinchExplorationEvent _getPinchExploration(PointerTrace pointer) {
+    final sampledPositions = _samplePositions(pointer.positions);
+
+    final pinch = PinchExplorationEvent(
       timestamp: pointer.firstTimestamp,
       endTimestamp: pointer.lastTimestamp,
-      viewport: viewportScroll,
-      positions: pointer.positions.map((p) => p.position).toList(),
+      viewport: _recorder.viewport,
+      positions: sampledPositions.map((p) => p.position).toList(),
     );
 
-    return zoom;
+    return pinch;
+  }
+
+  /// Returns a sampled version of `positions` keeping every `nth` point.
+  /// Always includes the first and last position to preserve start and end.
+  List<TimedPosition> _samplePositions(
+    List<TimedPosition> positions, {
+    int nth = 6,
+  }) {
+    if (positions.length <= 2) return positions;
+    final sampled = <TimedPosition>[];
+    for (var i = 0; i < positions.length; i++) {
+      if (i == 0 || i == positions.length - 1 || i % nth == 0) {
+        sampled.add(positions[i]);
+      }
+    }
+    return sampled;
   }
 }

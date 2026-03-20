@@ -5,7 +5,7 @@ class Session {
   /// Unique identifier for this reporting session.
   final String id;
 
-  Session() : id = Uuid().v4();
+  Session() : id = Uuid().v7();
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{'id': id};

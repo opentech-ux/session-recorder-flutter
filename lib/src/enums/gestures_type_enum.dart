@@ -1,4 +1,14 @@
-enum GesturesType { none, tap, doubleTap, longPress, pan, zoom, scroll }
+enum GesturesType {
+  none,
+  tap,
+  doubleTap,
+  longPress,
+  drag,
+  pinch,
+  scroll,
+  scrollStart,
+  scrollEnd,
+}
 
 enum ScrollPhase { start, update, end }
 

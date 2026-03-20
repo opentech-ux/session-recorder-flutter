@@ -9,8 +9,15 @@ import 'models.dart';
 abstract class LomAbstract {
   final String id;
   final int timestamp;
+  final String signature;
+  final Root? root;
 
-  const LomAbstract({required this.id, required this.timestamp});
+  const LomAbstract({
+    required this.id,
+    required this.timestamp,
+    required this.signature,
+    this.root,
+  });
 
   Map<String, dynamic> toMap();
 }
@@ -18,16 +25,14 @@ abstract class LomAbstract {
 class Lom extends LomAbstract {
   final int width;
   final int height;
-  final Root? root;
-  final String signature;
 
   const Lom({
     required super.id,
     required super.timestamp,
     required this.width,
     required this.height,
-    required this.signature,
-    this.root,
+    required super.signature,
+    super.root,
   });
 
   @override
@@ -50,7 +55,12 @@ class Lom extends LomAbstract {
 }
 
 class LomRef extends LomAbstract {
-  LomRef({required super.id, required super.timestamp});
+  const LomRef({
+    required super.id,
+    required super.timestamp,
+    required super.signature,
+    super.root,
+  });
 
   @override
   Map<String, dynamic> toMap() {

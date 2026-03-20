@@ -44,7 +44,7 @@ class Chunk {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
-      'lib_t': libraryType,
+      'type': libraryType,
       'ts': timestamp,
       'sid': sId,
       'loms': loms.map((x) => x.toMap()).toList(),

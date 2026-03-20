@@ -81,7 +81,7 @@ class TreeDetector {
 
     final DateTime now = DateTime.now();
 
-    /// Minimum [200] ms between consecutive captures
+    // Minimum 500 ms between consecutive captures
     if (now.difference(_lastCaptureTime).inMilliseconds < 500) {
       debugPrint(">> multiple 3");
 

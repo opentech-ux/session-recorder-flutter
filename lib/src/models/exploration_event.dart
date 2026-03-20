@@ -23,7 +23,7 @@ abstract class ExplorationEvent {
 
     final GesturesType type = GesturesType.values.firstWhere(
       (e) => e.name == typeName,
-      orElse: () => GesturesType.pan,
+      orElse: () => GesturesType.drag,
     );
 
     final List<dynamic> viewport = map['viewport'] as List<dynamic>;
@@ -35,10 +35,10 @@ abstract class ExplorationEvent {
     );
 
     switch (type) {
-      case GesturesType.zoom:
+      case GesturesType.pinch:
         final List<dynamic> pos = map['positions'] as List<dynamic>;
 
-        return ZoomExplorationEvent(
+        return PinchExplorationEvent(
           timestamp: map['timestamp'] as int,
           endTimestamp: map['endTimestamp'] as int,
           viewport: rectViewport,
@@ -58,10 +58,10 @@ abstract class ExplorationEvent {
           phase: phase,
         );
 
-      case GesturesType.pan:
+      case GesturesType.drag:
       default:
         final List<dynamic> pos = map['position'] as List<dynamic>;
-        return PanExplorationEvent(
+        return DragExplorationEvent(
           timestamp: map['timestamp'] as int,
           viewport: rectViewport,
           position: Offset(
@@ -79,14 +79,14 @@ abstract class ExplorationEvent {
       [o.dx, o.dy].map((o) => o.toDouble()).toList();
 }
 
-class PanExplorationEvent extends ExplorationEvent {
+class DragExplorationEvent extends ExplorationEvent {
   final Offset position;
 
-  const PanExplorationEvent({
+  const DragExplorationEvent({
     required super.timestamp,
     required super.viewport,
     required this.position,
-  }) : super(explorationType: GesturesType.pan);
+  }) : super(explorationType: GesturesType.drag);
 
   @override
   String concatenateString() {
@@ -112,27 +112,31 @@ class PanExplorationEvent extends ExplorationEvent {
 
   @override
   String toString() =>
-      'PanExplorationEvent(timestamp: $timestamp, viewport: $viewport, position: $position)';
+      'DragExplorationEvent(timestamp: $timestamp, viewport: $viewport, position: $position)';
 }
 
-class ZoomExplorationEvent extends ExplorationEvent {
+class PinchExplorationEvent extends ExplorationEvent {
   final int endTimestamp;
   final List<Offset> positions;
 
-  const ZoomExplorationEvent({
+  const PinchExplorationEvent({
     required super.timestamp,
     required super.viewport,
     required this.endTimestamp,
     required this.positions,
-  }) : super(explorationType: GesturesType.zoom);
+  }) : super(explorationType: GesturesType.pinch);
 
   @override
   String concatenateString() {
+    final String pos = positions
+        .map((p) => '${p.dx.toInt()},${p.dy.toInt()}')
+        .join('|');
+
     final List<String> attrs = [
       timestamp.toString(),
       explorationType.name,
       '${viewport.left.toInt()},${viewport.top.toInt()}',
-      ...positions.map((p) => '${p.dx.toInt()},${p.dy.toInt()}'),
+      pos,
       endTimestamp.toString(),
     ];
 
@@ -152,7 +156,7 @@ class ZoomExplorationEvent extends ExplorationEvent {
 
   @override
   String toString() =>
-      'ZoomExplorationEvent(timestamp: $timestamp, endTimestamp: $endTimestamp, viewport: $viewport, positions: $positions)';
+      'PinchExplorationEvent(timestamp: $timestamp, endTimestamp: $endTimestamp, viewport: $viewport, positions: $positions)';
 }
 
 class ScrollExplorationEvent extends ExplorationEvent {
@@ -166,10 +170,13 @@ class ScrollExplorationEvent extends ExplorationEvent {
 
   @override
   String concatenateString() {
+    final String type = (phase == ScrollPhase.end)
+        ? GesturesType.scrollEnd.name
+        : GesturesType.scrollStart.name;
+
     final List<String> attrs = [
       timestamp.toString(),
-      explorationType.name,
-      phase.name,
+      type,
       '${viewport.left.toInt()},${viewport.top.toInt()},${viewport.width.toInt()},${viewport.height.toInt()}',
     ];
 

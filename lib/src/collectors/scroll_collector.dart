@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
@@ -12,7 +11,8 @@ class ScrollCollector {
 
   ScrollCollector(this._recorder);
 
-  ScrollSession? _scrollSession;
+  /// Caches of the recent scroll viewport
+  Rect _scrollableRect = Rect.zero;
 
   /// Handles incoming [ScrollNotification] events to detect and record scroll
   /// interactions.
@@ -23,57 +23,72 @@ class ScrollCollector {
 
     final scrollableState = Scrollable.maybeOf(context);
 
-    ScrollPosition scrollPosition;
+    if (notification is! OverscrollNotification) {
+      ScrollPosition scrollPosition;
 
-    if (scrollableState != null) {
-      scrollPosition = scrollableState.position;
-    } else {
-      scrollPosition = notification.metrics as ScrollPosition;
-    }
-
-    if (notification is ScrollStartNotification) {
-      _scrollSession = ScrollSession(startPixel: scrollPosition.pixels);
-      _recorder.recordExploration(
-        ScrollExplorationEvent(
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          viewport: Rect.zero,
-          phase: ScrollPhase.start,
-        ),
-      );
-
-      return false;
-    }
-
-    if (_scrollSession == null) return false;
-
-    final double pixel = scrollPosition.pixels;
-
-    if (notification is ScrollUpdateNotification) {
-      if (_scrollSession == null) return false;
-      if ((pixel - _scrollSession!.positions.last).abs() >= scrollSlop) {
-        _scrollSession!.positions.add(pixel);
-      }
-    }
-
-    if (notification is ScrollEndNotification) {
-      final ScrollSession scrollSession = _scrollSession!;
-      _scrollSession = null;
-
-      if (scrollSession.positions.last != scrollPosition.pixels) {
-        scrollSession.positions.add(pixel);
+      if (scrollableState != null) {
+        scrollPosition = scrollableState.position;
+      } else {
+        scrollPosition = notification.metrics as ScrollPosition;
       }
 
-      _recorder.recordExploration(
-        ScrollExplorationEvent(
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          viewport: Rect.zero,
-          phase: ScrollPhase.end,
-        ),
-      );
+      _captureViewportGeometry(context, scrollPosition);
+      _recorder.setViewport(_scrollableRect);
+
+      if (notification is ScrollStartNotification) {
+        _recorder.recordExploration(
+          ScrollExplorationEvent(
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            viewport: _scrollableRect,
+            phase: ScrollPhase.start,
+          ),
+        );
+
+        return false;
+      }
+
+      if (notification is ScrollEndNotification) {
+        _recorder.recordExploration(
+          ScrollExplorationEvent(
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            viewport: _scrollableRect,
+            phase: ScrollPhase.end,
+          ),
+        );
+      }
     }
 
     return false;
   }
 
-  // TODO : viewport rect
+  /// Computes and updates the current viewport rectangle for a scrollable
+  /// position.
+  void _captureViewportGeometry(
+    BuildContext context,
+    ScrollPosition? scrollPosition,
+  ) {
+    final renderObject = context.findRenderObject();
+
+    if (renderObject is! RenderBox) return;
+
+    final initPosition = renderObject.localToGlobal(Offset.zero);
+
+    final rect = initPosition & renderObject.size;
+
+    _scrollableRect = rect;
+
+    if (scrollPosition == null) return;
+
+    final double contentHeight =
+        scrollPosition.maxScrollExtent + scrollPosition.viewportDimension;
+    final double left = rect.left;
+    final double contentTop = rect.top - scrollPosition.pixels;
+
+    _scrollableRect = Rect.fromLTWH(
+      left,
+      contentTop,
+      rect.width,
+      contentHeight,
+    );
+  }
 }

@@ -8,8 +8,12 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 abstract interface class SessionRecorderInternal {
   Element? get currentRouteElement;
 
-  void recordLom(Lom lom);
+  Rect get viewport;
+  void setViewport(Rect viewport);
+
+  void recordLom(LomAbstract lom);
   void recordAction(ActionEvent action);
   void recordExploration(ExplorationEvent exploration);
+
   Root? findRoot(Offset position);
 }

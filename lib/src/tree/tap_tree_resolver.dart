@@ -20,7 +20,7 @@ class TapTreeFinder {
   const TapTreeFinder();
 
   /// Resolves `position` against `lom` and returns the deepest root.
-  TapTreeResult find(Lom lom, Offset position) {
+  TapTreeResult find(LomAbstract lom, Offset position) {
     final paths = _getHitPaths(position);
     if (paths.isEmpty) return TapTreeResult(null);
 
