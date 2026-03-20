@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
@@ -18,11 +21,14 @@ class TreeDetector {
   bool _isPendingCapture = false;
   bool _isPostFrameQueued = false;
   bool _isBuilded = false;
-  bool _isPendingNavigation = false;
+  bool _isNavigating = false;
 
-  String _lastSignature = '';
-  DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastTimeCaptured = DateTime.fromMillisecondsSinceEpoch(0);
   VoidCallback? _lastOnBuildScheduled;
+
+  /// Holds the latest captured snapshot.
+  /// Used by `[TreeOverlay]` to repaint the debug overlay automatically.
+  final ValueNotifier<LomAbstract?> notifier = ValueNotifier(null);
 
   /// Starts watching for tree changes.
   void detect() {
@@ -74,15 +80,15 @@ class TreeDetector {
 
     debugPrint(">> _onRequestCapture 2");
 
-    debugPrint(">> _isPendingNavigation : $_isPendingNavigation");
+    debugPrint(">> _isNavigating : $_isNavigating");
 
     // Navigation has priority, suppress auto-captures during animations.
-    if (_isPendingNavigation) return;
+    if (_isNavigating) return;
 
     final DateTime now = DateTime.now();
 
     // Minimum 500 ms between consecutive captures
-    if (now.difference(_lastCaptureTime).inMilliseconds < 500) {
+    if (now.difference(_lastTimeCaptured).inMilliseconds < 500) {
       debugPrint(">> multiple 3");
 
       return;
@@ -94,12 +100,16 @@ class TreeDetector {
     captureTree(false);
   }
 
-  void currentlyNavigation() => _isPendingNavigation = true;
+  void setCurrentlyNavigating() => _isNavigating = true;
 
   void captureTree(bool comesFromNavigation) {
-    if (comesFromNavigation) _isPendingNavigation = true;
+    if (comesFromNavigation) _isNavigating = true;
+
+    debugPrint("comesFromNavigation : $comesFromNavigation");
 
     Future.microtask(() {
+      debugPrint("_isPendingCapture : $_isPendingCapture");
+
       if (!comesFromNavigation) if (_isPendingCapture) return;
 
       try {
@@ -110,18 +120,23 @@ class TreeDetector {
 
         if (lom == null) return;
 
-        // If the stable structure did not change, no additional processing is
-        // performed.
-        if (lom.signature == _lastSignature) return;
+        _lastTimeCaptured = DateTime.now();
 
-        _lastSignature = lom.signature;
-
+        _printTree([lom.root!], 0);
+        notifier.value = lom;
         recorder.recordLom(lom);
 
-        _lastCaptureTime = DateTime.now();
+        _lastTimeCaptured = DateTime.now();
       } finally {
-        if (comesFromNavigation) _isPendingNavigation = false;
+        if (comesFromNavigation) _isNavigating = false;
       }
     });
+  }
+
+  static void _printTree(List<Root> nodes, int indent) {
+    for (final node in nodes) {
+      debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
+      _printTree(node.children, indent + 1);
+    }
   }
 }

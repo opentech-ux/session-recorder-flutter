@@ -1,6 +1,7 @@
-import 'package:meta/meta.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/models/models.dart';
 
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 
@@ -14,7 +15,9 @@ abstract interface class SessionControllerInternal {
   void setCurrentRouteElement(Element? element);
 
   void captureTree(bool comesFromNavigation);
-  void captureCurrentNavigation();
+  void setCurrentlyNavigating();
+
+  ValueListenable<LomAbstract?>? get notifier;
 
   void startReporting();
   void stopReporting();

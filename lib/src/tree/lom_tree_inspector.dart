@@ -9,6 +9,8 @@ import 'package:uuid/uuid.dart';
 class LomTreeInspector {
   const LomTreeInspector._();
 
+  static String _lastSignature = "";
+
   static final LinkedHashMap<String, Lom> _cache = LinkedHashMap();
 
   /// Captures the widget tree starting from `[Element]`.
@@ -17,8 +19,7 @@ class LomTreeInspector {
     LomTreeConfig config = const LomTreeConfig(),
   }) {
     final rootElement = element ?? WidgetsBinding.instance.rootElement;
-    debugPrint('rootElement.runtimeType');
-    debugPrint(rootElement.runtimeType.toString());
+
     if (rootElement == null) return null;
 
     final counter = _RootCounter();
@@ -42,12 +43,7 @@ class LomTreeInspector {
       children: children,
     );
 
-    // _printTree(children, 0);
-
     final signature = _signatureRoots([root]);
-
-    debugPrint("signature");
-    debugPrint(signature.toString());
 
     if (_cache.containsKey(signature)) {
       final Lom cacheLom = _cache[signature]!;
@@ -69,17 +65,20 @@ class LomTreeInspector {
       root: root,
     );
 
+    debugPrint(
+      "lom.signature == _lastSignature : ${lom.signature == _lastSignature}",
+    );
+
+    // If the stable structure did not change, no additional processing is
+    // performed.
+    if (lom.signature == _lastSignature) null;
+
+    _lastSignature = lom.signature;
+
     _cache[signature] = lom;
 
     return lom;
   }
-
-  // static void _printTree(List<Root> nodes, int indent) {
-  //   for (final node in nodes) {
-  //     debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
-  //     _printTree(node.children, indent + 1);
-  //   }
-  // }
 
   static List<Root> _visitElement(
     Element element, {

@@ -84,7 +84,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   /// Suppresses auto-captures and waits for `route`'s animation to settle,
   /// then captures the tree from the route's subtree element.
   void _handleCapture(Route<dynamic> route) {
-    _controller.captureCurrentNavigation();
+    _controller.setCurrentlyNavigating();
 
     final animation = (route as TransitionRoute).animation;
 

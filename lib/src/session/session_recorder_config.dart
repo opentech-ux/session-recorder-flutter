@@ -36,5 +36,15 @@ class SessionRecorderConfig {
   /// __Only used for debug purpose.__
   final bool debugLog;
 
-  const SessionRecorderConfig({this.endpoint = "", this.debugLog = false});
+  /// Paints captured [Root] rectangles as a semi-transparent overlay.
+  ///
+  /// Useful during development to verify which widgets are being captured.
+  /// Only active in debug builds regardless of this value.
+  final bool debugShowTree;
+
+  const SessionRecorderConfig({
+    this.endpoint = "",
+    this.debugLog = false,
+    this.debugShowTree = false,
+  });
 }

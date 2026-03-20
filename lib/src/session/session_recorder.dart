@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/io_client.dart';
 import 'package:meta/meta.dart';
 
@@ -193,9 +194,8 @@ class _RecorderImpl implements SessionRecorderInternal {
   @override
   void recordLom(LomAbstract lom) {
     _recorder._currentLom = lom;
-    debugPrint("_currentLom.toString()");
-    debugPrint(_recorder._currentLom.toString());
     _recorder._currentChunk.addLom(lom);
+    debugPrint(" >>>> recordLom");
     debugPrint(_recorder._currentChunk.loms.length.toString());
 
     SessionLogger.mlog("> [ LOM SAVED - ${lom.id} sign=${lom.signature}]");
@@ -216,7 +216,8 @@ class _ControllerImpl implements SessionControllerInternal {
   final List<SessionNavigatorObserver> _observers = [];
 
   @override
-  void captureCurrentNavigation() => _recorder._detector?.currentlyNavigation();
+  void setCurrentlyNavigating() =>
+      _recorder._detector?.setCurrentlyNavigating();
 
   @override
   void captureTree(bool comesFromNavigation) =>
@@ -234,6 +235,9 @@ class _ControllerImpl implements SessionControllerInternal {
   late final _SessionRecorderReporter reporter = _SessionRecorderReporter(
     _recorder,
   );
+
+  @override
+  ValueNotifier<LomAbstract?>? get notifier => _recorder._detector?.notifier;
 
   @override
   void registerObserver(SessionNavigatorObserver observer) {

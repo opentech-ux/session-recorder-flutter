@@ -4,6 +4,7 @@ import 'package:session_recorder_flutter/src/collectors/scroll_collector.dart';
 import 'package:session_recorder_flutter/src/observers/session_lifecycle_observer.dart';
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 
 /// {@template session_recorder_widget}
 /// Root widget that activates behavior tracking for the whole app.
@@ -46,15 +47,11 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 /// {@endtemplate}
 class SessionRecorderWidget extends StatefulWidget {
   final Widget child;
-  final bool showLayout;
 
   /// {@macro session_recorder_widget}
-  const SessionRecorderWidget({
-    super.key,
-    required this.child,
-    this.showLayout = false,
-  });
+  const SessionRecorderWidget({super.key, required this.child});
 
+  /// {@macro session_recorder_widget}
   static Widget observer({
     Key? key,
     required Widget Function(SessionNavigatorObserver observer) builder,
@@ -122,7 +119,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
 
   @override
   Widget build(BuildContext context) {
-    return NotificationListener<ScrollNotification>(
+    Widget content = NotificationListener<ScrollNotification>(
       onNotification: _explorations.handleScrollNotification,
       child: Listener(
         behavior: HitTestBehavior.translucent,
@@ -133,56 +130,13 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
       ),
     );
 
-    // return Stack(
-    //   children: [
-    //     NotificationListener<ScrollNotification>(
-    //       onNotification: _explorations.handleScrollNotification,
-    //       child: Listener(
-    //         behavior: HitTestBehavior.translucent,
-    //         onPointerDown: _gestures.onPointerDown,
-    //         onPointerMove: _gestures.onPointerMove,
-    //         onPointerUp: _gestures.onPointerUp,
-    //         child: widget.child,
-    //       ),
-    //     ),
+    if (_session.config.debugShowTree) {
+      final notifier = _session.controller.notifier;
+      if (notifier != null) {
+        content = LomTreeOverlay(notifier: notifier, child: content);
+      }
+    }
 
-    //     // if (widget.showLayout)
-    //     //   ValueListenableBuilder<List<Rect>>(
-    //     //     valueListenable: SessionRecorder.instance.rects,
-    //     //     builder: (context, rects, child) {
-    //     //       return IgnorePointer(
-    //     //         ignoring: true,
-    //     //         child: CustomPaint(
-    //     //           painter: _BoundsPainter(rects),
-    //     //           size: Size.infinite,
-    //     //         ),
-    //     //       );
-    //     //     },
-    //     //   ),
-    //   ],
-    // );
+    return content;
   }
 }
-
-// class _BoundsPainter extends CustomPainter {
-//   final List<Rect> rects;
-
-//   _BoundsPainter(this.rects);
-
-//   @override
-//   void paint(Canvas canvas, Size size) {
-//     final paint = Paint()
-//       ..color = Colors.red
-//       ..style = PaintingStyle.stroke
-//       ..strokeWidth = 1.5;
-
-//     for (final rect in rects) {
-//       canvas.drawRect(rect, paint);
-//     }
-//   }
-
-//   @override
-//   bool shouldRepaint(covariant _BoundsPainter oldDelegate) {
-//     return oldDelegate.rects != rects;
-//   }
-// }
