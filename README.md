@@ -6,7 +6,7 @@ Designed for production use — efficient, isolated, and safe to integrate with 
 
 > [!warning]
 > 
-> This package is in beta and some things may break your app.
+> This package is currently in **Beta**. Please be aware that future updates may introduce **breaking changes** as the API evolves. We recommend pinning your version to avoid unexpected issues
 
 
 ## Features
