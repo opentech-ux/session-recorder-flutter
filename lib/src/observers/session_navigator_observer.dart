@@ -48,6 +48,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   bool _isAttached = false;
 
   /// True if this observer was ever attached to a Navigator and is now detached.
+  @pragma('vm:prefer-inline')
   bool get isDisposed => _isAttached && navigator == null;
 
   @override
@@ -79,6 +80,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
     _setAttached();
   }
 
+  @pragma('vm:prefer-inline')
   void _setAttached() => _isAttached = true;
 
   /// Suppresses auto-captures and waits for `route`'s animation to settle,

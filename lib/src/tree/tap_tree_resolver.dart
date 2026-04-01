@@ -21,8 +21,10 @@ class TapTreeFinder {
 
   /// Resolves `position` against `lom` and returns the deepest root.
   TapTreeResult find(LomAbstract lom, Offset position) {
+    if (lom.root == null) return const TapTreeResult(null);
+
     final paths = _getHitPaths(position);
-    if (paths.isEmpty) return TapTreeResult(null);
+    if (paths.isEmpty) return const TapTreeResult(null);
 
     final hitsId = {
       for (int i = 0; i < paths.length; i++)
@@ -61,6 +63,8 @@ class TapTreeFinder {
     _DeepRoot? found,
   }) {
     for (Root root in roots) {
+      if (found != null && found.depth == 0) return found;
+
       final depth = hitsId[root.objectId];
 
       if (depth != null && (found == null || depth < found.depth)) {

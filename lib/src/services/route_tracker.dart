@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
-// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
 import '../models/models.dart';
 

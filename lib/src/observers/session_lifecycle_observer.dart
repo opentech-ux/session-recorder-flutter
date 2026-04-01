@@ -8,7 +8,7 @@ import 'package:session_recorder_flutter/src/session/session_controller_internal
 /// (pause/resume/etc.) and to manage timers and periodic uploads safely.
 mixin SessionLifecycleObserver<T extends StatefulWidget>
     on State<T>, WidgetsBindingObserver {
-  SessionControllerInternal get _controller;
+  SessionControllerInternal get controller;
 
   @override
   void initState() {
@@ -26,12 +26,12 @@ mixin SessionLifecycleObserver<T extends StatefulWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
-        _controller.startReporting();
+        controller.startReporting();
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
-        _controller.stopReporting();
+        controller.stopReporting();
     }
 
     super.didChangeAppLifecycleState(state);

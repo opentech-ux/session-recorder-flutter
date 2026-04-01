@@ -1,9 +1,9 @@
-import 'dart:collection';
-
 import 'package:flutter/material.dart';
+
+import 'package:uuid/uuid.dart';
+
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:uuid/uuid.dart';
 
 /// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
@@ -11,34 +11,30 @@ class LomTreeInspector {
 
   static String _lastSignature = "";
 
-  static final LinkedHashMap<String, Lom> _cache = LinkedHashMap();
+  static final Map<String, String> _cache = {};
 
   /// Captures the widget tree starting from `[Element]`.
   static LomAbstract? captureLom(
     Element? element, {
     LomTreeConfig config = const LomTreeConfig(),
   }) {
-    final rootElement = element ?? WidgetsBinding.instance.rootElement;
+    if (element == null) return null;
 
-    if (rootElement == null) return null;
+    if (!element.mounted) return null;
 
     final counter = _RootCounter();
-    final children = _visitElement(
-      rootElement,
-      config: config,
-      counter: counter,
-    );
+    final children = _visitElement(element, config: config, counter: counter);
 
-    final Rect? rect = _transformRect(rootElement.renderObject);
+    final Rect? rect = _transformRect(element.renderObject);
 
     if (rect == null) return null;
 
     final Root root = Root(
       id: counter.next(),
-      objectId: rootElement.renderObject.hashCode.toRadixString(16),
+      objectId: element.renderObject.hashCode.toRadixString(16),
       parentId: 0,
-      widgetType: rootElement.widget.runtimeType.toString(),
-      renderType: rootElement.renderObject.runtimeType.toString(),
+      widgetType: element.widget.runtimeType.toString(),
+      renderType: element.renderObject.runtimeType.toString(),
       box: rect,
       children: children,
     );
@@ -46,18 +42,23 @@ class LomTreeInspector {
     final signature = _signatureRoots([root]);
 
     if (_cache.containsKey(signature)) {
-      final Lom cacheLom = _cache[signature]!;
+      debugPrint("EXIST ALREADY ??");
+      debugPrint("${_cache.keys}");
+
+      final String cacheId = _cache[signature]!;
 
       return LomRef(
-        id: cacheLom.id,
+        id: cacheId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
-        signature: cacheLom.signature,
-        root: cacheLom.root,
+        signature: signature,
+        root: root,
       );
     }
 
+    final String lomId = Uuid().v7();
+
     final Lom lom = Lom(
-      id: Uuid().v7(),
+      id: lomId,
       timestamp: DateTime.now().millisecondsSinceEpoch,
       width: root.box.width.toInt(),
       height: root.box.height.toInt(),
@@ -65,17 +66,12 @@ class LomTreeInspector {
       root: root,
     );
 
-    debugPrint(
-      "lom.signature == _lastSignature : ${lom.signature == _lastSignature}",
-    );
-
     // If the stable structure did not change, no additional processing is
     // performed.
-    if (lom.signature == _lastSignature) null;
+    if (signature == _lastSignature) return null;
 
-    _lastSignature = lom.signature;
-
-    _cache[signature] = lom;
+    _cache[signature] = lomId;
+    _lastSignature = signature;
 
     return lom;
   }
@@ -86,29 +82,31 @@ class LomTreeInspector {
     required _RootCounter counter,
   }) {
     final Widget widget = element.widget;
+
     final String widgetType = widget.runtimeType.toString();
 
-    // Always visit children first, even skipped roots may have valid children.
-    final children = <Root>[];
-    element.visitChildren((child) {
-      children.addAll(_visitElement(child, config: config, counter: counter));
-    });
+    if (config.pruneAt.contains(widgetType)) return [];
 
-    // Only capture RenderObjectWidgets, skips all StatelessWidget wrappers.
-    if (widget is! RenderObjectWidget) return children;
+    if (config.noiseAt.contains(widgetType)) {
+      return _visitChildrenFlat(element, config, counter);
+    }
 
-    if (widgetType.startsWith('_')) return children;
+    final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
-    if (config.pruneAt.contains(widgetType)) return children;
-    if (config.ignoreAt.any((widget) => widgetType.contains(widget))) {
-      return children;
+    if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
+      return _visitChildrenFlat(element, config, counter);
+    }
+
+    if (widgetType.startsWith('_') ||
+        config.ignoreAt.any((w) => widgetType.contains(w))) {
+      return _visitChildrenFlat(element, config, counter);
     }
 
     final renderObject = element.renderObject;
     final Rect? rect = _transformRect(renderObject);
 
     if (rect == null || (rect.width == 0 && rect.height == 0)) {
-      return children;
+      return _visitChildrenFlat(element, config, counter);
     }
 
     return [
@@ -119,18 +117,39 @@ class LomTreeInspector {
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),
         box: rect,
-        children: children,
+        children: _visitChildrenFlat(element, config, counter),
       ),
     ];
+  }
+
+  /// Visite children in flat mode using heavy spread to avoid unnecessary lists
+  static List<Root> _visitChildrenFlat(
+    Element element,
+    LomTreeConfig config,
+    _RootCounter counter,
+  ) {
+    final children = <Root>[];
+    element.visitChildren((child) {
+      final rootChildren = _visitElement(
+        child,
+        config: config,
+        counter: counter,
+      );
+      if (rootChildren.isNotEmpty) {
+        children.addAll(rootChildren);
+      }
+    });
+
+    return children;
   }
 
   /// Computes the screen rect of `render` in global coordinates.
   static Rect? _transformRect(RenderObject? render) {
     if (render == null || !render.attached || render is! RenderBox) return null;
     try {
-      final transform = render.getTransformTo(render);
-      final Offset position = render.localToGlobal(Offset.zero);
-      return MatrixUtils.transformRect(transform, position & render.size);
+      final transform = render.getTransformTo(null);
+      final Rect localRect = Offset.zero & render.size;
+      return MatrixUtils.transformRect(transform, localRect);
     } catch (_) {
       return null;
     }
@@ -147,6 +166,7 @@ class LomTreeInspector {
     for (var root in roots) {
       _writeRoot(root, buffer);
     }
+
     return buffer.toString().hashCode.toRadixString(16);
   }
 
@@ -172,4 +192,7 @@ class _RootCounter {
   int _value = 0;
   int next() => ++_value;
   void clear() => _value = 0;
+
+  @override
+  String toString() => "value: $_value";
 }

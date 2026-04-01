@@ -18,6 +18,9 @@ final Duration longPressTimeout = kLongPressTimeout;
 /// Minimum of pixels if scroll has moved
 final double scrollSlop = 10.0;
 
+const Duration kDebounceTime = Duration(milliseconds: 300);
+const Duration kCooldownTime = Duration(milliseconds: 400);
+
 // * SCALE CONSTS
 
 /// Ratio between radial and tangential movement required

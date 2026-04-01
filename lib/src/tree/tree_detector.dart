@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
@@ -16,24 +17,35 @@ class TreeDetector {
   TreeDetector({required this.recorder, this.config = const LomTreeConfig()});
 
   bool _isRunning = false;
+
+  @pragma('vm:prefer-inline')
   bool get isRunning => _isRunning;
 
-  bool _isPendingCapture = false;
-  bool _isPostFrameQueued = false;
   bool _isBuilded = false;
   bool _isNavigating = false;
+  bool _isNotifierLocked = false;
 
-  DateTime _lastTimeCaptured = DateTime.fromMillisecondsSinceEpoch(0);
+  /// Timer used to handle debouncing of widget tree captures.
+  ///
+  ///  - Acts as a delay mechanism **(300ms)** to avoid capturing the widget
+  /// tree on every minor change.
+  ///  - The timer resets on each detected change and only triggers once no
+  /// further updates occur within the debounce window.
+  ///  - Helps reduce redundant or heavy operations by batching changes.
+  Timer? _debounce;
   VoidCallback? _lastOnBuildScheduled;
+  DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Holds the latest captured snapshot.
   /// Used by `[TreeOverlay]` to repaint the debug overlay automatically.
   final ValueNotifier<LomAbstract?> notifier = ValueNotifier(null);
 
+  @pragma('vm:prefer-inline')
+  void setCurrentlyNavigating() => _isNavigating = true;
+
   /// Starts watching for tree changes.
   void detect() {
     if (_isRunning) return;
-
     _isRunning = true;
     _buildOrDefer();
   }
@@ -51,86 +63,57 @@ class TreeDetector {
     if (_isBuilded) return;
 
     _lastOnBuildScheduled = buildOwner.onBuildScheduled;
+
     buildOwner.onBuildScheduled = () {
       _lastOnBuildScheduled?.call();
 
-      if (!_isRunning) return;
+      if (!_isRunning || _isNavigating) return;
 
-      // Multiple dirty elements in the same frame set this flag once and
-      // register a single postFrameCallback.
-      _isPendingCapture = true;
+      if (_isNotifierLocked) return;
 
-      if (!_isPostFrameQueued) {
-        _isPostFrameQueued = true;
-        WidgetsBinding.instance.addPostFrameCallback(_onRequestCapture);
-      }
+      _debounce?.cancel();
+      _debounce = Timer(kDebounceTime, () {
+        if (!_isRunning || _isNavigating) return;
+
+        captureTree(false);
+      });
     };
 
     _isBuilded = true;
   }
 
-  void _onRequestCapture(Duration _) {
-    _isPostFrameQueued = false;
-
-    debugPrint(">> _onRequestCapture");
-
-    if (!_isRunning || !_isPendingCapture) return;
-
-    _isPendingCapture = false;
-
-    debugPrint(">> _onRequestCapture 2");
-
-    debugPrint(">> _isNavigating : $_isNavigating");
-
-    // Navigation has priority, suppress auto-captures during animations.
-    if (_isNavigating) return;
-
-    final DateTime now = DateTime.now();
-
-    // Minimum 500 ms between consecutive captures
-    if (now.difference(_lastTimeCaptured).inMilliseconds < 500) {
-      debugPrint(">> multiple 3");
-
-      return;
-    }
-
-    debugPrint(">> REQUEST CAPTURE");
-
-    /// Capture queued
-    captureTree(false);
-  }
-
-  void setCurrentlyNavigating() => _isNavigating = true;
-
   void captureTree(bool comesFromNavigation) {
     if (comesFromNavigation) _isNavigating = true;
 
-    debugPrint("comesFromNavigation : $comesFromNavigation");
+    final now = DateTime.now();
+    if (now.difference(_lastCaptureTime).inMilliseconds <
+        kCooldownTime.inMilliseconds) {
+      if (comesFromNavigation) _isNavigating = false;
+      return;
+    }
 
-    Future.microtask(() {
-      debugPrint("_isPendingCapture : $_isPendingCapture");
+    try {
+      final lom = LomTreeInspector.captureLom(
+        recorder.currentRouteElement,
+        config: config,
+      );
 
-      if (!comesFromNavigation) if (_isPendingCapture) return;
+      if (lom == null) return;
 
+      _lastCaptureTime = DateTime.now();
+
+      _isNotifierLocked = true;
       try {
-        final lom = LomTreeInspector.captureLom(
-          recorder.currentRouteElement,
-          config: config,
-        );
-
-        if (lom == null) return;
-
-        _lastTimeCaptured = DateTime.now();
-
-        _printTree([lom.root!], 0);
         notifier.value = lom;
-        recorder.recordLom(lom);
-
-        _lastTimeCaptured = DateTime.now();
       } finally {
-        if (comesFromNavigation) _isNavigating = false;
+        _isNotifierLocked = false;
       }
-    });
+
+      _printTree([lom.root!], 0);
+      recorder.recordLom(lom);
+    } finally {
+      if (comesFromNavigation) _isNavigating = false;
+    }
   }
 
   static void _printTree(List<Root> nodes, int indent) {

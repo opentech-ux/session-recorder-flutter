@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:session_recorder_flutter/src/constants/widgets_excluded_constants.dart';
-
 /// Top-level compute hash
 String _computeBufferHash(String buffer) => buffer.hashCode.toString();
 
@@ -125,15 +123,15 @@ class SerializeTreeUtils {
   /// Returns [true] if the widget is considered valid and should be part of the
   /// mapped tree; otherwise, returns [false].
   static bool shouldInclude(Widget widget) {
-    final String widgetType = widget.runtimeType.toString();
+    // final String widgetType = widget.runtimeType.toString();
 
-    if (widgetsToIgnore.contains(widgetType)) return false;
+    // if (widgetsToIgnore.contains(widgetType)) return false;
 
-    for (final widget in widgetsToIgnoreIfContains) {
-      if (widgetType.contains(widget)) return false;
-    }
+    // for (final widget in widgetsToIgnoreIfContains) {
+    //   if (widgetType.contains(widget)) return false;
+    // }
 
-    if (widgetType.startsWith('_')) return false;
+    // if (widgetType.startsWith('_')) return false;
 
     return true;
   }
