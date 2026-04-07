@@ -11,51 +11,45 @@ class ScrollCollector {
 
   ScrollCollector(this._recorder);
 
-  /// Caches of the recent scroll viewport
-  Rect _scrollableRect = Rect.zero;
+  bool _isScrolling = false;
+  Rect? _activeViewportBounds;
 
   /// Handles incoming [ScrollNotification] events to detect and record scroll
   /// interactions.
   bool handleScrollNotification(ScrollNotification notification) {
     final context = notification.context;
 
-    if (context == null) return false;
+    if (context == null || notification is OverscrollNotification) return false;
 
-    final scrollableState = Scrollable.maybeOf(context);
+    final scrollMetrics = notification.metrics;
 
-    if (notification is! OverscrollNotification) {
-      ScrollPosition scrollPosition;
+    final rect = _captureViewportGeometry(context, scrollMetrics);
+    if (rect == null) return false;
 
-      if (scrollableState != null) {
-        scrollPosition = scrollableState.position;
-      } else {
-        scrollPosition = notification.metrics as ScrollPosition;
-      }
+    if (notification is ScrollStartNotification) {
+      _isScrolling = true;
+      _activeViewportBounds = rect;
 
-      _captureViewportGeometry(context, scrollPosition);
-      _recorder.setViewport(_scrollableRect);
+      _recorder.recordExploration(
+        ScrollExplorationEvent(
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          viewport: rect,
+          phase: ScrollPhase.start,
+        ),
+      );
+    } else if (notification is ScrollUpdateNotification) {
+      _activeViewportBounds = rect;
+    } else if (notification is ScrollEndNotification) {
+      _isScrolling = false;
+      _activeViewportBounds = null;
 
-      if (notification is ScrollStartNotification) {
-        _recorder.recordExploration(
-          ScrollExplorationEvent(
-            timestamp: DateTime.now().millisecondsSinceEpoch,
-            viewport: _scrollableRect,
-            phase: ScrollPhase.start,
-          ),
-        );
-
-        return false;
-      }
-
-      if (notification is ScrollEndNotification) {
-        _recorder.recordExploration(
-          ScrollExplorationEvent(
-            timestamp: DateTime.now().millisecondsSinceEpoch,
-            viewport: _scrollableRect,
-            phase: ScrollPhase.end,
-          ),
-        );
-      }
+      _recorder.recordExploration(
+        ScrollExplorationEvent(
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          viewport: rect,
+          phase: ScrollPhase.end,
+        ),
+      );
     }
 
     return false;
@@ -63,32 +57,46 @@ class ScrollCollector {
 
   /// Computes and updates the current viewport rectangle for a scrollable
   /// position.
-  void _captureViewportGeometry(
+  Rect? _captureViewportGeometry(
     BuildContext context,
-    ScrollPosition? scrollPosition,
+    ScrollMetrics scrollMetrics,
   ) {
     final renderObject = context.findRenderObject();
-
-    if (renderObject is! RenderBox) return;
+    if (renderObject is! RenderBox || !renderObject.hasSize) return null;
 
     final initPosition = renderObject.localToGlobal(Offset.zero);
-
-    final rect = initPosition & renderObject.size;
-
-    _scrollableRect = rect;
-
-    if (scrollPosition == null) return;
+    final physicalRect = initPosition & renderObject.size;
 
     final double contentHeight =
-        scrollPosition.maxScrollExtent + scrollPosition.viewportDimension;
-    final double left = rect.left;
-    final double contentTop = rect.top - scrollPosition.pixels;
+        scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
+    final double contentTop = physicalRect.top - scrollMetrics.pixels;
 
-    _scrollableRect = Rect.fromLTWH(
-      left,
+    final virtualRect = Rect.fromLTWH(
+      physicalRect.left,
       contentTop,
-      rect.width,
+      physicalRect.width,
       contentHeight,
     );
+
+    _recorder.setScrollPhysicalBounds(physicalRect);
+    _recorder.setScrollVirtualCanvas(virtualRect);
+
+    return virtualRect;
+  }
+
+  /// Forced shutdown when the collection is interrupted
+  void forceRecordCollector() {
+    if (_isScrolling && _activeViewportBounds != null) {
+      _recorder.recordExploration(
+        ScrollExplorationEvent(
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          viewport: _activeViewportBounds!,
+          phase: ScrollPhase.end,
+        ),
+      );
+
+      _isScrolling = false;
+      _activeViewportBounds = null;
+    }
   }
 }

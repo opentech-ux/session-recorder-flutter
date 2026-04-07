@@ -17,13 +17,7 @@ class GestureCollector {
 
   DateTime? _lastTapTime;
   Offset? _lastTapPosition;
-  double? _pinchInitialAverage;
-
-  /// Most recent computed scale — updated every move while pinch is active.
-  /// Stored here so every finger can read the same value when lifting.
-  // double _pinchLatestScale = 1.0;
-  // Offset _pinchLatestCenter = Offset.zero;
-  // int _pinchFingerCount = 0;
+  PinchMetricsBaseline? _pinchMetrics;
 
   /// Called when a pointer first touches the screen.
   void onPointerDown(PointerDownEvent details) {
@@ -32,9 +26,7 @@ class GestureCollector {
     /// Add the first [PointerTrace]
     addPointer(pointer, details.position);
 
-    if (_pointers.length >= 2) {
-      _pinchInitialAverage = MathUtils.getAverageDistance(_pointers);
-    }
+    _updatePinchMetrics();
   }
 
   /// Called whenever the pointer moves across the screen.
@@ -63,32 +55,77 @@ class GestureCollector {
       return;
     }
 
-    pointerTrace.add(
-      position,
-      viewport: _recorder.viewport.contains(position)
-          ? _recorder.viewport
-          : Rect.zero,
-    );
+    pointerTrace.add(position, viewport: _recorder.resolveViewport(position));
 
-    if (_pointers.length < 2 || _pinchInitialAverage == null) return;
-
-    final avg = MathUtils.getAverageDistance(_pointers);
-    final avgAbsolute = (avg - _pinchInitialAverage!).abs();
-
-    if (avgAbsolute >= pinchSlop) {
-      for (var p in _pointers.values) {
-        p.setType(GesturesType.pinch);
-      }
+    if (pointerTrace.type != GesturesType.pinch &&
+        pointerTrace.distance >= touchSlop) {
+      pointerTrace.setType(GesturesType.drag);
     }
 
-    // // Keep pinch metrics up to date so every finger reads the latest values.
-    // _pinchLatestScale = _pinchInitialAverage! > 0
-    //     ? avg / _pinchInitialAverage!
-    //     : 1.0;
-    // _pinchLatestCenter = _centerOf(
-    //   _pointers.values.map((pointer) => pointer.lastPosition).toList(),
-    // );
-    // _pinchFingerCount = _pointers.length;
+    if (_pointers.length < 2 && _pinchMetrics != null) return;
+
+    final bool isScaling = MathUtils.evaluatePinchGesture(
+      _pointers,
+      _pinchMetrics!,
+    );
+    final bool isAlreadyScaling = pointerTrace.type == GesturesType.pinch;
+
+    if (isScaling || isAlreadyScaling) {
+      for (var p in _pointers.values) {
+        if (p.type == GesturesType.pinch) continue;
+
+        final p0 = _pinchMetrics!.initialPositions![p.pointer];
+        if (p0 != null && (p.lastPosition - p0).distance >= 3.0) {
+          if (p.type == GesturesType.drag) {
+            _emitExplorations(pointerTrace);
+
+            _pointers[p.pointer] = p.splitForTransition(
+              newType: GesturesType.pinch,
+            );
+          } else {
+            p.setType(GesturesType.pinch);
+          }
+        }
+      }
+    }
+  }
+
+  /// Called whenever the pointer cancels in the screen (e.g. a phone call).
+  void onPointerCancel(PointerCancelEvent details) {
+    final pointerTrace = _pointers.remove(details.pointer);
+
+    if (pointerTrace != null) {
+      _evaluatePointer(pointerTrace);
+    }
+
+    _updatePinchMetrics();
+    _lastTapPosition = null;
+    _lastTapTime = null;
+  }
+
+  /// Forced shutdown when the collection is interrupted
+  void forceRecordCollector() {
+    if (_pointers.isEmpty) return;
+
+    for (var p in _pointers.values) {
+      _evaluatePointer(p);
+    }
+
+    _pointers.clear();
+    _pinchMetrics = null;
+    _lastTapTime = null;
+    _lastTapPosition = null;
+  }
+
+  /// Emit any valid gesture that is in progress to the [Record] before
+  /// the pointer is destroyed by a system interrupt.
+  void _evaluatePointer(PointerTrace p) {
+    if (p.type == GesturesType.pinch || p.type == GesturesType.drag) {
+      _emitExplorations(p);
+    } else if (p.distance >= touchSlop) {
+      p.setType(GesturesType.drag);
+      _emitExplorations(p);
+    }
   }
 
   /// Add the first [PointerTrace] with their first [TimedPosition].
@@ -98,13 +135,24 @@ class GestureCollector {
     int pointer,
     Offset position, [
     GesturesType type = GesturesType.tap,
-  ]) => _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-    ..add(
-      position,
-      viewport: _recorder.viewport.contains(position)
-          ? _recorder.viewport
-          : Rect.zero,
-    );
+  ]) =>
+      _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
+        ..add(position, viewport: _recorder.resolveViewport(position));
+
+  /// Re-set the [Pinch]'s stats
+  void _updatePinchMetrics() {
+    if (_pointers.length >= 2) {
+      _pinchMetrics = PinchMetricsBaseline(
+        initialPositions: _pointers.map(
+          (key, pointer) => MapEntry(key, pointer.lastPosition),
+        ),
+        centroid: MathUtils.getCentroid(_pointers),
+        avgDistance: MathUtils.getAverageDistance(_pointers),
+      );
+    } else {
+      _pinchMetrics = null;
+    }
+  }
 
   /// Called when the pointer is lifted from the screen.
   ///
@@ -115,22 +163,39 @@ class GestureCollector {
 
     if (pointerTrace == null) return;
 
-    // final pinchScale = _pinchLatestScale;
-    // final pinchCenter = _pinchLatestCenter;
-    // final pinchFingers = _pinchFingerCount;
-
-    // if (_pointers.isEmpty) {
-    //   _pinchInitialAverage = null;
-    //   _pinchLatestScale = 1.0;
-    //   _pinchLatestCenter = Offset.zero;
-    //   _pinchFingerCount = 0;
-    // }
-
-    // * pinch
+    // * PINCH
     if (pointerTrace.type == GesturesType.pinch) {
-      pointerTrace.setType(GesturesType.pinch);
-      final explorations = _createExplorationEvent(pointerTrace);
-      _recorder.recordExploration(explorations.first);
+      // pointerTrace.setType(GesturesType.pinch);
+      _emitExplorations(pointerTrace);
+
+      if (_pointers.length == 1) {
+        final lastPointer = _pointers.values.first;
+
+        if (lastPointer.type == GesturesType.pinch) {
+          _emitExplorations(lastPointer);
+
+          _pointers[lastPointer.pointer] = lastPointer.splitForTransition(
+            newType: GesturesType.tap,
+            isOrphanedPointer: true,
+          );
+        }
+      }
+
+      _updatePinchMetrics();
+
+      return;
+    }
+
+    _updatePinchMetrics();
+
+    // * LONG PRESS
+    if (pointerTrace.duration >= longPressTimeout &&
+        pointerTrace.distance < touchSlop) {
+      pointerTrace.setType(GesturesType.longPress);
+      final action = _createActionEvent(pointerTrace);
+      _recorder.recordAction(action);
+      _lastTapTime = null;
+      _lastTapPosition = null;
       return;
     }
 
@@ -141,16 +206,6 @@ class GestureCollector {
       for (ExplorationEvent exploration in explorations) {
         _recorder.recordExploration(exploration);
       }
-      return;
-    }
-
-    // * LONG PRESS
-    if (pointerTrace.duration >= longPressTimeout) {
-      pointerTrace.setType(GesturesType.longPress);
-      final action = _createActionEvent(pointerTrace);
-      _recorder.recordAction(action);
-      _lastTapTime = null;
-      _lastTapPosition = null;
       return;
     }
 
@@ -169,6 +224,11 @@ class GestureCollector {
       return;
     }
 
+    if (pointerTrace.isOrphanedPointer &&
+        pointerTrace.duration.inMilliseconds < 250) {
+      return;
+    }
+
     // * TAP
     pointerTrace.setType(GesturesType.tap);
     final action = _createActionEvent(pointerTrace);
@@ -176,6 +236,13 @@ class GestureCollector {
 
     _lastTapPosition = pointerTrace.lastPosition;
     _lastTapTime = now;
+  }
+
+  void _emitExplorations(PointerTrace pointerTrace) {
+    final explorations = _createExplorationEvent(pointerTrace);
+    if (explorations.isNotEmpty) {
+      _recorder.recordExploration(explorations.first);
+    }
   }
 
   /// Creates and returns the `[ActionEvent]` object with its zone.
@@ -266,7 +333,7 @@ class GestureCollector {
     final pinch = PinchExplorationEvent(
       timestamp: pointer.firstTimestamp,
       endTimestamp: pointer.lastTimestamp,
-      viewport: _recorder.viewport,
+      viewport: pointer.first.viewport,
       positions: sampledPositions.map((p) => p.position).toList(),
     );
 

@@ -1,15 +1,15 @@
-import 'dart:isolate';
+// import 'dart:isolate';
 
-import 'package:uuid/uuid.dart';
+// import 'package:uuid/uuid.dart';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
 
-// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
-// import 'package:session_recorder_flutter/src/session/session_recorder.dart';
-import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
+// // import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// // import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+// import 'package:session_recorder_flutter/src/utils/serialize_tree_utils.dart';
 
-import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;
+// import '../models/models.dart' show Lom, Root, LomAbstract, LomRef;
 
 class LomNotInitializedException implements Exception {
   final String message;
@@ -35,28 +35,28 @@ class LomDelegate {
   /// {@macro lom}
   LomDelegate._internal();
 
-  Lom? _lom;
+  // Lom? _lom;
 
-  Lom get lom {
-    final lom = _lom;
-    if (lom == null) throw LomNotInitializedException();
-    return lom;
-  }
+  // Lom get lom {
+  //   final lom = _lom;
+  //   if (lom == null) throw LomNotInitializedException();
+  //   return lom;
+  // }
 
-  /// Stack cache that stores the most recent [Lom].
-  final Map<String, Lom> _cacheLom = {};
+  // /// Stack cache that stores the most recent [Lom].
+  // final Map<String, Lom> _cacheLom = {};
 
-  /// Clears the cache [Lom] objects
-  void clearCache() => _cacheLom.clear();
+  // /// Clears the cache [Lom] objects
+  // void clearCache() => _cacheLom.clear();
 
-  /// Unique identifier [Root] node
-  int _zoneId = 1;
+  // /// Unique identifier [Root] node
+  // int _zoneId = 1;
 
-  /// Tracks the [Root] nodes by its [HashCode]
-  final Map<int, Root> rootReference = <int, Root>{};
+  // /// Tracks the [Root] nodes by its [HashCode]
+  // final Map<int, Root> rootReference = <int, Root>{};
 
-  /// Clears the `_lom`
-  void clearLom() => _lom = null;
+  // /// Clears the `_lom`
+  // void clearLom() => _lom = null;
 
   /// Creates and assigns a new [Lom] instance using a given `size` viewport.
   // void _init(Size size) {

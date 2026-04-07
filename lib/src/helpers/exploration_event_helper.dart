@@ -13,7 +13,7 @@
 //         PointerTrace,
 //         PanExplorationEvent,
 //         ZoomExplorationEvent,
-//         ScaleStats,
+//         PinchMetricsBaseline,
 //         TimedPosition,
 //         ViewportPosition,
 //         ScrollExplorationEvent;
@@ -116,9 +116,9 @@ class ExplorationEventHelper {
   // /// Returns `[true]` if the average radial distance exceeds the `_scaleSlop`
   // /// threshold and both fingers move consistently in a scaling direction.
   // ///
-  // static bool evaluateZoomGesture(
+  // static bool evaluatePinchGesture(
   //   Map<int, PointerTrace> pointers,
-  //   ScaleStats scaleStats,
+  //   PinchMetricsBaseline scaleStats,
   // ) {
   //   try {
   //     if (scaleStats.scalePointers == null) return false;
@@ -137,10 +137,10 @@ class ExplorationEventHelper {
   //     final scaleSensitivity = (scale - 1.0).abs();
   //     final scalePx = (dNow - d0).abs();
 
-  //     /// If `scaleSensitivity` is less than `scaleThreshold` and `scalePx` is
-  //     /// less than `scalePxThreshold` we consider it noise and not zoom.
+  //     /// If `scaleSensitivity` is less than `pinchThreshold` and `scalePx` is
+  //     /// less than `pinchPxThreshold` we consider it noise and not zoom.
   //     final bool maybeScale =
-  //         (scaleSensitivity > scaleThreshold) || (scalePx > scalePxThreshold);
+  //         (scaleSensitivity > pinchThreshold) || (scalePx > pinchPxThreshold);
 
   //     if (!maybeScale) return false;
 

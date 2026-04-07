@@ -69,7 +69,7 @@ class SessionRecorderWidget extends StatefulWidget {
 class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     with WidgetsBindingObserver, SessionLifecycleObserver {
   late final GestureCollector _gestures;
-  late final ScrollCollector _explorations;
+  late final ScrollCollector _scrolls;
 
   SessionRecorder get _session => SessionRecorder.instance;
 
@@ -80,11 +80,27 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   void initState() {
     super.initState();
     _gestures = GestureCollector(_session.recorder);
-    _explorations = ScrollCollector(_session.recorder);
+    _scrolls = ScrollCollector(_session.recorder);
+
+    controller.onInterrupt(_dispatchPendingEvents);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyObserver();
     });
+  }
+
+  @override
+  void dispose() {
+    _dispatchPendingEvents();
+    super.dispose();
+  }
+
+  @override
+  void onSessionSuspended() => _dispatchPendingEvents();
+
+  void _dispatchPendingEvents() {
+    _gestures.forceRecordCollector();
+    _scrolls.forceRecordCollector();
   }
 
   /// Verifies that at least one `[SessionNavigatorObserver]` is attached
@@ -125,12 +141,13 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   @override
   Widget build(BuildContext context) {
     Widget content = NotificationListener<ScrollNotification>(
-      onNotification: _explorations.handleScrollNotification,
+      onNotification: _scrolls.handleScrollNotification,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: _gestures.onPointerDown,
         onPointerMove: _gestures.onPointerMove,
         onPointerUp: _gestures.onPointerUp,
+        onPointerCancel: _gestures.onPointerCancel,
         child: widget.child,
       ),
     );

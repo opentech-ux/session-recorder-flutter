@@ -31,9 +31,12 @@ mixin SessionLifecycleObserver<T extends StatefulWidget>
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
+        onSessionSuspended();
         controller.stopReporting();
     }
 
     super.didChangeAppLifecycleState(state);
   }
+
+  void onSessionSuspended() {}
 }

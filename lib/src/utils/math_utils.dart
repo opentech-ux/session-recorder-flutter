@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
-import '../models/models.dart' show PointerTrace, ZoomStats;
+import '../models/models.dart'
+    show PointerTrace, ZoomStats, PinchMetricsBaseline;
 
 class MathUtils {
   /// Calculates the centroid (average of positions) of all active fingers.
@@ -46,6 +48,67 @@ class MathUtils {
   static double getScale(double firstDistance, double secondDistance) =>
       secondDistance / firstDistance;
 
+  /// Evaluates whether the current set of active pointers constitutes
+  /// a zoom gesture.
+  ///
+  /// This method computes the centroid, mean distances, and directional
+  /// vectors between fingers to determine if a scaling motion is occurring.
+  ///
+  /// Returns `[true]` if the average radial distance exceeds the `pinchSlop`
+  /// threshold and both fingers move consistently in a scaling direction.
+  ///
+  static bool evaluatePinchGesture(
+    Map<int, PointerTrace> pointers,
+    PinchMetricsBaseline pinchMetrics,
+  ) {
+    if (pinchMetrics.initialPositions == null) return false;
+
+    /// This block filters out most insignificant movements: if there is
+    /// no relevant change in the average distance, it is not a zoom.
+    final d0 = pinchMetrics.avgDistance ?? 0.0;
+
+    /// Avoid divided by 0
+    if (d0 <= 1e-6) return false;
+
+    // final cNow = MathUtils.getCentroid(pinchMetrics.scalePointers!);
+    final dNow = MathUtils.getAverageDistance(pointers);
+
+    final scale = MathUtils.getScale(d0, dNow);
+    final scaleSensitivity = (scale - 1.0).abs();
+    final scalePx = (dNow - d0).abs();
+
+    /// If `scaleSensitivity` is less than `pinchThreshold` and `scalePx` is
+    /// less than `pinchPxThreshold` we consider it noise and not zoom.
+    final bool maybePinch =
+        (scaleSensitivity > pinchThreshold) || (scalePx > pinchPxThreshold);
+
+    if (!maybePinch) return false;
+
+    final stats = MathUtils.analyzeFingerDirections(
+      pointers,
+      pinchMetrics.initialPositions!,
+      pinchMetrics.centroid!,
+    );
+
+    /// We check that the absolute value of `avgRadial` is greater than:
+    ///
+    /// - `touchSlop`
+    /// - `radialToTang` * `tangRms` (i.e., that the radial is several times
+    ///   greater than the typical lateral movement).
+    ///
+    /// `math.max()` uses the greater of the two thresholds, so radial
+    /// must exceed the more demanding one.
+    final bool radialDominates =
+        stats.avgRadial.abs() >
+        math.max(pinchSlop, radialToTang * stats.tangentialRms);
+
+    /// Requires that the fraction of fingers pointing in the same radial
+    /// direction be ≥ `consistencyFraction`
+    final bool consistent = stats.consistency >= consistencyFraction;
+
+    return radialDominates && consistent && maybePinch;
+  }
+
   /// Analyzes the movement of each finger to measure [Radial] and [Tangential],
   /// then we calculate how consistent those movements between the fingers are.
   ///
@@ -57,7 +120,7 @@ class MathUtils {
   /// Returns a [ZoomStats] object.
   static ZoomStats analyzeFingerDirections(
     Map<int, PointerTrace> pointers,
-    Map<int, PointerTrace> initialPointers,
+    Map<int, Offset> initialPointers,
     Offset initialCentroid,
   ) {
     double sumRadial = 0.0, sumTangentialSq = 0.0;
@@ -68,7 +131,7 @@ class MathUtils {
       if (!pointers.containsKey(pointer)) continue;
 
       /// Initial position
-      final p0 = initialPointers[pointer]!.lastPosition;
+      final p0 = initialPointers[pointer]!;
 
       /// Current position
       final pNow = pointers[pointer]!.lastPosition;
@@ -81,11 +144,13 @@ class MathUtils {
       /// If the finger was exactly at the initial center, continues.
       if (rDis <= 1e-6) continue;
 
-      /// The [Radial Unit Vector]: normalized radial direction (length 1).
-      final u = Offset(rVec.dx / rDis, rVec.dy / rDis);
-
       /// The [Finger's Movement Vector]: how much the finger moved.
       final v = pNow - p0;
+
+      if (v.distance < 3.0) continue;
+
+      /// The [Radial Unit Vector]: normalized radial direction (length 1).
+      final u = Offset(rVec.dx / rDis, rVec.dy / rDis);
 
       /// How much of the movement is toward/away from the center.
       /// ```

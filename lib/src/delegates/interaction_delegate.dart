@@ -1,19 +1,19 @@
-import 'dart:async';
+// import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
+// import 'package:flutter/material.dart';
+// import 'package:flutter/rendering.dart' show ScrollDirection;
 
-import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
-import 'package:session_recorder_flutter/src/helpers/action_event_helper.dart';
-import 'package:session_recorder_flutter/src/helpers/exploration_event_helper.dart';
-import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
-import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
-import 'package:session_recorder_flutter/src/utils/math_utils.dart';
-// import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+// import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
+// import 'package:session_recorder_flutter/src/helpers/action_event_helper.dart';
+// import 'package:session_recorder_flutter/src/helpers/exploration_event_helper.dart';
+// import 'package:session_recorder_flutter/src/delegates/chunk_delegate.dart';
+// import 'package:session_recorder_flutter/src/delegates/layout_object_manager_delegate.dart';
+// import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+// // import 'package:session_recorder_flutter/src/utils/session_logger.dart';
 
-import '../enums/gestures_type_enum.dart';
-import '../models/models.dart'
-    show PointerTrace, ScaleStats, TimedPosition, ActionEvent;
+// import '../enums/gestures_type_enum.dart';
+// import '../models/models.dart'
+//     show PointerTrace, PinchMetricsBaseline, TimedPosition, ActionEvent;
 
 /// {@template interaction_delegate}
 /// A delegate responsible for managing and processing user interactions
@@ -35,44 +35,44 @@ import '../models/models.dart'
 ///
 /// {@endtemplate}
 class InteractionDelegate {
-  /// {@macro interaction_delegate}
-  InteractionDelegate();
+  // /// {@macro interaction_delegate}
+  // InteractionDelegate();
 
-  final ChunkDelegate _chunkDelegate = ChunkDelegate();
-  final LomDelegate _lomDelegate = LomDelegate();
+  // final ChunkDelegate _chunkDelegate = ChunkDelegate();
+  // final LomDelegate _lomDelegate = LomDelegate();
 
-  /// Tracks main active pointers for gesture detection and movement history
-  final Map<int, PointerTrace> _pointers = {};
+  // /// Tracks main active pointers for gesture detection and movement history
+  // final Map<int, PointerTrace> _pointers = {};
 
-  /// Stores the viewports bounds for each scrollable widget
-  final Map<int, Rect> _scrollViewportRects = {};
+  // /// Stores the viewports bounds for each scrollable widget
+  // final Map<int, Rect> _scrollViewportRects = {};
 
-  /// Tracks the scroll pan positions
-  final Map<int, Offset> _scrollPanScrollablePositions = {};
+  // /// Tracks the scroll pan positions
+  // final Map<int, Offset> _scrollPanScrollablePositions = {};
 
-  /// Tracks the pointers involved in a double-tap gesture
-  final Map<int, PointerTrace> _doubleTapPointers = {};
+  // /// Tracks the pointers involved in a double-tap gesture
+  // final Map<int, PointerTrace> _doubleTapPointers = {};
 
-  /// Tracks the pointers involved in a scale/zoom gesture
-  final Map<int, PointerTrace> _scalePointers = {};
+  // /// Tracks the pointers involved in a scale/zoom gesture
+  // final Map<int, PointerTrace> _scalePointers = {};
 
-  /// Caches of the recent scroll viewport
-  Rect _lastViewportScroll = Rect.zero;
+  // /// Caches of the recent scroll viewport
+  // Rect _lastViewportScroll = Rect.zero;
 
-  /// Initial scale metrics
-  ScaleStats _initialScaleStats = ScaleStats.zero();
+  // /// Initial scale metrics
+  // PinchMetricsBaseline _initialScaleStats = PinchMetricsBaseline.zero();
 
-  /// Indicates if a scroll interaction has been detected
-  bool _didScroll = false;
+  // /// Indicates if a scroll interaction has been detected
+  // bool _didScroll = false;
 
-  /// Indicates when the user is actively performing a zoom gesture
-  bool _isZooming = false;
+  // /// Indicates when the user is actively performing a zoom gesture
+  // bool _isZooming = false;
 
-  /// Indicates if a [Zoom] gesture has been confirmed beyonds a threshold
-  bool _hasZoomed = false;
+  // /// Indicates if a [Zoom] gesture has been confirmed beyonds a threshold
+  // bool _hasZoomed = false;
 
-  /// Indicates if the scroll position is currently at the edge
-  bool _isAtScrollEdge = false;
+  // /// Indicates if the scroll position is currently at the edge
+  // bool _isAtScrollEdge = false;
 
   // // * ------------- POINTER EVENTS ------------ * //
 
@@ -132,7 +132,7 @@ class InteractionDelegate {
   // void _initZoomValues() {
   //   try {
   //     if (_pointers.length < 2) {
-  //       _initialScaleStats = ScaleStats.zero();
+  //       _initialScaleStats = PinchMetricsBaseline.zero();
 
   //       /// We set [false] if there are not active pointers
   //       if (_pointers.isEmpty) _hasZoomed = false;
@@ -221,7 +221,7 @@ class InteractionDelegate {
 
   //       // * ZOOM
   //       if (!_isZooming) {
-  //         if (ExplorationEventHelper.evaluateZoomGesture(
+  //         if (ExplorationEventHelper.evaluatePinchGesture(
   //           _pointers,
   //           _initialScaleStats,
   //         )) {

@@ -243,7 +243,7 @@ class RouteTracker {
           animation.addStatusListener(statusListener);
         }
       });
-    } catch (e, s) {
+    } catch (e) {
       // SessionLogger.elog("!! >> [Some error]", e, s);
       return;
     }
@@ -349,7 +349,7 @@ class RouteTracker {
       if (navigatorContext is BuildContext) return navigatorContext;
 
       return null;
-    } catch (e, s) {
+    } catch (e) {
       // SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }
@@ -367,7 +367,7 @@ class RouteTracker {
       }
 
       return null;
-    } catch (e, s) {
+    } catch (e) {
       // SessionLogger.elog("!! >> [Some error]", e, s);
       return null;
     }

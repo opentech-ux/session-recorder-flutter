@@ -6,13 +6,13 @@ class PointerTrace {
   final int pointer;
   final List<TimedPosition> positions;
   GesturesType type;
-  // Timer? timer;
+  final bool isOrphanedPointer;
 
   PointerTrace({
     required this.pointer,
     List<TimedPosition>? positions,
     required this.type,
-    // Timer? timer,
+    this.isOrphanedPointer = false,
   }) : positions = positions ?? [];
 
   TimedPosition get first => positions.isNotEmpty
@@ -45,10 +45,6 @@ class PointerTrace {
   double get distance =>
       isEmpty ? 0.0 : (lastPosition - firstPosition).distance;
 
-  // void dispose() {
-  //   timer?.cancel();
-  // }
-
   void setType(GesturesType type) {
     this.type = type;
   }
@@ -59,6 +55,17 @@ class PointerTrace {
 
   void clear() {
     positions.clear();
+  }
+
+  PointerTrace splitForTransition({
+    required GesturesType newType,
+    bool isOrphanedPointer = false,
+  }) {
+    return PointerTrace(
+      pointer: pointer,
+      type: newType,
+      isOrphanedPointer: isOrphanedPointer,
+    )..add(lastPosition, viewport: positions.last.viewport);
   }
 
   @override

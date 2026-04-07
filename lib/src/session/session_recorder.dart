@@ -109,7 +109,6 @@ class SessionRecorder {
   late Session _currentSession;
   late Chunk _currentChunk;
   late LomAbstract _currentLom;
-  late Rect _viewport = Rect.zero;
 
   Element? _currentRouteElement;
 
@@ -168,11 +167,31 @@ class _RecorderImpl implements SessionRecorderInternal {
 
   final TapTreeFinder _finder = const TapTreeFinder();
 
-  @override
-  Rect get viewport => _recorder._viewport;
+  late Rect _screenViewport = Rect.zero;
+  late Rect _scrollPhysicalBounds = Rect.zero;
+  late Rect _scrollVirtualCanvas = Rect.zero;
 
   @override
-  void setViewport(Rect viewport) => _recorder._viewport = viewport;
+  Rect get screenViewport => _screenViewport;
+  @override
+  void setScreenViewport(Rect sV) => _screenViewport = sV;
+
+  @override
+  Rect get scrollPhysicalBounds => _scrollPhysicalBounds;
+  @override
+  void setScrollPhysicalBounds(Rect sPB) => _scrollPhysicalBounds = sPB;
+
+  @override
+  Rect get scrollVirtualCanvas => _scrollVirtualCanvas;
+  @override
+  void setScrollVirtualCanvas(Rect sVC) => _scrollVirtualCanvas = sVC;
+
+  @override
+  Rect resolveViewport(Offset position) {
+    if (_scrollPhysicalBounds.contains(position)) return _scrollVirtualCanvas;
+
+    return _screenViewport;
+  }
 
   @override
   Element? get currentRouteElement => _recorder._currentRouteElement;
@@ -212,6 +231,8 @@ class _ControllerImpl implements SessionControllerInternal {
   _ControllerImpl(this._recorder);
 
   final List<SessionNavigatorObserver> _observers = [];
+
+  VoidCallback? onCollectorInterrupt;
 
   @override
   void setCurrentlyNavigating() =>
@@ -261,6 +282,13 @@ class _ControllerImpl implements SessionControllerInternal {
     reporter.stop();
     inactivity.stop();
   }
+
+  @override
+  void interrupt() => onCollectorInterrupt?.call();
+
+  @override
+  void onInterrupt(VoidCallback? onInterrupt) =>
+      onCollectorInterrupt = onInterrupt;
 }
 
 class _SessionRecorderReporter {

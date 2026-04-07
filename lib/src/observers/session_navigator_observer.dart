@@ -88,6 +88,8 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void _handleCapture(Route<dynamic> route) {
     _controller.setCurrentlyNavigating();
 
+    _controller.interrupt();
+
     final animation = (route as TransitionRoute).animation;
 
     void capture() {

@@ -21,4 +21,7 @@ abstract interface class SessionControllerInternal {
 
   void startReporting();
   void stopReporting();
+
+  void onInterrupt(VoidCallback? onInterrupt);
+  void interrupt();
 }

@@ -1,5 +1,5 @@
-import '../models/models.dart'
-    show Chunk, LomAbstract, ExplorationEvent, ActionEvent;
+// import '../models/models.dart'
+//     show Chunk, LomAbstract, ExplorationEvent, ActionEvent;
 
 class ChunkNotInitializedException implements Exception {
   final String message;
