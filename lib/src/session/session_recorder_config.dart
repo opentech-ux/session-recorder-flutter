@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 /// Configuration for the session recorder.
 ///
@@ -21,6 +22,9 @@ import 'package:flutter/foundation.dart';
 ///   runApp(const App());
 /// }
 /// ```
+/// See also
+///  - `[SessionLogger]`: which defines the logging mechanism for the SDK's
+/// internal logs.
 @immutable
 class SessionRecorderConfig {
   /// The backend endpoint that receives session data.
@@ -47,15 +51,20 @@ class SessionRecorderConfig {
   /// only be true if `[debugSendSession]` is explicitly set to true.
   final bool shouldSend;
 
+  /// Define the logging mechanism for the SDK's internal logs.
+  final SessionLoggerCallback logger;
+
   const SessionRecorderConfig({
     this.endpoint = "",
     this.debugLog = false,
     this.debugShowTree = false,
 
-    /// Default to `[false]` to avoid sending to the `endpoint` the data
+    /// Default to `[false]` to avoid sending to the `[endpoint]` the data
     /// captured in debug mode.
     /// Enable this ONLY to send TESTING data. Normally you do not
     /// have to enable this.
     bool debugSendSession = false,
-  }) : shouldSend = kReleaseMode || debugSendSession;
+    SessionLoggerCallback? logger,
+  }) : shouldSend = kReleaseMode || debugSendSession,
+       logger = logger ?? defaultSessionLogger;
 }

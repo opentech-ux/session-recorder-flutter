@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:session_recorder_flutter/src/utils/session_logger.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 enum InactivityState { active, inactive }
 
@@ -34,7 +34,7 @@ class InactivityDetector {
   void ping() {
     if (_state == InactivityState.inactive) {
       _state = InactivityState.active;
-      SessionLogger.mlog(">> [ Inactivity active ]");
+      SessionLogger.verbose("Inactivity active");
       onActive();
     }
 
@@ -51,7 +51,7 @@ class InactivityDetector {
       if (_state == InactivityState.inactive) return;
       _state = InactivityState.inactive;
 
-      SessionLogger.mlog(">> [ Inactivity after ${_interval.inSeconds}s ]");
+      SessionLogger.verbose("Inactivity after ${_interval.inSeconds}s");
       onInactive();
     });
   }

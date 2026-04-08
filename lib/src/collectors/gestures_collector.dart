@@ -3,14 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
 class GestureCollector {
-  final SessionRecorderInternal _recorder;
+  final SessionRecorderEngineInternal _engine;
 
-  GestureCollector(this._recorder);
+  GestureCollector({SessionRecorderEngineInternal? engine})
+    : _engine = engine ?? SessionRecorder.engine;
 
   /// Tracks main active pointers for gesture detection and movement history
   final Map<int, PointerTrace> _pointers = {};
@@ -55,7 +57,10 @@ class GestureCollector {
       return;
     }
 
-    pointerTrace.add(position, viewport: _recorder.resolveViewport(position));
+    pointerTrace.add(
+      position,
+      viewport: _engine.recorder.resolveViewport(position),
+    );
 
     if (pointerTrace.type != GesturesType.pinch &&
         pointerTrace.distance >= touchSlop) {
@@ -137,7 +142,7 @@ class GestureCollector {
     GesturesType type = GesturesType.tap,
   ]) =>
       _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-        ..add(position, viewport: _recorder.resolveViewport(position));
+        ..add(position, viewport: _engine.recorder.resolveViewport(position));
 
   /// Re-set the [Pinch]'s stats
   void _updatePinchMetrics() {
@@ -193,7 +198,7 @@ class GestureCollector {
         pointerTrace.distance < touchSlop) {
       pointerTrace.setType(GesturesType.longPress);
       final action = _createActionEvent(pointerTrace);
-      _recorder.recordAction(action);
+      _engine.recorder.recordAction(action);
       _lastTapTime = null;
       _lastTapPosition = null;
       return;
@@ -204,7 +209,7 @@ class GestureCollector {
       pointerTrace.setType(GesturesType.drag);
       final explorations = _createExplorationEvent(pointerTrace);
       for (ExplorationEvent exploration in explorations) {
-        _recorder.recordExploration(exploration);
+        _engine.recorder.recordExploration(exploration);
       }
       return;
     }
@@ -218,7 +223,7 @@ class GestureCollector {
         (pointerTrace.lastPosition - _lastTapPosition!).distance < 40) {
       pointerTrace.setType(GesturesType.doubleTap);
       final action = _createActionEvent(pointerTrace);
-      _recorder.recordAction(action);
+      _engine.recorder.recordAction(action);
       _lastTapPosition = null;
       _lastTapTime = null;
       return;
@@ -232,7 +237,7 @@ class GestureCollector {
     // * TAP
     pointerTrace.setType(GesturesType.tap);
     final action = _createActionEvent(pointerTrace);
-    _recorder.recordAction(action);
+    _engine.recorder.recordAction(action);
 
     _lastTapPosition = pointerTrace.lastPosition;
     _lastTapTime = now;
@@ -241,7 +246,7 @@ class GestureCollector {
   void _emitExplorations(PointerTrace pointerTrace) {
     final explorations = _createExplorationEvent(pointerTrace);
     if (explorations.isNotEmpty) {
-      _recorder.recordExploration(explorations.first);
+      _engine.recorder.recordExploration(explorations.first);
     }
   }
 
@@ -253,7 +258,7 @@ class GestureCollector {
   ActionEvent _createActionEvent(PointerTrace pointer) {
     final TimedPosition firstPosition = pointer.first;
 
-    final root = _recorder.findRoot(firstPosition.position);
+    final root = _engine.recorder.findRoot(firstPosition.position);
     int rootId = root?.id ?? 0;
 
     switch (pointer.type) {

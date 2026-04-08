@@ -4,7 +4,6 @@ import 'package:session_recorder_flutter/src/collectors/gestures_collector.dart'
 import 'package:session_recorder_flutter/src/collectors/scroll_collector.dart';
 import 'package:session_recorder_flutter/src/observers/session_lifecycle_observer.dart';
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
-import 'package:session_recorder_flutter/src/session/session_controller_internal.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 
@@ -71,18 +70,13 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   late final GestureCollector _gestures;
   late final ScrollCollector _scrolls;
 
-  SessionRecorder get _session => SessionRecorder.instance;
-
-  @override
-  SessionControllerInternal get controller => _session.controller;
-
   @override
   void initState() {
     super.initState();
-    _gestures = GestureCollector(_session.recorder);
-    _scrolls = ScrollCollector(_session.recorder);
+    _gestures = GestureCollector();
+    _scrolls = ScrollCollector();
 
-    controller.onInterrupt(_dispatchPendingEvents);
+    SessionRecorder.engine.controller.onInterrupt(_dispatchPendingEvents);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyObserver();
@@ -106,7 +100,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   /// Verifies that at least one `[SessionNavigatorObserver]` is attached
   /// to a Navigator after the first frame.
   void _verifyObserver() {
-    if (controller.isNavigationAttached) return;
+    if (SessionRecorder.engine.controller.isNavigationAttached) return;
 
     FlutterError.reportError(
       FlutterErrorDetails(
@@ -152,8 +146,8 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
       ),
     );
 
-    if (_session.config.debugShowTree) {
-      final notifier = controller.notifier;
+    if (SessionRecorder.engine.config.debugShowTree) {
+      final notifier = SessionRecorder.engine.recorder.notifier;
       if (notifier != null) {
         content = LomTreeOverlay(notifier: notifier, child: content);
       }

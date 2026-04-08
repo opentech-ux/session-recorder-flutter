@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
 
 /// Collects scroll position data and emits one [ScrollSessionEndEvent] per
 /// gesture.
 class ScrollCollector {
-  final SessionRecorderInternal _recorder;
+  final SessionRecorderEngineInternal _engine;
 
-  ScrollCollector(this._recorder);
+  ScrollCollector({SessionRecorderEngineInternal? engine})
+    : _engine = engine ?? SessionRecorder.engine;
 
   bool _isScrolling = false;
   Rect? _activeViewportBounds;
@@ -30,7 +32,7 @@ class ScrollCollector {
       _isScrolling = true;
       _activeViewportBounds = rect;
 
-      _recorder.recordExploration(
+      _engine.recorder.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
@@ -43,7 +45,7 @@ class ScrollCollector {
       _isScrolling = false;
       _activeViewportBounds = null;
 
-      _recorder.recordExploration(
+      _engine.recorder.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
@@ -78,8 +80,8 @@ class ScrollCollector {
       contentHeight,
     );
 
-    _recorder.setScrollPhysicalBounds(physicalRect);
-    _recorder.setScrollVirtualCanvas(virtualRect);
+    _engine.recorder.setScrollPhysicalBounds(physicalRect);
+    _engine.recorder.setScrollVirtualCanvas(virtualRect);
 
     return virtualRect;
   }
@@ -87,7 +89,7 @@ class ScrollCollector {
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
     if (_isScrolling && _activeViewportBounds != null) {
-      _recorder.recordExploration(
+      _engine.recorder.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: _activeViewportBounds!,

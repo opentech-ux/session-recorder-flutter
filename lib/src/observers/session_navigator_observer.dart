@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:session_recorder_flutter/src/session/session_controller_internal.dart';
+
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_observer}
@@ -22,10 +22,10 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 ///
 /// ```dart
 /// GoRouter(
-///   observers: [BehaviorNavigatorObserver()],
+///   observers: [SessionNavigatorObserver()],
 ///   routes: [
 ///     ShellRoute(
-///       observers: [BehaviorNavigatorObserver()],
+///       observers: [SessionNavigatorObserver()],
 ///       routes: [...],
 ///     ),
 ///   ],
@@ -33,16 +33,10 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 /// ```
 /// All instances share the same `[SessionRecorder]` singleton.
 ///
-/// See also :
-///   - `[SessionRecorder]`: Main recorder and controller coordinator for
-/// session interaction and tree capture.
 /// {@endtemplate}
 class SessionNavigatorObserver extends NavigatorObserver {
-  final SessionControllerInternal _controller;
-
-  SessionNavigatorObserver({SessionRecorder? recorder})
-    : _controller = (recorder ?? SessionRecorder.instance).controller {
-    _controller.registerObserver(this);
+  SessionNavigatorObserver() {
+    SessionRecorder.engine.controller.registerObserver(this);
   }
 
   bool _isAttached = false;
@@ -86,9 +80,8 @@ class SessionNavigatorObserver extends NavigatorObserver {
   /// Suppresses auto-captures and waits for `route`'s animation to settle,
   /// then captures the tree from the route's subtree element.
   void _handleCapture(Route<dynamic> route) {
-    _controller.setCurrentlyNavigating();
-
-    _controller.interrupt();
+    SessionRecorder.engine.recorder.setCurrentlyNavigating();
+    SessionRecorder.engine.controller.interrupt();
 
     final animation = (route as TransitionRoute).animation;
 
@@ -96,13 +89,15 @@ class SessionNavigatorObserver extends NavigatorObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final elementFromContext = _contextOf(route);
 
-        _controller.setCurrentRouteElement(elementFromContext);
+        SessionRecorder.engine.recorder.setCurrentRouteElement(
+          elementFromContext,
+        );
 
         if (elementFromContext == null) return;
 
         debugPrint(">> OBSERVER CAPTURE");
 
-        _controller.captureTree(true);
+        SessionRecorder.engine.recorder.captureTree(true);
       });
     }
 

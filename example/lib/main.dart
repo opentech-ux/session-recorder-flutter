@@ -6,9 +6,7 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SessionRecorder.instance
-    ..configure(SessionRecorderConfig(debugLog: true, endpoint: ""))
-    ..init();
+  SessionRecorder.init(SessionRecorderConfig(debugLog: true, endpoint: ""));
 
   runApp(const MainApp());
 }

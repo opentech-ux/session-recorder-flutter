@@ -4,17 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_internal.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 
 /// Watches for widget tree structural changes and captures snapshots.
 
 class TreeDetector {
-  final SessionRecorderInternal recorder;
-  final LomTreeConfig config;
+  final SessionRecorderEngine _engine;
+  final LomTreeConfig _config;
 
-  TreeDetector({required this.recorder, this.config = const LomTreeConfig()});
+  TreeDetector({
+    required SessionRecorderEngine engine,
+    LomTreeConfig config = const LomTreeConfig(),
+  }) : _engine = engine,
+       _config = config;
 
   bool _isRunning = false;
 
@@ -94,8 +98,8 @@ class TreeDetector {
 
     try {
       final lom = LomTreeInspector.captureLom(
-        recorder.currentRouteElement,
-        config: config,
+        _engine.recorder.currentRouteElement,
+        config: _config,
       );
 
       if (lom == null) return;
@@ -110,7 +114,7 @@ class TreeDetector {
       }
 
       _printTree([lom.root!], 0);
-      recorder.recordLom(lom);
+      _engine.recorder.recordLom(lom);
     } finally {
       if (comesFromNavigation) _isNavigating = false;
     }
