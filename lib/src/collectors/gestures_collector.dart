@@ -16,9 +16,8 @@ class GestureCollector {
 
   /// Tracks main active pointers for gesture detection and movement history
   final Map<int, PointerTrace> _pointers = {};
+  final List<PointerTrace> _lastTaps = [];
 
-  DateTime? _lastTapTime;
-  Offset? _lastTapPosition;
   PinchMetricsBaseline? _pinchMetrics;
 
   /// Called when a pointer first touches the screen.
@@ -67,29 +66,27 @@ class GestureCollector {
       pointerTrace.setType(GesturesType.drag);
     }
 
-    if (_pointers.length < 2 && _pinchMetrics != null) return;
+    bool isScaling = false;
 
-    final bool isScaling = MathUtils.evaluatePinchGesture(
-      _pointers,
-      _pinchMetrics!,
-    );
+    if (_pointers.length >= 2 && _pinchMetrics != null) {
+      isScaling = MathUtils.evaluatePinchGesture(_pointers, _pinchMetrics!);
+    }
+
     final bool isAlreadyScaling = pointerTrace.type == GesturesType.pinch;
 
     if (isScaling || isAlreadyScaling) {
+      /// Split and emit the exploration
       for (var p in _pointers.values) {
         if (p.type == GesturesType.pinch) continue;
 
-        final p0 = _pinchMetrics!.initialPositions![p.pointer];
-        if (p0 != null && (p.lastPosition - p0).distance >= 3.0) {
-          if (p.type == GesturesType.drag) {
-            _emitExplorations(pointerTrace);
+        if (p.type == GesturesType.drag) {
+          _emitExplorations(p);
 
-            _pointers[p.pointer] = p.splitForTransition(
-              newType: GesturesType.pinch,
-            );
-          } else {
-            p.setType(GesturesType.pinch);
-          }
+          _pointers[p.pointer] = p.splitForTransition(
+            newType: GesturesType.pinch,
+          );
+        } else {
+          p.setType(GesturesType.pinch);
         }
       }
     }
@@ -104,8 +101,6 @@ class GestureCollector {
     }
 
     _updatePinchMetrics();
-    _lastTapPosition = null;
-    _lastTapTime = null;
   }
 
   /// Forced shutdown when the collection is interrupted
@@ -118,8 +113,6 @@ class GestureCollector {
 
     _pointers.clear();
     _pinchMetrics = null;
-    _lastTapTime = null;
-    _lastTapPosition = null;
   }
 
   /// Emit any valid gesture that is in progress to the [Record] before
@@ -199,8 +192,6 @@ class GestureCollector {
       pointerTrace.setType(GesturesType.longPress);
       final action = _createActionEvent(pointerTrace);
       _engine.recorder.recordAction(action);
-      _lastTapTime = null;
-      _lastTapPosition = null;
       return;
     }
 
@@ -215,17 +206,30 @@ class GestureCollector {
     }
 
     // * DOUBLE TAP
-    final now = DateTime.now();
-    if (_lastTapTime != null &&
-        now.difference(_lastTapTime!).inMilliseconds <
-            doubleTapTimeout.inMilliseconds &&
-        _lastTapPosition != null &&
-        (pointerTrace.lastPosition - _lastTapPosition!).distance < 40) {
+    final currentPosition = pointerTrace.lastPosition;
+    final currentTimestamp = DateTime.now().millisecondsSinceEpoch;
+    _lastTaps.removeWhere(
+      (pointer) =>
+          (currentTimestamp - pointer.lastTimestamp) >
+          doubleTapTimeout.inMilliseconds,
+    );
+
+    int? tapFoundIndex;
+    for (var i = 0; i < _lastTaps.length; i++) {
+      final tap = _lastTaps[i];
+      final distance = (currentPosition - tap.lastPosition).distance;
+
+      if (distance < doubleTapSlop) {
+        tapFoundIndex = i;
+        break;
+      }
+    }
+
+    if (tapFoundIndex != null) {
       pointerTrace.setType(GesturesType.doubleTap);
       final action = _createActionEvent(pointerTrace);
       _engine.recorder.recordAction(action);
-      _lastTapPosition = null;
-      _lastTapTime = null;
+      _lastTaps.removeAt(tapFoundIndex);
       return;
     }
 
@@ -236,17 +240,18 @@ class GestureCollector {
 
     // * TAP
     pointerTrace.setType(GesturesType.tap);
+    _lastTaps.add(pointerTrace);
+
     final action = _createActionEvent(pointerTrace);
     _engine.recorder.recordAction(action);
-
-    _lastTapPosition = pointerTrace.lastPosition;
-    _lastTapTime = now;
   }
 
   void _emitExplorations(PointerTrace pointerTrace) {
     final explorations = _createExplorationEvent(pointerTrace);
     if (explorations.isNotEmpty) {
-      _engine.recorder.recordExploration(explorations.first);
+      for (final exploration in explorations) {
+        _engine.recorder.recordExploration(exploration);
+      }
     }
   }
 
@@ -349,7 +354,7 @@ class GestureCollector {
   /// Always includes the first and last position to preserve start and end.
   List<TimedPosition> _samplePositions(
     List<TimedPosition> positions, {
-    int nth = 6,
+    int nth = 8,
   }) {
     if (positions.length <= 2) return positions;
     final sampled = <TimedPosition>[];

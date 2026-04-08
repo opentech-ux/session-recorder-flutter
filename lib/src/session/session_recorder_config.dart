@@ -9,18 +9,10 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 /// ### Example
 ///
 /// ```dart
-/// void main() {
-///   WidgetsFlutterBinding.ensureInitialized();
-///
-///   SessionRecorder.instance.configure(
-///     SessionRecorderConfig(
+///   final params = SessionRecorderConfig(
 ///       endpoint: 'https://api.com/endpoint',
 ///       debugLog: true,
-///     ),
 ///   );
-///
-///   runApp(const App());
-/// }
 /// ```
 /// See also
 ///  - `[SessionLogger]`: which defines the logging mechanism for the SDK's
@@ -51,7 +43,7 @@ class SessionRecorderConfig {
   /// only be true if `[debugSendSession]` is explicitly set to true.
   final bool shouldSend;
 
-  /// Define the logging mechanism for the SDK's internal logs.
+  ///{@macro session_logger}
   final SessionLoggerCallback logger;
 
   const SessionRecorderConfig({

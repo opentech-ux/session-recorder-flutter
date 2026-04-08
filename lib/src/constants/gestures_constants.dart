@@ -21,6 +21,8 @@ final double scrollSlop = 10.0;
 const Duration kDebounceTime = Duration(milliseconds: 300);
 const Duration kCooldownTime = Duration(milliseconds: 400);
 
+const double doubleTapSlop = 18.0;
+
 // * PINCH CONSTS
 
 /// Ratio between radial and tangential movement required

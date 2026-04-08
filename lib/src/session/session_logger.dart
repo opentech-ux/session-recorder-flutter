@@ -22,20 +22,21 @@ void defaultSessionLogger(
   if (kReleaseMode) return;
 
   final prefix = switch (level) {
-    SessionLogLevel.verbose => '-]',
-    SessionLogLevel.info => '>]',
-    SessionLogLevel.warning => '!]',
-    SessionLogLevel.error => '!!]',
+    SessionLogLevel.verbose => '-',
+    SessionLogLevel.info => '>',
+    SessionLogLevel.warning => '!',
+    SessionLogLevel.error => '!!',
   };
 
   developer.log(
     message,
-    name: "[SessionRecorder $prefix",
+    name: "SessionRecorder $prefix",
     error: error,
     stackTrace: stackTrace,
   );
 }
 
+/// {@template session_logger}
 /// Defines the delegation mechanism for the SDK's internal logs.
 ///
 /// This prevents console pollution and gives the client application absolute
@@ -62,6 +63,7 @@ void defaultSessionLogger(
 ///   },
 /// )
 /// ```
+/// {@endtemplate}
 class SessionLogger {
   static late SessionRecorderConfig _config;
 
