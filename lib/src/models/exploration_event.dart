@@ -14,12 +14,32 @@ abstract class ExplorationEvent {
     required this.explorationType,
   });
 
+  @protected
+  String get viewportStringLT =>
+      '${viewport.left.toInt()},${viewport.top.toInt()}';
+
+  @protected
+  String get viewportStringLTWH =>
+      '${viewport.left.toInt()},${viewport.top.toInt()},${viewport.width.toInt()},${viewport.height.toInt()}';
+
   String concatenateString();
 
-  Map<String, dynamic> toMap();
+  @mustCallSuper
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'timestamp': timestamp,
+      'explorationType': explorationType.name,
+      'viewport': [
+        viewport.left,
+        viewport.top,
+        viewport.width,
+        viewport.height,
+      ],
+    };
+  }
 
   static ExplorationEvent fromMap(Map<String, dynamic> map) {
-    final String typeName = (map['explorationType'] as String);
+    final String typeName = map['explorationType'] as String;
 
     final GesturesType type = GesturesType.values.firstWhere(
       (e) => e.name == typeName,
@@ -37,21 +57,27 @@ abstract class ExplorationEvent {
     switch (type) {
       case GesturesType.pinch:
         final List<dynamic> pos = map['positions'] as List<dynamic>;
-
         return PinchExplorationEvent(
           timestamp: map['timestamp'] as int,
+          pointer: map['pointer'] as int,
           endTimestamp: map['endTimestamp'] as int,
           viewport: rectViewport,
-          positions: pos.map((p) => Offset(p["dx"], p["dy"])).toList(),
+          positions: pos
+              .map(
+                (p) => Offset(
+                  (p['dx'] as num).toDouble(),
+                  (p['dy'] as num).toDouble(),
+                ),
+              )
+              .toList(),
         );
+
       case GesturesType.scroll:
         final String phaseName = map['phase'] as String;
-
         final ScrollPhase phase = ScrollPhase.values.firstWhere(
           (p) => p.name == phaseName,
           orElse: () => ScrollPhase.update,
         );
-
         return ScrollExplorationEvent(
           timestamp: map['timestamp'] as int,
           viewport: rectViewport,
@@ -63,6 +89,8 @@ abstract class ExplorationEvent {
         final List<dynamic> pos = map['position'] as List<dynamic>;
         return DragExplorationEvent(
           timestamp: map['timestamp'] as int,
+          pointer: map['pointer'] as int,
+
           viewport: rectViewport,
           position: Offset(
             (pos[0] as num).toDouble(),
@@ -71,43 +99,36 @@ abstract class ExplorationEvent {
         );
     }
   }
-
-  static List<double> rectToList(Rect r) =>
-      [r.left, r.top, r.width, r.height].map((r) => r.toDouble()).toList();
-
-  static List<double> offsetToList(Offset o) =>
-      [o.dx, o.dy].map((o) => o.toDouble()).toList();
 }
 
 class DragExplorationEvent extends ExplorationEvent {
   final Offset position;
+  final int pointer;
 
   const DragExplorationEvent({
     required super.timestamp,
+    required this.pointer,
     required super.viewport,
     required this.position,
   }) : super(explorationType: GesturesType.drag);
 
   @override
   String concatenateString() {
-    final List<String> attrs = [
+    return [
       timestamp.toString(),
       explorationType.name,
-      '${viewport.left.toInt()},${viewport.top.toInt()}',
+      pointer,
+      viewportStringLT,
       '${position.dx.toInt()},${position.dy.toInt()}',
-    ];
-
-    return attrs.join(':');
+    ].join(':');
   }
 
   @override
   Map<String, dynamic> toMap() {
-    return {
-      'timestamp': timestamp,
-      'explorationType': explorationType.name,
-      'viewport': ExplorationEvent.rectToList(viewport),
-      'position': ExplorationEvent.offsetToList(position),
-    };
+    return super.toMap()..addAll({
+      'pointer': pointer,
+      'position': [position.dx, position.dy],
+    });
   }
 
   @override
@@ -117,10 +138,12 @@ class DragExplorationEvent extends ExplorationEvent {
 
 class PinchExplorationEvent extends ExplorationEvent {
   final int endTimestamp;
+  final int pointer;
   final List<Offset> positions;
 
   const PinchExplorationEvent({
     required super.timestamp,
+    required this.pointer,
     required super.viewport,
     required this.endTimestamp,
     required this.positions,
@@ -128,30 +151,26 @@ class PinchExplorationEvent extends ExplorationEvent {
 
   @override
   String concatenateString() {
-    final String pos = positions
+    final String positionsString = positions
         .map((p) => '${p.dx.toInt()},${p.dy.toInt()}')
         .join('|');
-
-    final List<String> attrs = [
+    return [
       timestamp.toString(),
       explorationType.name,
-      '${viewport.left.toInt()},${viewport.top.toInt()}',
-      pos,
+      pointer,
+      viewportStringLT,
+      positionsString,
       endTimestamp.toString(),
-    ];
-
-    return attrs.join(':');
+    ].join(':');
   }
 
   @override
   Map<String, dynamic> toMap() {
-    return {
-      'timestamp': timestamp,
+    return super.toMap()..addAll({
+      'pointer': pointer,
       'endTimestamp': endTimestamp,
-      'explorationType': explorationType.name,
-      'viewport': ExplorationEvent.rectToList(viewport),
       'positions': positions.map((o) => {'dx': o.dx, 'dy': o.dy}).toList(),
-    };
+    });
   }
 
   @override
@@ -170,27 +189,16 @@ class ScrollExplorationEvent extends ExplorationEvent {
 
   @override
   String concatenateString() {
-    final String type = (phase == ScrollPhase.end)
+    final String typeName = (phase == ScrollPhase.end)
         ? GesturesType.scrollEnd.name
         : GesturesType.scrollStart.name;
 
-    final List<String> attrs = [
-      timestamp.toString(),
-      type,
-      '${viewport.left.toInt()},${viewport.top.toInt()},${viewport.width.toInt()},${viewport.height.toInt()}',
-    ];
-
-    return attrs.join(':');
+    return [timestamp.toString(), typeName, viewportStringLTWH].join(':');
   }
 
   @override
   Map<String, dynamic> toMap() {
-    return {
-      'timestamp': timestamp,
-      'explorationType': explorationType.name,
-      'viewport': ExplorationEvent.rectToList(viewport),
-      'phase': phase.name,
-    };
+    return super.toMap()..addAll({'phase': phase.name});
   }
 
   @override

@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 
 @immutable
-class ZoomStats {
+class PinchStats {
   /// Average radial movement (in pixels).
   ///
   /// Indicates how far, on average, the fingers move away (>0) or closer (<0)
@@ -24,16 +24,16 @@ class ZoomStats {
   /// - 0.5 = half move away and half move closer.
   final double consistency;
 
-  const ZoomStats({
+  const PinchStats({
     required this.avgRadial,
     required this.tangentialRms,
     required this.consistency,
   });
 
-  factory ZoomStats.zero() =>
-      ZoomStats(avgRadial: 0, tangentialRms: 0, consistency: 0);
+  factory PinchStats.zero() =>
+      PinchStats(avgRadial: 0, tangentialRms: 0, consistency: 0);
 
   @override
   String toString() =>
-      'ZoomStats(avgRadial: $avgRadial, tangentialRms: $tangentialRms, consistency: $consistency)';
+      'PinchStats(avgRadial: $avgRadial, tangentialRms: $tangentialRms, consistency: $consistency)';
 }

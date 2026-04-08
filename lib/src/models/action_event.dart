@@ -18,9 +18,32 @@ abstract class ActionEvent {
     required this.position,
   });
 
-  String concatenateString();
+  @mustCallSuper
+  String concatenateString() {
+    return [
+      timestampRelative.toString(),
+      actionType.name,
+      zone,
+      '${viewport.left.toInt()},${viewport.top.toInt()}',
+      '${position.dx.toInt()},${position.dy.toInt()}',
+    ].join(':');
+  }
 
-  Map<String, dynamic> toMap();
+  @mustCallSuper
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'timestampRelative': timestampRelative,
+      'actionType': actionType.name,
+      'zone': zone,
+      'viewport': [
+        viewport.left,
+        viewport.top,
+        viewport.width,
+        viewport.height,
+      ],
+      'position': [position.dx, position.dy],
+    };
+  }
 
   static ActionEvent fromMap(Map<String, dynamic> map) {
     final String typeName = map['actionType'] as String;
@@ -37,28 +60,17 @@ abstract class ActionEvent {
       (viewport[2] as num).toDouble(),
       (viewport[3] as num).toDouble(),
     );
+
     final List<dynamic> pos = map['position'] as List<dynamic>;
+    final Offset offsetPosition = Offset(pos[0] as double, pos[1] as double);
 
     switch (type) {
-      case GesturesType.tap:
-        return TapActionEvent(
-          timestampRelative: map['timestampRelative'] as int,
-          zone: map['zone'] as String,
-          viewport: rectViewport,
-          position: Offset(
-            (pos[0] as num).toDouble(),
-            (pos[1] as num).toDouble(),
-          ),
-        );
       case GesturesType.longPress:
         return LongPressActionEvent(
           timestampRelative: map['timestampRelative'] as int,
           zone: map['zone'] as String,
           viewport: rectViewport,
-          position: Offset(
-            (pos[0] as num).toDouble(),
-            (pos[1] as num).toDouble(),
-          ),
+          position: offsetPosition,
           duration: Duration(milliseconds: map['duration'] as int),
         );
       case GesturesType.doubleTap:
@@ -66,29 +78,18 @@ abstract class ActionEvent {
           timestampRelative: map['timestampRelative'] as int,
           zone: map['zone'] as String,
           viewport: rectViewport,
-          position: Offset(
-            (pos[0] as num).toDouble(),
-            (pos[1] as num).toDouble(),
-          ),
+          position: offsetPosition,
         );
+      case GesturesType.tap:
       default:
         return TapActionEvent(
           timestampRelative: map['timestampRelative'] as int,
           zone: map['zone'] as String,
           viewport: rectViewport,
-          position: Offset(
-            (pos[0] as num).toDouble(),
-            (pos[1] as num).toDouble(),
-          ),
+          position: offsetPosition,
         );
     }
   }
-
-  static List<double> rectToList(Rect r) =>
-      [r.left, r.top, r.width, r.height].map((r) => r.toDouble()).toList();
-
-  static List<double> offsetToList(Offset o) =>
-      [o.dx, o.dy].map((o) => o.toDouble()).toList();
 }
 
 class TapActionEvent extends ActionEvent {
@@ -98,30 +99,6 @@ class TapActionEvent extends ActionEvent {
     required super.viewport,
     required super.position,
   }) : super(actionType: GesturesType.tap);
-
-  @override
-  String concatenateString() {
-    final List<String> attrs = [
-      timestampRelative.toString(),
-      actionType.name,
-      zone,
-      '${viewport.left.toInt()},${viewport.top.toInt()}',
-      '${position.dx.toInt()},${position.dy.toInt()}',
-    ];
-
-    return attrs.join(':');
-  }
-
-  @override
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'timestampRelative': timestampRelative,
-      'actionType': actionType.name,
-      'zone': zone,
-      'viewport': ActionEvent.rectToList(viewport),
-      'position': ActionEvent.offsetToList(position),
-    };
-  }
 }
 
 class DoubleTapActionEvent extends ActionEvent {
@@ -131,30 +108,6 @@ class DoubleTapActionEvent extends ActionEvent {
     required super.viewport,
     required super.position,
   }) : super(actionType: GesturesType.doubleTap);
-
-  @override
-  String concatenateString() {
-    final List<String> attrs = [
-      timestampRelative.toString(),
-      actionType.name,
-      zone,
-      '${viewport.left.toInt()},${viewport.top.toInt()}',
-      '${position.dx.toInt()},${position.dy.toInt()}',
-    ];
-
-    return attrs.join(':');
-  }
-
-  @override
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'timestampRelative': timestampRelative,
-      'actionType': actionType.name,
-      'zone': zone,
-      'viewport': ActionEvent.rectToList(viewport),
-      'position': ActionEvent.offsetToList(position),
-    };
-  }
 }
 
 class LongPressActionEvent extends ActionEvent {
@@ -170,27 +123,13 @@ class LongPressActionEvent extends ActionEvent {
 
   @override
   String concatenateString() {
-    final List<String> attrs = [
-      timestampRelative.toString(),
-      actionType.name,
-      zone,
-      '${viewport.left.toInt()},${viewport.top.toInt()}',
-      '${position.dx.toInt()},${position.dy.toInt()}',
-      duration.inMilliseconds.toString(),
-    ];
-
-    return attrs.join(':');
+    return '${super.concatenateString()}:${duration.inMilliseconds}';
   }
 
   @override
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'timestampRelative': timestampRelative,
-      'actionType': actionType.name,
-      'zone': zone,
-      'viewport': ActionEvent.rectToList(viewport),
-      'position': ActionEvent.offsetToList(position),
-      'duration': duration.inMilliseconds,
-    };
+    final map = super.toMap();
+    map['duration'] = duration.inMilliseconds;
+    return map;
   }
 }

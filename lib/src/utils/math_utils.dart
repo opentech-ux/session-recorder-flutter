@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
 import '../models/models.dart'
-    show PointerTrace, ZoomStats, PinchMetricsBaseline;
+    show PointerTrace, PinchMetricsBaseline, PinchStats;
 
 class MathUtils {
   /// Calculates the centroid (average of positions) of all active fingers.
@@ -117,8 +117,8 @@ class MathUtils {
   /// - __Tangential__ : Rotating around the center (rotation)
   /// - In chaotic or inconsistent directions, neither clear zoom nor rotation
   ///
-  /// Returns a [ZoomStats] object.
-  static ZoomStats analyzeFingerDirections(
+  /// Returns a [PinchStats] object.
+  static PinchStats analyzeFingerDirections(
     Map<int, PointerTrace> pointers,
     Map<int, Offset> initialPointers,
     Offset initialCentroid,
@@ -180,7 +180,7 @@ class MathUtils {
       counted++;
     }
 
-    if (counted == 0) return ZoomStats.zero();
+    if (counted == 0) return PinchStats.zero();
 
     // * METRICS
 
@@ -209,7 +209,7 @@ class MathUtils {
     /// closer together.
     final consistency = (math.max(positives, negatives) / counted.toDouble());
 
-    return ZoomStats(
+    return PinchStats(
       avgRadial: avgRadial,
       tangentialRms: tangRms,
       consistency: consistency,

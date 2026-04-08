@@ -295,7 +295,7 @@ class InteractionDelegate {
 
   //     if (_isZooming) _isZooming = false;
 
-  //     /// Reset [ZoomStats] value
+  //     /// Reset [PinchStats] value
   //     _initZoomValues();
 
   //     if (_chunkDelegate.hasChunk) {
