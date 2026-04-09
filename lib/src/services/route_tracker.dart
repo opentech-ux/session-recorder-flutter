@@ -202,7 +202,9 @@ class RouteTracker {
             : null;
 
         if (currentRoute != null && (isValidRoute || isValidOldRoute)) {
-          final ModalRoute routePage = currentRoute as ModalRoute;
+          if (currentRoute is! ModalRoute) return;
+
+          final ModalRoute routePage = currentRoute;
 
           final Animation<double>? animation = routePage.animation;
 
