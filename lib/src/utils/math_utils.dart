@@ -215,4 +215,23 @@ class MathUtils {
       consistency: consistency,
     );
   }
+
+  /// Computes the screen rect of `render` in global coordinates.
+  static Rect? transformRect(RenderObject? render) {
+    if (render == null ||
+        !render.attached ||
+        render is! RenderBox ||
+        !render.hasSize ||
+        render.debugNeedsLayout) {
+      return null;
+    }
+
+    try {
+      final transform = render.getTransformTo(null);
+      final Rect localRect = Offset.zero & render.size;
+      return MatrixUtils.transformRect(transform, localRect);
+    } catch (_) {
+      return null;
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -25,7 +26,7 @@ class LomTreeInspector {
     final counter = _RootCounter();
     final children = _visitElement(element, config: config, counter: counter);
 
-    final Rect? rect = _transformRect(element.renderObject);
+    final Rect? rect = MathUtils.transformRect(element.renderObject);
 
     debugPrint("rect : ${rect.toString()}");
 
@@ -107,7 +108,7 @@ class LomTreeInspector {
     }
 
     final renderObject = element.renderObject;
-    final Rect? rect = _transformRect(renderObject);
+    final Rect? rect = MathUtils.transformRect(renderObject);
 
     if (rect == null || (rect.width == 0 && rect.height == 0)) {
       return _visitChildrenFlat(element, config, counter);
@@ -145,18 +146,6 @@ class LomTreeInspector {
     });
 
     return children;
-  }
-
-  /// Computes the screen rect of `render` in global coordinates.
-  static Rect? _transformRect(RenderObject? render) {
-    if (render == null || !render.attached || render is! RenderBox) return null;
-    try {
-      final transform = render.getTransformTo(null);
-      final Rect localRect = Offset.zero & render.size;
-      return MatrixUtils.transformRect(transform, localRect);
-    } catch (_) {
-      return null;
-    }
   }
 
   /// Signs into a hexadecimal every [Root] and its children.

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Collects scroll position data and emits one [ScrollSessionEndEvent] per
 /// gesture.
@@ -64,26 +66,30 @@ class ScrollCollector {
     ScrollMetrics scrollMetrics,
   ) {
     final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.hasSize) return null;
 
-    final initPosition = renderObject.localToGlobal(Offset.zero);
-    final physicalRect = initPosition & renderObject.size;
+    final physicalRect = MathUtils.transformRect(renderObject);
 
-    final double contentHeight =
-        scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
-    final double contentTop = physicalRect.top - scrollMetrics.pixels;
+    if (physicalRect == null) return null;
 
-    final virtualRect = Rect.fromLTWH(
-      physicalRect.left,
-      contentTop,
-      physicalRect.width,
-      contentHeight,
-    );
+    try {
+      final double contentHeight =
+          scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
+      final double contentTop = physicalRect.top - scrollMetrics.pixels;
 
-    _engine.recorder.setScrollPhysicalBounds(physicalRect);
-    _engine.recorder.setScrollVirtualCanvas(virtualRect);
+      final virtualRect = Rect.fromLTWH(
+        physicalRect.left,
+        contentTop,
+        physicalRect.width,
+        contentHeight,
+      );
 
-    return virtualRect;
+      _engine.recorder.setScrollPhysicalBounds(physicalRect);
+      _engine.recorder.setScrollVirtualCanvas(virtualRect);
+
+      return virtualRect;
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Forced shutdown when the collection is interrupted
