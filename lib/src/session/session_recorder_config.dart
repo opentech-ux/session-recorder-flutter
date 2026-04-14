@@ -46,6 +46,10 @@ class SessionRecorderConfig {
   ///{@macro session_logger}
   final SessionLoggerCallback logger;
 
+  static final RegExp _endpointRegExp = RegExp(
+    r'^https://[a-zA-Z0-9-]+\.ux-key\.com/endpoint$',
+  );
+
   const SessionRecorderConfig({
     this.endpoint = "",
     this.debugLog = false,
@@ -59,4 +63,12 @@ class SessionRecorderConfig {
     SessionLoggerCallback? logger,
   }) : shouldSend = kReleaseMode || debugSendSession,
        logger = logger ?? defaultSessionLogger;
+
+  void validate() {
+    if (!_endpointRegExp.hasMatch(endpoint)) {
+      throw FormatException(
+        'Invalid Endpoint. The expected format is `https://[subdomain].ux-key.com/endpoint`, where the subdomain may only contain letters, numbers, and hyphens.',
+      );
+    }
+  }
 }

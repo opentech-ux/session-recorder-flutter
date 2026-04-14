@@ -105,29 +105,37 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     FlutterError.reportError(
       FlutterErrorDetails(
         exception: FlutterError(
-          'SessionNavigatorObserver was not attached to any Navigator.\n'
-          'Pass the observer to MaterialApp.navigatorObservers:\n\n'
-          '  SessionRecorder.observer(\n'
-          '    builder: (observer) => MaterialApp(\n'
-          '      navigatorObservers: [observer],  // ← required\n'
-          '      home: ...,\n'
-          '    ),\n'
-          '  );\n'
-          'Or if you are using GoRouter Navigator.\n'
-          'Pass the observer to GoRouter.observers:\n\n'
-          '  SessionRecorderWidget(\n'
-          '    child: MaterialApp.router(\n'
-          '      routeConfig: GoRouter('
-          '         observers: [SessionNavigatorObserver()]\n' // ← required\n'
-          '      ),\n'
-          '      home: ...,\n'
-          '    ),\n'
-          '  );\n',
+          'SessionNavigatorObserver was not attached to any Navigator.',
         ),
         library: 'session_recorder_flutter',
         context: ErrorDescription(
           'checking SessionNavigatorObserver attachment',
         ),
+        informationCollector: () => <DiagnosticsNode>[
+          ErrorDescription(
+            'Pass the observer to MaterialApp.navigatorObservers:',
+          ),
+          ErrorHint(
+            '  SessionRecorder.observer(\n'
+            '    builder: (observer) => MaterialApp(\n'
+            '      navigatorObservers: [observer],  // ← required\n'
+            '      home: ...,\n'
+            '    ),\n'
+            '  );',
+          ),
+          ErrorDescription('\nOr if you are using GoRouter Navigator.'),
+          ErrorDescription('Pass the observer to GoRouter.observers:'),
+          ErrorHint(
+            '  SessionRecorderWidget(\n'
+            '    child: MaterialApp.router(\n'
+            '      routeConfig: GoRouter(\n'
+            '        observers: [SessionNavigatorObserver()], // ← required\n'
+            '      ),\n'
+            '      home: ...,\n'
+            '    ),\n'
+            '  );',
+          ),
+        ],
       ),
     );
   }

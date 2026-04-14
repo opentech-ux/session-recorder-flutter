@@ -88,7 +88,7 @@ class _RecorderImpl implements SessionRecorderInternal {
 
   late Chunk _currentChunk;
   late Session _currentSession;
-  late LomAbstract _currentLom;
+  LomAbstract? _currentLom;
 
   Element? _currentRouteElement;
 
@@ -146,7 +146,9 @@ class _RecorderImpl implements SessionRecorderInternal {
 
   @override
   Root? findRoot(Offset position) {
-    final tapTreeResult = _finder.find(_currentLom, position);
+    if (_currentLom == null) return null;
+
+    final tapTreeResult = _finder.find(_currentLom!, position);
     return tapTreeResult.didTap ? tapTreeResult.target : null;
   }
 
@@ -314,20 +316,5 @@ class _SessionRecorderReporter {
     } catch (e, s) {
       SessionLogger.error("Unexpected error sending data", e, s);
     }
-
-    // final List<LomAbstract> currentLoms = chunk.loms;
-
-    // currentLoms.removeWhere(
-    //   (lom) => lastLoms.any((lastLom) => lom.id == lastLom.id),
-    // );
-
-    // _lomDelegate.clearLom();
-    // _chunkDelegate.init(_sessionDelegate.getId());
-
-    // if (currentLoms.isNotEmpty) {
-    //   for (LomAbstract lom in currentLoms) {
-    //     _chunkDelegate.addLom(lom);
-    //   }
-    // }
   }
 }

@@ -27,6 +27,8 @@ class LomTreeInspector {
 
     final Rect? rect = _transformRect(element.renderObject);
 
+    debugPrint("rect : ${rect.toString()}");
+
     if (rect == null) return null;
 
     final Root root = Root(
@@ -38,6 +40,8 @@ class LomTreeInspector {
       box: rect,
       children: children,
     );
+
+    debugPrint("root : ${root.toString()}");
 
     final signature = _signatureRoots([root]);
 

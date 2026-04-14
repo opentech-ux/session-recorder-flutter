@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
@@ -46,6 +47,9 @@ class TreeDetector {
 
   @pragma('vm:prefer-inline')
   void setCurrentlyNavigating() => _isNavigating = true;
+
+  @pragma('vm:prefer-inline')
+  Element? get currentRouteElement => _engine.recorder.currentRouteElement;
 
   /// Starts watching for tree changes.
   void detect() {
@@ -97,8 +101,17 @@ class TreeDetector {
     }
 
     try {
+      final element = _getSafeElement();
+
+      if (element == null) {
+        SessionLogger.warning(
+          "No route could be found to capture. Provide the `SessionNavigatorObserver`",
+        );
+        return;
+      }
+
       final lom = LomTreeInspector.captureLom(
-        _engine.recorder.currentRouteElement,
+        _getSafeElement(),
         config: _config,
       );
 
@@ -118,6 +131,32 @@ class TreeDetector {
     } finally {
       if (comesFromNavigation) _isNavigating = false;
     }
+  }
+
+  Element? _getSafeElement() {
+    if (currentRouteElement != null) return currentRouteElement;
+
+    Element? fallbackElement;
+
+    WidgetsBinding.instance.rootElement?.visitChildren((Element rootChild) {
+      void findNavigator(Element element) {
+        if (element.widget is Navigator) {
+          fallbackElement = element;
+          return;
+        }
+        element.visitChildren(findNavigator);
+      }
+
+      findNavigator(rootChild);
+    });
+
+    if (fallbackElement != null) {
+      SessionLogger.warning(
+        "The brute-force fallback was used to find the element. Please provide the `SessionNavigatorObserver` instance. For more information go to the GitHub's Repository",
+      );
+    }
+
+    return fallbackElement;
   }
 
   static void _printTree(List<Root> nodes, int indent) {

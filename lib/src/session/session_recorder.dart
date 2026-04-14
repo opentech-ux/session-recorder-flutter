@@ -6,7 +6,7 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC FACADE
-// Only configure() and init() are exposed to end users.
+// Only init() are exposed to end users.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// {@template session_record_service}
@@ -77,6 +77,15 @@ class SessionRecorder {
 
   static SessionRecorderEngineInternal _engine = NoOpSessionRecorderEngine();
 
+  /// __DO NOT USE - INTERNAL SDK API__
+  ///
+  /// This getter is exposed solely for internal communication within the SDK
+  /// (e.g., between the Engine and the Collectors).
+  ///
+  /// Accessing or manipulating this engine directly from your application code
+  /// bypasses all safety checks. Doing so will corrupt the Session Recorder
+  /// state, cause unexpected memory leaks, and potentially crash the host
+  /// application.
   @internal
   static SessionRecorderEngineInternal get engine => _engine;
 
@@ -105,11 +114,7 @@ class SessionRecorder {
 
     try {
       // TODO uncomment this :
-      // if (!endpointRegExp.hasMatch(config.endpoint)) {
-      //   throw FormatException(
-      //     'Invalid Endpoint. The expected format is `https://[subdomain].ux-key.com/endpoint`, where the subdomain may only contain letters, numbers, and hyphens.',
-      //   );
-      // }
+      // config.validate();
 
       SessionLogger.configure(configuration: config);
 
