@@ -80,24 +80,22 @@ class SessionNavigatorObserver extends NavigatorObserver {
   /// Suppresses auto-captures and waits for `route`'s animation to settle,
   /// then captures the tree from the route's subtree element.
   void _handleCapture(Route<dynamic> route) {
-    SessionRecorder.engine.recorder.setCurrentlyNavigating();
+    SessionRecorder.engine.context.setCurrentlyNavigating();
     SessionRecorder.engine.controller.interrupt();
 
-    final animation = (route as TransitionRoute).animation;
+    final animation = (route is TransitionRoute) ? route.animation : null;
 
     void capture() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final elementFromContext = _contextOf(route);
 
-        SessionRecorder.engine.recorder.setCurrentRouteElement(
+        SessionRecorder.engine.context.setCurrentRouteElement(
           elementFromContext,
         );
 
         if (elementFromContext == null) return;
 
-        debugPrint(">> OBSERVER CAPTURE");
-
-        SessionRecorder.engine.recorder.captureTree(true);
+        SessionRecorder.engine.context.captureTree(true);
       });
     }
 

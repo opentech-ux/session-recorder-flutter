@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
+import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Collects scroll position data and emits one [ScrollSessionEndEvent] per
@@ -34,7 +33,7 @@ class ScrollCollector {
       _isScrolling = true;
       _activeViewportBounds = rect;
 
-      _engine.recorder.recordExploration(
+      _engine.context.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
@@ -47,7 +46,7 @@ class ScrollCollector {
       _isScrolling = false;
       _activeViewportBounds = null;
 
-      _engine.recorder.recordExploration(
+      _engine.context.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
@@ -66,25 +65,35 @@ class ScrollCollector {
     ScrollMetrics scrollMetrics,
   ) {
     final renderObject = context.findRenderObject();
-
     final physicalRect = MathUtils.transformRect(renderObject);
 
     if (physicalRect == null) return null;
 
     try {
-      final double contentHeight =
-          scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
-      final double contentTop = physicalRect.top - scrollMetrics.pixels;
+      double contentWidth = physicalRect.width;
+      double contentHeight = physicalRect.height;
+      double contentLeft = physicalRect.left;
+      double contentTop = physicalRect.top;
+
+      if (scrollMetrics.axis == Axis.vertical) {
+        contentHeight =
+            scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
+        contentTop = physicalRect.top - scrollMetrics.pixels;
+      } else {
+        contentWidth =
+            scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
+        contentLeft = physicalRect.left - scrollMetrics.pixels;
+      }
 
       final virtualRect = Rect.fromLTWH(
-        physicalRect.left,
+        contentLeft,
         contentTop,
-        physicalRect.width,
+        contentWidth,
         contentHeight,
       );
 
-      _engine.recorder.setScrollPhysicalBounds(physicalRect);
-      _engine.recorder.setScrollVirtualCanvas(virtualRect);
+      _engine.context.setScrollPhysicalBounds(physicalRect);
+      _engine.context.setScrollVirtualCanvas(virtualRect);
 
       return virtualRect;
     } catch (e) {
@@ -95,7 +104,7 @@ class ScrollCollector {
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
     if (_isScrolling && _activeViewportBounds != null) {
-      _engine.recorder.recordExploration(
+      _engine.context.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: _activeViewportBounds!,

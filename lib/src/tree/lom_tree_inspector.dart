@@ -1,34 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 import 'package:uuid/uuid.dart';
 
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
-  const LomTreeInspector._();
+  LomTreeInspector() {
+    _config = const LomTreeConfig();
+  }
 
-  static String _lastSignature = "";
+  String _lastSignature = "";
+  final Map<String, String> _cache = {};
 
-  static final Map<String, String> _cache = {};
+  late LomTreeConfig _config;
 
   /// Captures the widget tree starting from `[Element]`.
-  static LomAbstract? captureLom(
-    Element? element, {
-    LomTreeConfig config = const LomTreeConfig(),
-  }) {
+  LomAbstract? captureLom(Element? element) {
     if (element == null) return null;
 
     if (!element.mounted) return null;
 
     final counter = _RootCounter();
-    final children = _visitElement(element, config: config, counter: counter);
+    final children = _visitElement(element, config: _config, counter: counter);
 
     final Rect? rect = MathUtils.transformRect(element.renderObject);
-
-    debugPrint("rect : ${rect.toString()}");
 
     if (rect == null) return null;
 
@@ -42,14 +40,9 @@ class LomTreeInspector {
       children: children,
     );
 
-    debugPrint("root : ${root.toString()}");
-
     final signature = _signatureRoots([root]);
 
     if (_cache.containsKey(signature)) {
-      debugPrint("EXIST ALREADY ??");
-      debugPrint("${_cache.keys}");
-
       final String cacheId = _cache[signature]!;
 
       return LomRef(

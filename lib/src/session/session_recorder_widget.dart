@@ -155,7 +155,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     );
 
     if (SessionRecorder.engine.config.debugShowTree) {
-      final notifier = SessionRecorder.engine.recorder.notifier;
+      final notifier = SessionRecorder.engine.context.notifier;
       if (notifier != null) {
         content = LomTreeOverlay(notifier: notifier, child: content);
       }

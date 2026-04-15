@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
-/// Configuration for the session recorder.
+/// Configuration for the session context.
 ///
 /// Pass an instance to `[SessionRecorder.configure]` before calling
 /// `[SessionRecorderWidget]` or starting the app.

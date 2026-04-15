@@ -1,30 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
-import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
+import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 
 /// Watches for widget tree structural changes and captures snapshots.
 
 class TreeDetector {
   final SessionRecorderEngine _engine;
-  final LomTreeConfig _config;
+  final LomTreeInspector _inspector;
 
-  TreeDetector({
-    required SessionRecorderEngine engine,
-    LomTreeConfig config = const LomTreeConfig(),
-  }) : _engine = engine,
-       _config = config;
+  TreeDetector({required SessionRecorderEngine engine})
+    : _engine = engine,
+      _inspector = LomTreeInspector();
 
   bool _isRunning = false;
 
   @pragma('vm:prefer-inline')
   bool get isRunning => _isRunning;
+
+  @pragma('vm:prefer-inline')
+  Element? get currentRouteElement => _engine.context.currentRouteElement;
 
   bool _isBuilded = false;
   bool _isNavigating = false;
@@ -47,9 +47,6 @@ class TreeDetector {
 
   @pragma('vm:prefer-inline')
   void setCurrentlyNavigating() => _isNavigating = true;
-
-  @pragma('vm:prefer-inline')
-  Element? get currentRouteElement => _engine.recorder.currentRouteElement;
 
   /// Starts watching for tree changes.
   void detect() {
@@ -110,10 +107,7 @@ class TreeDetector {
         return;
       }
 
-      final lom = LomTreeInspector.captureLom(
-        _getSafeElement(),
-        config: _config,
-      );
+      final lom = _inspector.captureLom(element);
 
       if (lom == null) return;
 
@@ -127,7 +121,8 @@ class TreeDetector {
       }
 
       _printTree([lom.root!], 0);
-      _engine.recorder.recordLom(lom);
+
+      _engine.context.recordLom(lom);
     } finally {
       if (comesFromNavigation) _isNavigating = false;
     }

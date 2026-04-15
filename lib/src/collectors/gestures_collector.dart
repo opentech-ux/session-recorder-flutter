@@ -4,7 +4,7 @@ import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
-import 'package:session_recorder_flutter/src/session/session_recorder_engine.dart';
+import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
@@ -58,7 +58,7 @@ class GestureCollector {
 
     pointerTrace.add(
       position,
-      viewport: _engine.recorder.resolveViewport(position),
+      viewport: _engine.context.resolveViewport(position),
     );
 
     if (pointerTrace.type != GesturesType.pinch &&
@@ -136,6 +136,7 @@ class GestureCollector {
 
     _pointers.clear();
     _pinchMetrics = null;
+    _lastTaps.clear();
   }
 
   /// Emit any valid gesture that is in progress to the record before
@@ -158,7 +159,7 @@ class GestureCollector {
     GesturesType type = GesturesType.tap,
   ]) =>
       _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-        ..add(position, viewport: _engine.recorder.resolveViewport(position));
+        ..add(position, viewport: _engine.context.resolveViewport(position));
 
   /// Update the Pinch Metrics Baseline
   void _updatePinchMetrics() {
@@ -222,13 +223,18 @@ class GestureCollector {
     pointerTrace.setType(GesturesType.tap);
     _lastTaps.add(pointerTrace);
 
+    if (_lastTaps.length > 10) _lastTaps.removeAt(0);
+
     final action = _createActionEvent(pointerTrace);
-    _engine.recorder.recordAction(action);
+    _engine.context.recordAction(action);
   }
 
   bool _evaluateDoubleTap(PointerTrace pointerTrace) {
+    if (_lastTaps.isEmpty) return false;
+
     final currentPosition = pointerTrace.lastPosition;
     final currentTimestamp = DateTime.now().millisecondsSinceEpoch;
+
     _lastTaps.removeWhere(
       (pointer) =>
           (currentTimestamp - pointer.lastTimestamp) >
@@ -249,7 +255,7 @@ class GestureCollector {
     if (tapFoundIndex != null) {
       pointerTrace.setType(GesturesType.doubleTap);
       final action = _createActionEvent(pointerTrace);
-      _engine.recorder.recordAction(action);
+      _engine.context.recordAction(action);
       _lastTaps.removeAt(tapFoundIndex);
 
       return true;
@@ -262,14 +268,14 @@ class GestureCollector {
     pointerTrace.setType(GesturesType.drag);
     final explorations = _createExplorationEvent(pointerTrace);
     for (ExplorationEvent exploration in explorations) {
-      _engine.recorder.recordExploration(exploration);
+      _engine.context.recordExploration(exploration);
     }
   }
 
   void _evaluateLongPress(PointerTrace pointerTrace) {
     pointerTrace.setType(GesturesType.longPress);
     final action = _createActionEvent(pointerTrace);
-    _engine.recorder.recordAction(action);
+    _engine.context.recordAction(action);
   }
 
   void _evaluatePinch(PointerTrace pointerTrace) {
@@ -295,14 +301,14 @@ class GestureCollector {
     final explorations = _createExplorationEvent(pointerTrace);
     if (explorations.isNotEmpty) {
       for (final exploration in explorations) {
-        _engine.recorder.recordExploration(exploration);
+        _engine.context.recordExploration(exploration);
       }
     }
   }
 
   void _emitAction(PointerTrace pointerTrace) {
     final action = _createActionEvent(pointerTrace);
-    _engine.recorder.recordAction(action);
+    _engine.context.recordAction(action);
   }
 
   /// Creates and returns the `[ActionEvent]` object with its zone.
@@ -313,7 +319,7 @@ class GestureCollector {
   ActionEvent _createActionEvent(PointerTrace pointer) {
     final TimedPosition firstPosition = pointer.first;
 
-    final root = _engine.recorder.findRoot(firstPosition.position);
+    final root = _engine.context.findRoot(firstPosition.position);
     int rootId = root?.id ?? 0;
 
     switch (pointer.type) {
@@ -358,6 +364,7 @@ class GestureCollector {
         break;
 
       default:
+        return [];
     }
 
     return explorationEvents;
