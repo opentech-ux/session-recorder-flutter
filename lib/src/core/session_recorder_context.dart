@@ -160,7 +160,7 @@ class ContextImpl implements SessionRecorderContext {
     _currentLom = lom;
     _currentChunk.addLom(lom);
 
-    SessionLogger.verbose("LOM SAVED - ${lom.id} sign=${lom.signature}");
+    SessionLogger.verbose("LOM SAVED - ${lom.id}");
   }
 
   @override

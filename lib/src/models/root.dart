@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 class Root {
   final int id;
   final String objectId;
-  final int parentId;
   final String widgetType;
   final String renderType;
   final Rect box;
@@ -15,7 +14,6 @@ class Root {
   const Root({
     required this.id,
     required this.objectId,
-    required this.parentId,
     required this.widgetType,
     required this.renderType,
     required this.box,
@@ -42,7 +40,6 @@ class Root {
     return <String, dynamic>{
       'id': id,
       'objectId': objectId,
-      'parentId': parentId,
       'widgetType': widgetType,
       'renderType': renderType,
       'box': rect,
@@ -58,7 +55,6 @@ class Root {
     return Root(
       id: map['id'] as int,
       objectId: map['objectId'] as String,
-      parentId: map['parentId'] as int,
       widgetType: map['widgetType'] as String,
       renderType: map['renderType'] as String,
       box: Rect.fromLTWH(b[0], b[1], b[2], b[3]),
@@ -79,5 +75,5 @@ class Root {
 
   @override
   String toString() =>
-      'Root(id: $id, objectId: $objectId, parentId: $parentId, widgetType: $widgetType, renderType: $renderType, box: $box, children: $children)';
+      'Root(id: $id, objectId: $objectId, widgetType: $widgetType, renderType: $renderType, box: $box, children: $children)';
 }

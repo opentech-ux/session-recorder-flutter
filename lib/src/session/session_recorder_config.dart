@@ -38,7 +38,8 @@ class SessionRecorderConfig {
   /// Only active in debug builds regardless of this value.
   final bool debugShowTree;
 
-  /// Determines whether the session data should be sent to the server.
+  /// Force sending data to the endpoint even in debug mode.
+  ///
   /// This will always be `[true]` in release mode. In debug mode, it will
   /// only be true if `[debugSendSession]` is explicitly set to true.
   final bool shouldSend;

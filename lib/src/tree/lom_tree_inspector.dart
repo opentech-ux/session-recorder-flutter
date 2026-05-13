@@ -2,20 +2,24 @@ import 'package:flutter/material.dart';
 
 import 'package:uuid/uuid.dart';
 
+import 'package:session_recorder_flutter/src/session/session_recorder_config.dart';
+import 'package:session_recorder_flutter/src/tree/lom_tree_hasher.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
-  LomTreeInspector() {
+  LomTreeInspector(SessionRecorderConfig config) {
     _config = const LomTreeConfig();
+    _sessionRecorderConfig = config;
   }
 
   String _lastSignature = "";
   final Map<String, String> _cache = {};
 
   late LomTreeConfig _config;
+  late SessionRecorderConfig _sessionRecorderConfig;
 
   /// Captures the widget tree starting from `[Element]`.
   LomAbstract? captureLom(Element? element) {
@@ -33,14 +37,13 @@ class LomTreeInspector {
     final Root root = Root(
       id: counter.next(),
       objectId: element.renderObject.hashCode.toRadixString(16),
-      parentId: 0,
       widgetType: element.widget.runtimeType.toString(),
       renderType: element.renderObject.runtimeType.toString(),
       box: rect,
       children: children,
     );
 
-    final signature = _signatureRoots([root]);
+    final signature = LomTreeHasher.signatureRoots([root]);
 
     if (_cache.containsKey(signature)) {
       final String cacheId = _cache[signature]!;
@@ -48,8 +51,7 @@ class LomTreeInspector {
       return LomRef(
         id: cacheId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
-        signature: signature,
-        root: root,
+        root: (_sessionRecorderConfig.debugShowTree) ? root : null,
       );
     }
 
@@ -60,7 +62,6 @@ class LomTreeInspector {
       timestamp: DateTime.now().millisecondsSinceEpoch,
       width: root.box.width.toInt(),
       height: root.box.height.toInt(),
-      signature: signature,
       root: root,
     );
 
@@ -111,7 +112,6 @@ class LomTreeInspector {
       Root(
         id: counter.next(),
         objectId: renderObject.hashCode.toRadixString(16),
-        parentId: 0,
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),
         box: rect,
@@ -139,38 +139,6 @@ class LomTreeInspector {
     });
 
     return children;
-  }
-
-  /// Signs into a hexadecimal every [Root] and its children.
-  ///
-  /// Example :
-  /// ```bash
-  ///   1847392847 => "9264b2f1"
-  /// ```
-  static String _signatureRoots(List<Root> roots) {
-    final buffer = StringBuffer();
-    for (var root in roots) {
-      _writeRoot(root, buffer);
-    }
-
-    return buffer.toString().hashCode.toRadixString(16);
-  }
-
-  /// Bucketing the pixels to define 4 px tolerance
-  ///
-  /// Example :
-  /// ```bash
-  ///   "Scaffold0,0,97,211|AppBar0,10,97,14|..."
-  /// ```
-  static void _writeRoot(Root root, StringBuffer buffer) {
-    final x = (root.box.topLeft.dx / 4).round();
-    final y = (root.box.topLeft.dy / 4).round();
-    final w = (root.box.width / 4).round();
-    final h = (root.box.height / 4).round();
-    buffer.write('${root.widgetType}$x,$y,$w,$h|');
-    for (var child in root.children) {
-      _writeRoot(child, buffer);
-    }
   }
 }
 

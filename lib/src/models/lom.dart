@@ -9,15 +9,9 @@ import 'models.dart';
 abstract class LomAbstract {
   final String id;
   final int timestamp;
-  final String signature;
   final Root? root;
 
-  const LomAbstract({
-    required this.id,
-    required this.timestamp,
-    required this.signature,
-    this.root,
-  });
+  const LomAbstract({required this.id, required this.timestamp, this.root});
 
   Map<String, dynamic> toMap();
 }
@@ -31,7 +25,6 @@ class Lom extends LomAbstract {
     required super.timestamp,
     required this.width,
     required this.height,
-    required super.signature,
     super.root,
   });
 
@@ -50,17 +43,12 @@ class Lom extends LomAbstract {
 
   @override
   String toString() {
-    return 'Lom(id: $id, timestamp: $timestamp, width: $width, height: $height, signature: $signature, root: $root)';
+    return 'Lom(id: $id, timestamp: $timestamp, width: $width, height: $height, root: $root)';
   }
 }
 
 class LomRef extends LomAbstract {
-  const LomRef({
-    required super.id,
-    required super.timestamp,
-    required super.signature,
-    super.root,
-  });
+  const LomRef({required super.id, required super.timestamp, super.root});
 
   @override
   Map<String, dynamic> toMap() {

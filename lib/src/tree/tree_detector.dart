@@ -16,7 +16,7 @@ class TreeDetector {
 
   TreeDetector({required SessionRecorderEngine engine})
     : _engine = engine,
-      _inspector = LomTreeInspector();
+      _inspector = LomTreeInspector(engine.config);
 
   bool _isRunning = false;
 
@@ -120,7 +120,7 @@ class TreeDetector {
         _isNotifierLocked = false;
       }
 
-      _printTree([lom.root!], 0);
+      // _printTree([lom.root!], 0);
 
       _engine.context.recordLom(lom);
     } finally {
@@ -154,10 +154,10 @@ class TreeDetector {
     return fallbackElement;
   }
 
-  static void _printTree(List<Root> nodes, int indent) {
-    for (final node in nodes) {
-      debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
-      _printTree(node.children, indent + 1);
-    }
-  }
+  // static void _printTree(List<Root> nodes, int indent) {
+  //   for (final node in nodes) {
+  //     debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
+  //     _printTree(node.children, indent + 1);
+  //   }
+  // }
 }

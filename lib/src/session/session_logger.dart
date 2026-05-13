@@ -84,14 +84,14 @@ class SessionLogger {
   @internal
   static void verbose(String message) {
     if (_config.debugLog) {
-      _delegate(SessionLogLevel.info, message);
+      _delegate(SessionLogLevel.verbose, message);
     }
   }
 
   @internal
   static void warning(String message) {
     if (_config.debugLog) {
-      _delegate(SessionLogLevel.info, message);
+      _delegate(SessionLogLevel.warning, message);
     }
   }
 
