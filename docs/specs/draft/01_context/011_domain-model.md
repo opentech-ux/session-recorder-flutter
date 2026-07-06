@@ -17,8 +17,8 @@ Elle est identifiée par un `sid` (Session ID) et regroupe l'intégralité des d
 
 - les événements comportementaux : Action Events (ae) et Exploration Events (ee) ;
 - les snapshots visuels : LOMs (loms) ;
-- les métriques de performance (pnt) ;
-- les métadonnées globales du payload : timestamp de la session (ts) et version de la librairie (lib_v).
+- les métriques de performance (`pnt`, champ réservé, non implémenté à ce stade) ;
+- les métadonnées globales du payload : timestamp de la session (`ts`), version de la librairie (`lib_v`) et type de librairie (`type`, ex: `mobile`).
 
 Règles :
 
@@ -38,6 +38,7 @@ Règles :
 - un chunk vide ne doit jamais être envoyé ;
 - un chunk contient un timestamp absolu `ts` correspondant au moment de sa création ;
 - un chunk embarque la version de la librairie (`lib_v`, ex: `2.0.0`) pour permettre la compatibilité et le versioning des schémas côté backend.
+- un chunk embarque le type de librairie (`type`, ex: `mobile`) pour distinguer les SDKs côté backend.
 
 ### Record
 
@@ -48,7 +49,9 @@ Il existe quatre types de records :
 1. Événement d'action (Action Event)
 2. Événement d'exploration (Exploration Event)
 3. Snapshot d'interface (LOM)
-4. Mesure de performance (Performance Metric)
+4. Mesure de performance (Performance Metric, réservé pour une évolution future)
+
+À ce stade, les métriques de performance ne sont pas collectées : la clé `pnt` est présente dans le payload, mais reste une liste vide.
 
 ### Action Event (ae)
 
@@ -59,8 +62,10 @@ Exemples : `tap`, `doubleTap`, `longPress`.
 Représentation (Optimisée pour le réseau) :
 
 - Stocké sous forme compacte (chaîne de caractères sérialisée) pour minimiser le payload.
-- Format cible : `timestamp_absolu:event_type:scroll_x,scroll_y:position_x,position_y:lom_ref`
-- Exemple : `1775810346601:tap:0,0:788,431:70bde03ac7705f7077`
+- `zone` identifie le nœud `Root` le plus profond touché par l'utilisateur (ex: `z12`). Si aucune zone n'est résolue, la valeur de repli est `z0`.
+- Format : `timestamp_absolu:event_type:zone:viewport_x,viewport_y:position_x,position_y`
+- Exemple : `1775810346601:tap:z12:0,0:788,431`
+- Pour `longPress`, la durée en millisecondes est ajoutée à la fin du format actuel : `timestamp_absolu:longPress:zone:viewport_x,viewport_y:position_x,position_y:duration_ms`.
 
 ### Exploration Event (ee)
 
@@ -70,14 +75,20 @@ Exemples : `drag`, `pinch`, `scrollStart`, `scrollEnd`
 
 Représentation :
 
-- `drag` : `timestamp_absolu:event_type:scroll_x,scroll_y:position_x,position_y:lom_ref`
-  - example : `1775810346601:drag:0:0,0:123,425:70bde03ac7705f7077`
-- `pinch` : `start_timestamp_absolu:event_type:pointer:scroll_x,scroll_y:x1,y1|x2,y2|x3,y3|xn,yn:end_timestamp_absolu:lom_ref`
-  - example : `1775810346601:pinch:1:0,0:207,583|207,583|207,583:1775810346750:70bde03ac7705f7077`
-- `scrollStart` : `timestamp_absolu:event_type:phase:scroll_x,scroll_y:scroll_width:scroll_height:lom_ref`
-  - example `1773931064746:scroll:start:0,0,260,500`
-- `scrollEnd` : `timestamp_absolu:event_type:phase:scroll_x,scroll_y:scroll_width:scroll_height:lom_ref`
-  - example `1773931065769:scroll:end:-400,0,260,500:70bde03ac7705f7077`
+- Les événements d'exploration ne portent pas de `zone` actuellement ; ils décrivent plutôt un pointeur, une position/trajectoire et un viewport.
+- `drag` : `timestamp_absolu:event_type:pointer:viewport_x,viewport_y:position_x,position_y`
+  - example : `1775810346601:drag:1:0,0:123,425`
+- `pinch` : `start_timestamp_absolu:event_type:pointer:viewport_x,viewport_y:x1,y1|x2,y2|x3,y3|xn,yn:end_timestamp_absolu`
+  - example : `1775810346601:pinch:1:0,0:207,583|210,586|215,590:1775810346750`
+- `scrollStart` : `timestamp_absolu:event_type:viewport_x,viewport_y,viewport_width,viewport_height`
+  - example `1773931064746:scrollStart:0,0,260,500`
+- `scrollEnd` : `timestamp_absolu:event_type:viewport_x,viewport_y,viewport_width,viewport_height`
+  - example `1773931065769:scrollEnd:-400,0,260,500`
+
+Évolution cible commune aux événements (`ae` et `ee`) :
+
+- Ajouter `:lom_ref` à la fin de chaque chaîne d'événement pour référencer le LOM actif au moment de l'interaction.
+- Exemple : `1775810346601:tap:z12:0,0:788,431` devient `1775810346601:tap:z12:0,0:788,431:70bde03ac7705f7077`.
 
 ***Note : La fréquence de ces événements étant très élevée (notamment lors du défilement ou du glissement), un mécanisme d'échantillonnage (sampling / throttling) est appliqué en amont (ex: 1 point tous les 50ms).***
 
@@ -103,11 +114,18 @@ Règles de déduplication et signature :
 - Mise en cache : Si la signature générée correspond au dernier LOM capturé (`_lastSignature`), la capture est avortée (aucun changement structurel).
 - LomRef : Si la signature existe déjà dans le cache de la session courante (l'utilisateur revient sur un état précédent), la librairie génère un `LomRef` léger (uniquement l'ID et le timestamp) au lieu de renvoyer l'arbre complet.
 
+Règles de confidentialité du payload `Root` :
+
+- Le payload envoyé au backend ne contient pas de texte, de valeur de champ, de label utilisateur, ni de contenu sensible.
+- Un `Root` complet sérialisé expose uniquement `id`, `b` et `c`.
+- Les champs `objectId`, `widgetType` et `renderType` sont des informations internes utilisées pour la capture, la signature, le hit-test et le debug ; ils ne font pas partie du payload réseau final.
+
 ## Relations métier
 
 - Un `Chunk` contient `1..n` records ;
 - Un `Record` appartient à `1` seul chunk ;
-- Un `Record` d'événement référence toujours le contexte visuel via le `lom_ref` du LOM actif au moment de l'interaction ;
+- Un `Record` d'action référence actuellement le contexte spatial via `zone` (ex: `z12`) ;
+- Évolution cible : chaque `Record` d'événement (`ae` et `ee`) référencera aussi le contexte visuel via le `lom_ref` du LOM actif au moment de l'interaction ;
 - Les événements et LOMs sont horodatés indépendamment avec des timestamps absolus ;
 - Le LOM complet n'est envoyé qu'une seule fois par session pour une signature spatiale donnée.
 
@@ -165,7 +183,12 @@ class Root {
   final Rect box;
   final List<Root> children;
   
-  // Constructeur et toMap()...
+  // Constructeur...
+  Map<String, dynamic> toMap() => {
+    'id': 'z$id',
+    'b': [box.left, box.top, box.width, box.height],
+    'c': children.map((x) => x.toMap()).toList(),
+  };
 }
 ```
 
@@ -188,10 +211,11 @@ class Chunk {
 
   Map<String, dynamic> toMap() => {
     'lib_v': "2.0.0",
+    'type': "mobile",
     'ts': timestamp,
     'sid': sId,
     'loms': loms.map((x) => x.toMap()).toList(),
-    'pnt': [], // Performance Metrics
+    'pnt': [], // Reserved for Performance Metrics, not implemented yet.
     'ee': explorationEvents.map((x) => x.concatenateString()).toList(),
     'ae': actionsEvents.map((x) => x.concatenateString()).toList(),
   };
@@ -202,5 +226,6 @@ class Chunk {
 
 - Le backend reçoit exclusivement des `Chunks`, jamais de flux d'événements unitaires en temps réel.
 - Le cycle de `flush` (ex: 10s) vérifie s'il existe des records en mémoire ; si oui, il ferme le `Chunk` courant, l'envoie, et en initialise un nouveau.
-- Un `flush` prioritaire (urgent) est déclenché par le `Controller` lorsque l'application passe en arrière-plan (Lifecycle `paused` / `inactive`) pour éviter la perte de données si l'OS tue le processus.
+- Lorsque l'application passe en arrière-plan ou est interrompue (Lifecycle `paused` / `inactive` / `hidden` / `detached`), les collectors drainent les événements en cours (ex: geste ou scroll non terminé) dans le chunk courant.
+- Aucun `flush` réseau prioritaire n'est garanti à ce stade lors du lifecycle suspendu ; l'envoi reste piloté par le cycle périodique de 10 secondes ou par un mécanisme futur à définir.
 

@@ -54,6 +54,8 @@ Une fois chargée, le package :
 
 Le SDK est conçu pour respecter strictement la vie privée des utilisateurs finaux. Il ne capture aucune donnée sensible ni contenu textuel. Le moteur d'analyse se limite exclusivement à la capture des métadonnées spatiales (tailles et positions des widgets, width, height, x, y) pour reconstruire les interactions, garantissant ainsi l'absence de fuite de PII (Personally Identifiable Information).
 
+Dans le payload réseau final, un nœud `Root` n'expose que son identifiant de zone (`id`, ex: `z12`), sa boîte géométrique (`b`: x, y, width, height) et ses enfants (`c`). Les informations internes utilisées pour l'analyse ou le debug (`objectId`, `widgetType`, `renderType`) ne sont pas sérialisées dans le payload envoyé au backend.
+
 ## Cible V2
 
 La V2 de ce package Dart doit préserver la simplicité d’installation actuelle, tout en reposant sur une architecture plus propre, modulaire et hautement performante.
@@ -82,5 +84,6 @@ Le produit doit permettre :
 - la capture d'événements d'action (taps, double taps, long presses) ;
 - la capture d'événements d'exploration (drags, pinches, scrolls) ;
 - la capture de snapshots LOM à chaque changement d'état significatif ou transition de route ;
-- la capture d'indicateurs de performance de l'appareil ;
+- la capture d'indicateurs de performance de l'appareil (champ `pnt` réservé, non implémenté à ce stade) ;
+- le drainage des gestes et scrolls en cours lors des interruptions ou transitions de lifecycle, sans flush réseau prioritaire garanti à ce stade ;
 - l'envoi périodique et asynchrone des données accumulées (par défaut, toutes les 10 secondes).
