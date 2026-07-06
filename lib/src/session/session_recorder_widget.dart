@@ -23,7 +23,7 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 /// Wrap the `[MaterialApp]` with the `.observer` method to has already the
 /// `[SessionNavigatorObserver]` instance and pass it to `navigatorObservers`
 /// ```dart
-/// return SessionRecorder.observer(
+/// return SessionRecorderWidget.observer(
 ///   builder: (observer) => MaterialApp(
 ///     navigatorObservers: [observer],
 ///     home: const HomeScreen(),
@@ -33,7 +33,7 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 /// ### 2. No factory method
 ///
 /// ```dart
-/// return SessionRecorder(
+/// return SessionRecorderWidget(
 ///   child: MaterialApp(
 ///     navigatorObservers: [SessionNavigatorObserver()],
 ///     home: const HomeScreen(),

@@ -5,6 +5,9 @@ class LomTreeHasher {
   static const int _tolerance = 4;
 
   /// Groups pixel values into larger buckets to tolerate small visual changes
+  ///
+  /// If a buttons moves from X1 (10.1) to X2 (11.8), the `_bucket()` is 3, so
+  /// the final hash is exactly the same
   static int _bucket(double value) => (value / _tolerance).round();
 
   /// Merges a new hash `value` into the global `seed`, ensuring the order of
