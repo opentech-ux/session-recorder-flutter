@@ -1,4 +1,4 @@
-# 024 - Pipeline de capture LOM
+# 032 - Pipeline de capture LOM
 
 ## Statut
 
@@ -154,3 +154,4 @@ Règles :
 - Si le LOM courant est un `LomRef` sans `root`, `TapTreeFinder` ne peut pas résoudre la zone et les actions retombent à `z0`.
 - Le fallback brute-force existe, mais l'architecture attend que le client fournisse un `SessionNavigatorObserver`.
 - La déduplication actuelle est cache-first : les signatures connues produisent un `LomRef`.
+

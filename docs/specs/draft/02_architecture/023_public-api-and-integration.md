@@ -1,4 +1,4 @@
-# 021 - API publique et intégration
+# 023 - API publique et intégration
 
 ## Statut
 
@@ -134,3 +134,4 @@ Responsabilités :
 - interrompre les collectors pour enregistrer les gestes/scrolls en cours avant changement d'écran.
 
 Il peut être installé plusieurs fois, notamment dans des configurations `GoRouter` avec plusieurs navigators.
+

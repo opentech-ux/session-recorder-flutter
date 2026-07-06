@@ -1,4 +1,4 @@
-# 026 - Notes d'évolution de l'architecture
+# 040 - Notes d'évolution
 
 ## Statut
 
@@ -6,8 +6,20 @@ Draft
 
 ## But
 
-Ce document liste les points d'évolution connus de l'architecture actuelle.
-Il ne remplace pas les specs fonctionnelles ; il sert de pense-bête technique avant modification du code.
+Ce document liste les évolutions connues du SDK.
+Il sert de zone temporaire pour les décisions non encore implémentées.
+
+Quand une évolution est implémentée, elle doit être retirée de ce document et reportée dans la spec stable correspondante (`01_context`, `02_architecture` ou `03_features`).
+
+## Règle de cycle de vie documentaire
+
+Une entrée de ce document doit suivre ce cycle :
+
+1. Décrire l'état actuel.
+2. Décrire la cible souhaitée.
+3. Lister les questions ouvertes.
+4. Être supprimée lorsque la cible est implémentée.
+5. Mettre à jour les specs stables avec le comportement réel.
 
 ## Évolutions déjà identifiées
 
@@ -96,7 +108,7 @@ Contraintes :
 Cible possible :
 
 - Réactiver la validation.
-- Décider si une configuration invalide doit throw, logger puis passer en no-op, ou uniquement désactiver le reporting.
+- Décider si une configuration invalide doit throw, logguer puis passer en no-op, ou uniquement désactiver le reporting.
 
 ### Adapter la déduplication LOM
 
@@ -133,4 +145,5 @@ Zones à couvrir en priorité :
 - Garder `ContextImpl` comme propriétaire unique du chunk courant.
 - Ne pas introduire de capture de texte ou de valeur utilisateur.
 - Mesurer l'impact UI avant toute capture plus fréquente.
-- Documenter tout changement de payload dans `01_context` et `02_architecture`.
+- Documenter tout changement de payload dans les specs stables.
+

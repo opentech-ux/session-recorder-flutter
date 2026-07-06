@@ -1,4 +1,4 @@
-# 020 - Vue d'ensemble de l'architecture
+# 022 - Vue d'ensemble de l'architecture
 
 ## Statut
 
@@ -7,52 +7,20 @@ Draft
 ## But
 
 Ce document donne une vue d'ensemble de l'architecture actuelle du package `SessionRecorder`.
-Il sert de carte de lecture avant d'entrer dans les documents plus détaillés de la section `02_architecture`.
+Il complète les fondations et la structure du projet avant d'entrer dans les APIs et le runtime.
 
 ## Principes généraux
 
 L'architecture actuelle est organisée autour d'un SDK Flutter embarqué dans l'application cliente.
 Le package doit rester invisible pour l'utilisateur final et ne doit jamais bloquer le thread UI.
 
-Les responsabilités sont séparées en six zones principales :
+Les responsabilités sont séparées en cinq zones principales :
 
 1. API publique et intégration client
-2. Core runtime et état de session
-3. Capture des événements utilisateur
-4. Capture LOM et résolution spatiale
-5. Reporting réseau, lifecycle et inactivité
-6. Modèles sérialisables et contrats de payload
-
-## Carte des modules
-
-```text
-lib/session_recorder.dart
-  -> Expose uniquement l'API publique du package.
-
-lib/src/session/
-  -> Façade publique, configuration, widget racine, session et logs.
-
-lib/src/core/
-  -> Moteur interne, contexte runtime, controller et reporter réseau.
-
-lib/src/collectors/
-  -> Capture des gestes pointeur et des notifications de scroll.
-
-lib/src/observers/
-  -> Observation de navigation Flutter et lifecycle applicatif.
-
-lib/src/tree/
-  -> Capture, filtrage, hash, overlay debug et résolution du LOM.
-
-lib/src/models/
-  -> Entités runtime et objets sérialisés dans les chunks.
-
-lib/src/controllers/
-  -> Contrôleurs transverses, actuellement l'inactivité.
-
-lib/src/constants/ et lib/src/enums/
-  -> Valeurs de seuils, versions et types d'événements.
-```
+2. API interne et runtime de session
+3. Fonctionnalités de capture
+4. Reporting réseau, lifecycle et inactivité
+5. Modèles sérialisables et contrats de payload
 
 ## Vue de flux
 
@@ -63,15 +31,13 @@ Application cliente
   -> ContextImpl + ControllerImpl
 
 SessionRecorderWidget
-  -> Listener / NotificationListener
-  -> GestureCollector / ScrollCollector
+  -> Collectors de fonctionnalités
   -> ContextImpl.recordAction / recordExploration
   -> Chunk courant
 
 SessionNavigatorObserver
   -> route stabilisée
-  -> TreeDetector.captureTree(true)
-  -> LomTreeInspector.captureLom
+  -> capture LOM
   -> ContextImpl.recordLom
   -> Chunk courant
 
@@ -88,21 +54,38 @@ SessionRecorderReporter
 - Le `SessionRecorderEngine` possède le `ContextImpl` et le `ControllerImpl`.
 - Le `ContextImpl` possède l'état mutable de session : session courante, chunk courant, LOM courant, route active et viewports.
 - Le `ControllerImpl` orchestre le reporting, l'inactivité, les observers de navigation et les interruptions de collectors.
+- Les fonctionnalités produisent des records, mais ne possèdent pas le chunk courant.
 - Les modèles restent sans dépendance forte vers le core ; ils sérialisent leur propre représentation.
 
 ## Frontières importantes
 
 - Frontière publique : `SessionRecorder`, `SessionRecorderConfig`, `SessionRecorderWidget`, `SessionNavigatorObserver`.
+- Frontière interne : `SessionRecorderEngineInternal`, `SessionRecorderContext`, `SessionRecorderController`.
 - Frontière de capture : `SessionRecorderWidget` et `SessionNavigatorObserver` sont les points d'entrée runtime.
 - Frontière de stockage mémoire : `ContextImpl` est le seul propriétaire du chunk courant.
 - Frontière réseau : le backend reçoit uniquement des `Chunk`, jamais des événements unitaires en temps réel.
 - Frontière privacy : le payload final ne contient pas de texte, de valeur utilisateur ni de type de widget interne pour les `Root`.
 
-## Documents de cette section
+## Découpage documentaire
 
-- `021_public-api-and-integration.md` : API publique, configuration et intégration client.
-- `022_runtime-core.md` : moteur interne, contexte, controller et état mutable.
-- `023_event-capture-pipeline.md` : gestes, scrolls, sampling et drain des collectors.
-- `024_lom-capture-pipeline.md` : navigation, mutations UI, capture LOM, hash et zones.
+Dans `02_architecture` :
+
+- `020_foundation-and-guidelines.md` : fondations et lignes directrices du package ;
+- `021_project-structure.md` : structure du projet Flutter ;
+- `022_architecture-overview.md` : carte d'ensemble du runtime ;
+- `023_public-api-and-integration.md` : API publique et intégration client ;
+- `024_runtime-core.md` : API interne, moteur, contexte et controller ;
 - `025_reporting-lifecycle-network.md` : chunks, timer, réseau, lifecycle et inactivité.
-- `026_architecture-evolution-notes.md` : points d'évolution et écarts connus.
+
+Dans `03_features` :
+
+- captures comportementales ;
+- capture LOM ;
+- futures fonctionnalités optionnelles.
+
+Dans `04_evolution` :
+
+- évolutions prévues ;
+- écarts connus ;
+- sujets à supprimer quand ils seront implémentés.
+

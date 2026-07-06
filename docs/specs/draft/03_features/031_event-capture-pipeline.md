@@ -1,4 +1,4 @@
-# 023 - Pipeline de capture des événements
+# 031 - Pipeline de capture des événements
 
 ## Statut
 
@@ -154,3 +154,4 @@ Ce drain ajoute les événements manquants au chunk courant, mais ne force pas u
 - Les scroll updates ne sont pas sérialisés comme événements séparés.
 - Les événements d'exploration ne portent pas de `zone`.
 - Les performances (`pnt`) ne sont pas capturées.
+
