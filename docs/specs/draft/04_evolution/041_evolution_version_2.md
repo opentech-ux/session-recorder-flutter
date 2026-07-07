@@ -140,19 +140,18 @@ Statut V2 :
 - La requête HTTP applique un timeout de 5 secondes.
 - Une file mémoire courte conserve au maximum 3 chunks.
 - Chaque chunk a droit à 1 retry.
-- `IOClient` n'est pas encore fermé par un cycle de vie définitif du SDK.
+- `IOClient` est fermé par le dispose interne du reporter.
 
 Risque :
 
 - Envois concurrents.
-- Ressources réseau conservées.
 - Requêtes suspendues trop longtemps.
 - Perte de données plus forte que nécessaire.
 
 Cible :
 
 - Garder le reporter non bloquant et sans persistance disque.
-- Ajouter une méthode `dispose` ou `close` au reporter en P1, quand le SDK aura un arrêt définitif.
+- Conserver `close()` comme cycle de vie interne, sans ajouter d'API publique.
 
 ### Assumer la séquence drag/scroll
 
@@ -215,13 +214,16 @@ Cible :
 
 ## Priorité P1 - À traiter avant une V2 stable
 
+Statut : les points P1 ci-dessous ont été traités de manière minimaliste dans le runtime V2. Il n'y a pas de nouvelle API publique ; le cycle de vie reste interne au SDK.
+
 ### Revoir le hook global `onBuildScheduled`
 
 État actuel :
 
 - `TreeDetector` remplace `BuildOwner.onBuildScheduled`.
-- Le hook précédent est appelé, mais il n'existe pas de restauration explicite.
-- Le SDK ne possède pas de méthode de dispose globale.
+- Le hook précédent est appelé.
+- Le hook précédent est restauré lors du dispose interne si le wrapper courant est encore celui du SDK.
+- Le SDK ne possède pas de méthode de dispose publique.
 
 Risque :
 
@@ -229,15 +231,15 @@ Risque :
 
 Cible :
 
-- Ajouter un cycle de vie clair au detector.
-- Restaurer `onBuildScheduled` lors d'un stop/dispose.
-- Documenter que le SDK est conçu pour vivre pendant toute la durée du processus.
+- Conserver le cycle de vie interne du detector.
+- Documenter que le SDK est conçu pour vivre pendant toute la durée du processus, sans API publique de dispose à ce stade.
 
 ### Adapter la règle de cooldown LOM pour la navigation
 
 État actuel :
 
-- Le cooldown de 400 ms s'applique aussi aux captures venant de la navigation.
+- Le cooldown de 400 ms s'applique aux mutations UI.
+- Les captures venant de la navigation ne sont pas bloquées par ce cooldown.
 
 Risque :
 
@@ -245,31 +247,26 @@ Risque :
 
 Cible :
 
-- Donner priorité aux captures de navigation.
-- Ou utiliser un cooldown séparé pour navigation et mutations UI.
+- Conserver la priorité navigation.
 
 ### Clarifier la politique de déduplication LOM
 
 État actuel :
 
 - Si une signature existe dans le cache, `LomTreeInspector` retourne un `LomRef`.
-- Le check `_lastSignature` arrive après le cache et ne bloque donc pas les signatures connues.
-
-Question :
-
-- Une signature identique consécutive doit-elle produire un `LomRef` ou être ignorée ?
+- Si une mutation UI produit la même signature que la dernière capture, elle est ignorée.
+- Si une navigation produit une signature connue, un `LomRef` est conservé.
 
 Cible :
 
-- Décider la règle produit.
-- Mettre le code, les specs et les tests en accord.
+- Garder la règle par trigger : mutation identique consécutive ignorée, navigation connue envoyée comme `LomRef`.
 
 ### Corriger les priorités de `LomTreeConfig`
 
 État actuel :
 
-- `TextFormField` est présent dans `noiseAt` et dans `semantics`.
-- `noiseAt` est évalué avant `semantics`.
+- `semantics` est évalué avant `noiseAt`.
+- `TextFormField` est conservé comme zone sémantique et n'est plus traité comme bruit.
 
 Risque :
 
@@ -277,31 +274,31 @@ Risque :
 
 Cible :
 
-- Définir une priorité claire : `pruneAt`, `semantics`, `noiseAt`, `ignoreAt`, ou autre ordre explicite.
-- Tester `TextField`, `TextFormField`, boutons, images, icônes et gestes custom.
+- Conserver la priorité `pruneAt`, `semantics`, `noiseAt`, `ignoreAt`.
+- Tester plus tard `TextField`, `TextFormField`, boutons, images, icônes et gestes custom en widget tests.
 
 ### Ajuster la détection double tap
 
 État actuel :
 
-- Le premier tap est enregistré immédiatement.
-- Le second tap peut ensuite produire un `doubleTap`.
+- Le premier tap est enregistré immédiatement pour garder une latence basse.
+- Les taps récents sont conservés dans `_lastTaps` pendant `doubleTapTimeout`.
+- Plusieurs taps récents peuvent coexister pour supporter le double tap multi-touch.
+- Aucun `Timer` n'est utilisé dans `GestureCollector`.
 
 Risque :
 
-- Un double tap produit `tap + doubleTap`.
+- Un double tap peut être représenté par un `tap` immédiat suivi d'un `doubleTap`, afin d'éviter toute attente artificielle côté UI.
 
 Cible :
 
-- Décider si ce comportement est voulu.
-- Si non, retarder l'émission du tap jusqu'à expiration de la fenêtre double tap.
+- Conserver la règle : pas de timer dans les gestes et support multi-touch via historique de taps.
 
 ### Dédupliquer le dernier point du sampling
 
 État actuel :
 
-- `_samplePositions` ajoute toujours le dernier point.
-- Si le dernier point a déjà été ajouté par le seuil temporel, il peut être dupliqué.
+- `_samplePositions` ajoute le dernier point seulement s'il n'a pas déjà été conservé.
 
 Risque :
 
@@ -309,13 +306,13 @@ Risque :
 
 Cible :
 
-- Ajouter le dernier point seulement s'il est différent du dernier point échantillonné.
+- Conserver cette déduplication du dernier point.
 
 ### Nettoyer les APIs internes no-op
 
 État actuel :
 
-- `NoOpContext.currentRouteElement` lance `UnimplementedError`.
+- `NoOpContext.currentRouteElement` retourne `null`.
 
 Risque :
 
@@ -323,22 +320,20 @@ Risque :
 
 Cible :
 
-- Retourner `null` au lieu de throw.
-- Ajouter un test de non-crash avant initialisation.
+- Ajouter plus tard un test de non-crash avant initialisation si nécessaire.
 
 ### Libérer les callbacks et ressources au dispose
 
 État actuel :
 
 - `SessionRecorderWidget.dispose` draine les collectors.
-- Le controller conserve potentiellement la callback d'interruption.
-- Le reporter ne ferme pas son client HTTP.
+- Le controller nettoie la callback d'interruption.
+- Le reporter ferme son client HTTP lors du dispose interne.
+- Le detector LOM restaure son hook `onBuildScheduled` si possible.
 
 Cible :
 
-- Ajouter une stratégie de dispose interne.
-- Nettoyer `onInterrupt(null)` quand le widget est détruit.
-- Fermer le client HTTP quand le SDK s'arrête définitivement.
+- Conserver cette stratégie interne sans ajouter de `SessionRecorder.dispose()` public.
 
 ## Priorité P2 - Améliorations de qualité et maintenance
 
@@ -447,4 +442,4 @@ Cible :
 ## Conclusion
 
 La V2 est proche d'une base publiable, mais elle ne doit pas encore être considérée comme stable sans refaire les validations locales complètes.
-Les points P0 runtime ont été traités de manière minimaliste ; les risques restants sont surtout la couverture widget, le dispose définitif des ressources et les évolutions P1/P2.
+Les points P0 et P1 runtime ont été traités de manière minimaliste ; les risques restants sont surtout la couverture widget, les validations de publication et les évolutions P2.

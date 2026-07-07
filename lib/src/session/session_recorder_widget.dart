@@ -76,6 +76,8 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     _gestures = GestureCollector();
     _scrolls = ScrollCollector();
 
+    SessionRecorder.engine.context.start();
+    SessionRecorder.engine.controller.startReporting();
     SessionRecorder.engine.controller.onInterrupt(_dispatchPendingEvents);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -86,6 +88,9 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   @override
   void dispose() {
     _dispatchPendingEvents();
+    SessionRecorder.engine.controller.onInterrupt(null);
+    SessionRecorder.engine.controller.dispose();
+    SessionRecorder.engine.context.dispose();
     super.dispose();
   }
 

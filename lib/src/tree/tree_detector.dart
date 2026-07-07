@@ -39,6 +39,7 @@ class TreeDetector {
   ///  - Helps reduce redundant or heavy operations by batching changes.
   Timer? _debounce;
   VoidCallback? _lastOnBuildScheduled;
+  VoidCallback? _installedOnBuildScheduled;
   DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Holds the latest captured snapshot.
@@ -69,7 +70,7 @@ class TreeDetector {
 
     _lastOnBuildScheduled = buildOwner.onBuildScheduled;
 
-    buildOwner.onBuildScheduled = () {
+    void onBuildScheduled() {
       _lastOnBuildScheduled?.call();
 
       if (!_isRunning || _isNavigating) return;
@@ -82,18 +83,49 @@ class TreeDetector {
 
         captureTree(false);
       });
-    };
+    }
 
+    _installedOnBuildScheduled = onBuildScheduled;
+    buildOwner.onBuildScheduled = onBuildScheduled;
     _isBuilded = true;
+  }
+
+  /// Stops tree detection and restores the previous build hook.
+  void dispose() {
+    _isRunning = false;
+    _debounce?.cancel();
+    _debounce = null;
+
+    final buildOwner = WidgetsBinding.instance.buildOwner;
+    final installedCallback = _installedOnBuildScheduled;
+
+    final didRestoreHook = _isBuilded &&
+        buildOwner != null &&
+        installedCallback != null &&
+        identical(buildOwner.onBuildScheduled, installedCallback);
+
+    if (didRestoreHook) {
+      buildOwner.onBuildScheduled = _lastOnBuildScheduled;
+    }
+
+    _isBuilded = false;
+    _isNavigating = false;
+    _isNotifierLocked = false;
+
+    // Keep forwarding intact if another callback wrapped ours after install.
+    if (didRestoreHook || buildOwner == null) {
+      _lastOnBuildScheduled = null;
+      _installedOnBuildScheduled = null;
+    }
   }
 
   void captureTree(bool comesFromNavigation) {
     if (comesFromNavigation) _isNavigating = true;
 
     final now = DateTime.now();
-    if (now.difference(_lastCaptureTime).inMilliseconds <
+    if (!comesFromNavigation &&
+        now.difference(_lastCaptureTime).inMilliseconds <
         kCooldownTime.inMilliseconds) {
-      if (comesFromNavigation) _isNavigating = false;
       return;
     }
 
@@ -107,11 +139,14 @@ class TreeDetector {
         return;
       }
 
-      final lom = _inspector.captureLom(element);
-
-      if (lom == null) return;
+      final lom = _inspector.captureLom(
+        element,
+        comesFromNavigation: comesFromNavigation,
+      );
 
       _lastCaptureTime = DateTime.now();
+
+      if (lom == null) return;
 
       _isNotifierLocked = true;
       try {

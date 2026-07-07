@@ -22,7 +22,10 @@ class LomTreeInspector {
   late SessionRecorderConfig _sessionRecorderConfig;
 
   /// Captures the widget tree starting from `[Element]`.
-  LomAbstract? captureLom(Element? element) {
+  LomAbstract? captureLom(
+    Element? element, {
+    required bool comesFromNavigation,
+  }) {
     if (element == null) return null;
 
     if (!element.mounted) return null;
@@ -44,9 +47,13 @@ class LomTreeInspector {
     );
 
     final signature = LomTreeHasher.signatureRoots([root]);
+    final isSameAsLast = signature == _lastSignature;
+
+    if (isSameAsLast && !comesFromNavigation) return null;
 
     if (_cache.containsKey(signature)) {
       final String cacheId = _cache[signature]!;
+      _lastSignature = signature;
 
       return LomRef(
         id: cacheId,
@@ -65,10 +72,6 @@ class LomTreeInspector {
       root: root,
     );
 
-    // If the stable structure did not change, no additional processing is
-    // performed.
-    if (signature == _lastSignature) return null;
-
     _cache[signature] = lomId;
     _lastSignature = signature;
 
@@ -86,18 +89,19 @@ class LomTreeInspector {
 
     if (config.pruneAt.contains(widgetType)) return [];
 
-    if (config.noiseAt.contains(widgetType)) {
-      return _visitChildrenFlat(element, config, counter);
-    }
-
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
     if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
       return _visitChildrenFlat(element, config, counter);
     }
 
-    if (widgetType.startsWith('_') ||
-        config.ignoreAt.any((w) => widgetType.contains(w))) {
+    if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
+      return _visitChildrenFlat(element, config, counter);
+    }
+
+    if (!hasImportanteSemantic &&
+        (widgetType.startsWith('_') ||
+            config.ignoreAt.any((w) => widgetType.contains(w)))) {
       return _visitChildrenFlat(element, config, counter);
     }
 

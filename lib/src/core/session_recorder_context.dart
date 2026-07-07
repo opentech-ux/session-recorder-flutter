@@ -11,6 +11,7 @@ import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 @internal
 abstract interface class SessionRecorderContext {
   void start();
+  void dispose();
 
   Element? get currentRouteElement;
   void setCurrentRouteElement(Element? element);
@@ -51,6 +52,8 @@ class NoOpContext implements SessionRecorderContext {
 
   @override
   void start() {}
+  @override
+  void dispose() {}
   @override
   Rect get screenViewport => Rect.zero;
   @override
@@ -124,6 +127,12 @@ class ContextImpl implements SessionRecorderContext {
 
     _detector = TreeDetector(engine: _engine);
     _detector!.detect();
+  }
+
+  @override
+  void dispose() {
+    _detector?.dispose();
+    _detector = null;
   }
 
   @override

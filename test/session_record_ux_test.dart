@@ -4,10 +4,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:session_recorder_flutter/src/collectors/gestures_collector.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_context.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_controller.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_reporter.dart';
+import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_config.dart';
@@ -133,6 +135,72 @@ void main() {
     });
   });
 
+  group('GestureCollector', () {
+    test('detects double tap from multiple recent taps without timers', () {
+      final context = _FakeContext([]);
+      final collector = GestureCollector(
+        engine: _FakeEngine(
+          config: const SessionRecorderConfig(),
+          context: context,
+        ),
+      );
+
+      collector.onPointerDown(
+        const PointerDownEvent(pointer: 1, position: Offset(10, 10)),
+      );
+      collector.onPointerUp(
+        const PointerUpEvent(pointer: 1, position: Offset(10, 10)),
+      );
+
+      collector.onPointerDown(
+        const PointerDownEvent(pointer: 2, position: Offset(30, 30)),
+      );
+      collector.onPointerUp(
+        const PointerUpEvent(pointer: 2, position: Offset(30, 30)),
+      );
+
+      expect(context.actionsEvents, hasLength(2));
+      expect(context.actionsEvents, everyElement(isA<TapActionEvent>()));
+
+      collector.onPointerDown(
+        const PointerDownEvent(pointer: 3, position: Offset(11, 11)),
+      );
+      collector.onPointerUp(
+        const PointerUpEvent(pointer: 3, position: Offset(11, 11)),
+      );
+
+      collector.onPointerDown(
+        const PointerDownEvent(pointer: 4, position: Offset(31, 31)),
+      );
+      collector.onPointerUp(
+        const PointerUpEvent(pointer: 4, position: Offset(31, 31)),
+      );
+
+      expect(context.actionsEvents, hasLength(4));
+      expect(
+        context.actionsEvents.whereType<DoubleTapActionEvent>(),
+        hasLength(2),
+      );
+    });
+
+    test('does not duplicate the last sampled point', () {
+      final collector = GestureCollector(engine: _FakeEngine.empty());
+      final positions = [
+        TimedPosition(Offset.zero, viewport: Rect.zero),
+        TimedPosition(const Offset(1, 1), viewport: Rect.zero),
+        TimedPosition(const Offset(2, 2), viewport: Rect.zero),
+      ];
+
+      final sampled = collector.samplePositionsForTest(
+        positions,
+        timestampThresholdMs: 0,
+      );
+
+      expect(sampled, hasLength(3));
+      expect(sampled.last, same(positions.last));
+    });
+  });
+
   group('ExplorationEvent payloads', () {
     test('serializes drag, pinch, scroll start, and scroll end', () {
       expect(_drag().concatenateString(), '10:drag:7:0,100:20,180');
@@ -232,6 +300,13 @@ class _TestServer {
 class _FakeEngine implements SessionRecorderEngineInternal {
   _FakeEngine({required this.config, required this.context});
 
+  factory _FakeEngine.empty() {
+    return _FakeEngine(
+      config: const SessionRecorderConfig(),
+      context: _FakeContext([]),
+    );
+  }
+
   @override
   final SessionRecorderConfig config;
 
@@ -270,6 +345,9 @@ class _FakeController implements SessionRecorderController {
 
   @override
   void stopReporting() {}
+
+  @override
+  void dispose() {}
 }
 
 /// Minimal context stub with controlled chunk extraction.
@@ -277,6 +355,8 @@ class _FakeContext implements SessionRecorderContext {
   _FakeContext(this._chunks);
 
   final List<Chunk?> _chunks;
+  final List<ActionEvent> actionsEvents = [];
+  final List<ExplorationEvent> explorationEvents = [];
   int extractCount = 0;
 
   @override
@@ -305,13 +385,20 @@ class _FakeContext implements SessionRecorderContext {
   void captureTree(bool comesFromNavigation) {}
 
   @override
+  void dispose() {}
+
+  @override
   Root? findRoot(Offset position) => null;
 
   @override
-  void recordAction(ActionEvent action) {}
+  void recordAction(ActionEvent action) {
+    actionsEvents.add(action);
+  }
 
   @override
-  void recordExploration(ExplorationEvent exploration) {}
+  void recordExploration(ExplorationEvent exploration) {
+    explorationEvents.add(exploration);
+  }
 
   @override
   void recordLom(LomAbstract? lom) {}

@@ -57,7 +57,6 @@ class LomTreeConfig {
       'TextFieldTapRegion',
       'ExcludeSemantics',
       'ImageFiltered',
-      'TextFormField',
     },
     this.semantics = const {
       'TextField',

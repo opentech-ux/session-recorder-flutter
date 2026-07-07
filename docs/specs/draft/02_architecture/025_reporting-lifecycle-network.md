@@ -50,6 +50,7 @@ Démarrage :
 Arrêt :
 
 - `stop()` annule le timer et remet sa référence à `null`.
+- `close()` annule le timer, vide la file mémoire courte et ferme le client HTTP.
 
 ## Flush périodique
 
@@ -142,6 +143,13 @@ Effet :
 - `GestureCollector.forceRecordCollector()` est appelé.
 - `ScrollCollector.forceRecordCollector()` est appelé.
 - Les gestes et scrolls en cours sont drainés dans le chunk courant.
+
+Dispose interne :
+
+- `SessionRecorderWidget.dispose` draine les collectors ;
+- la callback d'interruption du controller est nettoyée avec `onInterrupt(null)` ;
+- le reporting est arrêté et le reporter interne est fermé ;
+- le detector LOM restaure son hook `onBuildScheduled` si possible.
 
 Limite actuelle :
 

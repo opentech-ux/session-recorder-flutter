@@ -23,6 +23,7 @@ class SessionRecorderReporter {
 
   /// Prevents overlapping HTTP flushes.
   bool _isFlushing = false;
+  bool _isClosed = false;
 
   /// The interval used for the periodic timer ticks.
   ///
@@ -49,6 +50,7 @@ class SessionRecorderReporter {
 
   /// Starts the session record timer subsystem.
   void start() {
+    if (_isClosed) return;
     if (_engine.config.endpoint == '') return;
     if (_timer?.isActive ?? false) return;
 
@@ -61,6 +63,16 @@ class SessionRecorderReporter {
 
     _timer?.cancel();
     _timer = null;
+  }
+
+  /// Permanently closes reporter resources.
+  void close() {
+    if (_isClosed) return;
+
+    _isClosed = true;
+    stop();
+    _pendingChunks.clear();
+    _httpClient.close();
   }
 
   /// Validates the [Chunk] before to send it into the server.
@@ -107,6 +119,8 @@ class SessionRecorderReporter {
     while (_pendingChunks.isNotEmpty) {
       final queued = _pendingChunks.first;
       final sent = await _send(queued.chunk);
+
+      if (_isClosed) return;
 
       if (sent) {
         _pendingChunks.removeFirst();

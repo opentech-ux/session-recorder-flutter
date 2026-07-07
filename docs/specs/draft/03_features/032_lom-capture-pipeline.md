@@ -36,11 +36,17 @@ Mutation UI :
 - `TreeDetector` remplace `BuildOwner.onBuildScheduled` par un wrapper.
 - Chaque build schedule relance un debounce.
 - Après le debounce, il capture le LOM si l'application n'est pas en navigation.
+- Lors du dispose interne, le debounce est annulé et le hook précédent est restauré si le wrapper courant est encore celui du SDK.
 
 Constantes actuelles :
 
 - debounce : 300 ms ;
-- cooldown entre captures : 400 ms.
+- cooldown entre captures : 400 ms pour les mutations UI.
+
+Règle :
+
+- les captures de navigation ne sont pas bloquées par le cooldown ;
+- les mutations UI identiques consécutives sont ignorées pour réduire le bruit.
 
 ## Sélection de l'élément racine
 
@@ -78,6 +84,13 @@ Catégories :
 - `noiseAt` : flatten des widgets de layout ou de décoration.
 - `semantics` : conserve certains widgets importants même s'ils ne sont pas des `RenderObjectWidget` typiques.
 
+Priorité :
+
+1. `pruneAt`
+2. `semantics`
+3. `noiseAt`
+4. `ignoreAt`
+
 Objectif :
 
 - réduire le bruit ;
@@ -98,14 +111,15 @@ La géométrie est bucketisée avec une tolérance de 4 px pour éviter les chan
 
 Comportement actuel de `LomTreeInspector` :
 
-- Si la signature existe déjà dans le cache, un `LomRef` est retourné.
-- Sinon, un nouveau `Lom` est créé avec un UUID v7.
-- La signature et l'id du LOM sont stockés dans le cache.
+- Si la signature est identique à la dernière et vient d'une mutation UI, aucun LOM n'est retourné.
+- Si la signature est connue et vient d'une navigation, un `LomRef` est retourné.
+- Si la signature est connue mais non consécutive, un `LomRef` peut être retourné.
+- Sinon, un nouveau `Lom` est créé avec un UUID v7 et stocké dans le cache.
 - Le contexte conserve localement les arbres complets connus pour continuer à résoudre les zones même lorsqu'un `LomRef` léger est envoyé.
 
 Note d'implémentation :
 
-- Le code contient aussi une vérification `_lastSignature`, mais le cache est consulté avant. En pratique, une signature déjà connue retourne un `LomRef`.
+- `_lastSignature` est mis à jour aussi lors d'un `LomRef`, afin que le build identique suivant ne génère pas de bruit.
 
 ## Payload Root
 
@@ -153,4 +167,3 @@ Règles :
 ## Limites actuelles
 
 - Le fallback brute-force existe, mais l'architecture attend que le client fournisse un `SessionNavigatorObserver`.
-- La déduplication actuelle est cache-first : les signatures connues produisent un `LomRef`.

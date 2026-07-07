@@ -44,8 +44,13 @@ Gestes pris en charge :
 État interne :
 
 - `_pointers` : traces actives par identifiant de pointeur.
-- `_lastTaps` : historique court pour détecter les double taps.
+- `_lastTaps` : historique court des taps récents pour détecter les double taps, y compris multi-touch.
 - `_pinchMetrics` : baseline géométrique pour évaluer un pinch.
+
+Règle de performance :
+
+- le collector de gestes n'utilise pas de `Timer` ;
+- les actions sont évaluées à partir des événements pointeur et des drains explicites.
 
 ## PointerTrace et TimedPosition
 
@@ -76,7 +81,7 @@ PointerMove -> update distance/duration/type
 PointerUp
   -> longPress si durée >= timeout et distance faible
   -> drag si distance >= touchSlop
-  -> doubleTap si tap précédent proche et récent
+  -> doubleTap si un tap récent proche existe dans l'historique
   -> tap sinon
 ```
 
@@ -88,6 +93,14 @@ Les actions créent :
 
 La `zone` est résolue via `ContextImpl.findRoot(position)`.
 Si aucune zone n'est trouvée, la valeur de repli est `z0`.
+
+Règle double tap :
+
+- chaque tap est enregistré immédiatement pour garder une latence basse ;
+- les taps récents sont gardés dans `_lastTaps` pendant `doubleTapTimeout` ;
+- si un second tap valide arrive près d'un tap récent, un `DoubleTapActionEvent` est émis ;
+- plusieurs taps récents peuvent coexister pour supporter le double tap avec deux doigts ou plus ;
+- aucun timer n'est utilisé pour différer ou émettre une action.
 
 ## Détection des explorations
 
@@ -102,7 +115,8 @@ Types actuels :
 Pour les drags et pinches, le collector applique un sampling temporel :
 
 - 1 point toutes les 50 ms ;
-- le premier et le dernier point sont toujours conservés.
+- le premier et le dernier point sont conservés ;
+- le dernier point n'est pas ajouté deux fois s'il a déjà été conservé par le seuil temporel.
 
 ## Transitions de gestes
 

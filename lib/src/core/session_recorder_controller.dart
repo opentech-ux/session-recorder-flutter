@@ -13,6 +13,7 @@ abstract interface class SessionRecorderController {
 
   void startReporting();
   void stopReporting();
+  void dispose();
   void pingInactivity() {}
 
   void onInterrupt(VoidCallback? onInterrupt);
@@ -38,6 +39,8 @@ class NoOpController implements SessionRecorderController {
   @override
   void stopReporting() {}
   @override
+  void dispose() {}
+  @override
   void pingInactivity() {}
 }
 
@@ -57,9 +60,10 @@ class ControllerImpl implements SessionRecorderController {
     onActive: startReporting,
     onInactive: stopReporting,
   );
-  late final SessionRecorderReporter _reporter = SessionRecorderReporter(
-    _engine,
-  );
+  SessionRecorderReporter? _reporter;
+
+  SessionRecorderReporter get _activeReporter =>
+      _reporter ??= SessionRecorderReporter(_engine);
 
   @override
   void registerObserver(SessionNavigatorObserver observer) {
@@ -72,13 +76,13 @@ class ControllerImpl implements SessionRecorderController {
 
   @override
   void startReporting() {
-    _reporter.start();
+    _activeReporter.start();
     _inactivity.start();
   }
 
   @override
   void stopReporting() {
-    _reporter.stop();
+    _reporter?.stop();
     _inactivity.stop();
   }
 
@@ -88,4 +92,13 @@ class ControllerImpl implements SessionRecorderController {
   @override
   void onInterrupt(VoidCallback? onInterrupt) =>
       _onCollectorInterrupt = onInterrupt;
+
+  @override
+  void dispose() {
+    _onCollectorInterrupt = null;
+    stopReporting();
+    _reporter?.close();
+    _reporter = null;
+    _observers.removeWhere((observer) => observer.isDisposed);
+  }
 }

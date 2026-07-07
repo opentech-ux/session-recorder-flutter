@@ -12,12 +12,11 @@ class GestureCollector {
   final SessionRecorderEngineInternal _engine;
 
   GestureCollector({SessionRecorderEngineInternal? engine})
-    : _engine = engine ?? SessionRecorder.engine;
+      : _engine = engine ?? SessionRecorder.engine;
 
   /// Tracks main active pointers for gesture detection and movement history
   final Map<int, PointerTrace> _pointers = {};
   final List<PointerTrace> _lastTaps = [];
-
   PinchMetricsBaseline? _pinchMetrics;
 
   /// Called when a pointer first touches the screen.
@@ -94,8 +93,8 @@ class GestureCollector {
     if (isScaling || isAlreadyScaling) {
       /// Split and emit the exploration
       for (var p in _pointers.values) {
-        final isSomePointerPinching = _pinchMetrics!.initialPositions!
-            .containsKey(p.pointer);
+        final isSomePointerPinching =
+            _pinchMetrics!.initialPositions!.containsKey(p.pointer);
 
         if (!isSomePointerPinching) continue;
 
@@ -128,7 +127,11 @@ class GestureCollector {
 
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
-    if (_pointers.isEmpty) return;
+    if (_pointers.isEmpty) {
+      _pinchMetrics = null;
+      _lastTaps.clear();
+      return;
+    }
 
     for (var p in _pointers.values) {
       _evaluatePointer(p);
@@ -209,9 +212,6 @@ class GestureCollector {
       return;
     }
 
-    // * DOUBLE TAP
-    if (_evaluateDoubleTap(pointerTrace)) return;
-
     // * ORPHANED POINTER
     if (pointerTrace.isOrphanedPointer &&
         DateTime.now().millisecondsSinceEpoch - pointerTrace.firstTimestamp <
@@ -221,12 +221,14 @@ class GestureCollector {
 
     // * TAP
     pointerTrace.setType(GesturesType.tap);
-    _lastTaps.add(pointerTrace);
 
+    // * DOUBLE TAP
+    if (_evaluateDoubleTap(pointerTrace)) return;
+
+    _lastTaps.add(pointerTrace);
     if (_lastTaps.length > 10) _lastTaps.removeAt(0);
 
-    final action = _createActionEvent(pointerTrace);
-    _engine.context.recordAction(action);
+    _emitAction(pointerTrace);
   }
 
   bool _evaluateDoubleTap(PointerTrace pointerTrace) {
@@ -236,8 +238,8 @@ class GestureCollector {
     final currentTimestamp = DateTime.now().millisecondsSinceEpoch;
 
     _lastTaps.removeWhere(
-      (pointer) =>
-          (currentTimestamp - pointer.lastTimestamp) >
+      (tap) =>
+          currentTimestamp - tap.lastTimestamp >
           doubleTapTimeout.inMilliseconds,
     );
 
@@ -252,16 +254,13 @@ class GestureCollector {
       }
     }
 
-    if (tapFoundIndex != null) {
-      pointerTrace.setType(GesturesType.doubleTap);
-      final action = _createActionEvent(pointerTrace);
-      _engine.context.recordAction(action);
-      _lastTaps.removeAt(tapFoundIndex);
+    if (tapFoundIndex == null) return false;
 
-      return true;
-    }
+    pointerTrace.setType(GesturesType.doubleTap);
+    _emitAction(pointerTrace);
+    _lastTaps.removeAt(tapFoundIndex);
 
-    return false;
+    return true;
   }
 
   void _evaluateDrag(PointerTrace pointerTrace) {
@@ -420,7 +419,7 @@ class GestureCollector {
     final sampled = <TimedPosition>[positions.first];
     TimedPosition lastSaved = positions.first;
 
-    for (var i = 0; i < positions.length; i++) {
+    for (var i = 1; i < positions.length; i++) {
       final current = positions[i];
 
       final timePassed = current.timestamp - lastSaved.timestamp;
@@ -431,8 +430,27 @@ class GestureCollector {
       }
     }
 
-    sampled.add(positions.last);
+    if (!_isSameTimedPosition(lastSaved, positions.last)) {
+      sampled.add(positions.last);
+    }
 
     return sampled;
+  }
+
+  bool _isSameTimedPosition(TimedPosition a, TimedPosition b) {
+    return a.timestamp == b.timestamp &&
+        a.position == b.position &&
+        a.viewport == b.viewport;
+  }
+
+  /// Exposes sampling for focused regression tests.
+  List<TimedPosition> samplePositionsForTest(
+    List<TimedPosition> positions, {
+    int timestampThresholdMs = 50,
+  }) {
+    return _samplePositions(
+      positions,
+      timestampThresholdMs: timestampThresholdMs,
+    );
   }
 }
