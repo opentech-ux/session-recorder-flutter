@@ -58,7 +58,7 @@ class NoOpContext implements SessionRecorderContext {
   @override
   Root? findRoot(Offset p) => null;
   @override
-  Element? get currentRouteElement => throw UnimplementedError();
+  Element? get currentRouteElement => null;
   @override
   void recordAction(ActionEvent action) {}
   @override
@@ -107,9 +107,16 @@ class ContextImpl implements SessionRecorderContext {
   late Session _currentSession;
   LomAbstract? _currentLom;
 
+  /// Known LOM roots kept locally for zone resolution.
+  final Map<String, Root> _lomRoots = {};
+
   Element? _currentRouteElement;
 
   TreeDetector? _detector;
+
+  /// Exposes the local LOM state for regression tests.
+  @visibleForTesting
+  LomAbstract? get currentLomForTest => _currentLom;
 
   @override
   void start() {
@@ -157,7 +164,15 @@ class ContextImpl implements SessionRecorderContext {
   void recordLom(LomAbstract? lom) {
     if (lom == null) return;
 
-    _currentLom = lom;
+    // Keep payload refs light while preserving local hit-test data.
+    final root = lom.root ?? _lomRoots[lom.id];
+    if (root != null) {
+      _lomRoots[lom.id] = root;
+      _currentLom = lom.root == null
+          ? LomRef(id: lom.id, timestamp: lom.timestamp, root: root)
+          : lom;
+    }
+
     _currentChunk.addLom(lom);
 
     SessionLogger.verbose("LOM SAVED - ${lom.id}");

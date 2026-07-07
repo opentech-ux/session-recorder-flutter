@@ -1,3 +1,13 @@
+## 2.0.0
+
+- **BREAKING** Refactored the public API around `SessionRecorder.init`, `SessionRecorderConfig`, `SessionRecorderWidget`, and `SessionNavigatorObserver`.
+- **CHANGED** Reworked runtime internals into session, core, collectors, tree, models, and observers.
+- **ADDED** LOM deduplication with lightweight `LomRef` records.
+- **ADDED** Strict endpoint validation for `https://[subdomain].ux-key.com/endpoint`.
+- **ADDED** Reporter safeguards for concurrent flushes, HTTP timeout, and short in-memory retry.
+- **FIXED** Zone resolution after a `LomRef` by keeping a local LOM root cache.
+- **UPDATED** Documentation and examples for the V2 integration flow.
+
 ## 1.1.1
 
 - **FIXED** the bug that captured the tree too early.

@@ -1,23 +1,28 @@
 # Session Recorder Flutter
 
-A Flutter package for capturing and analyzing a structured record of user behavior sessions.
+**Session Recorder Flutter** is a lightweight Flutter SDK for capturing user
+interaction sessions and spatial UI snapshots.
 
-Designed for production use — efficient, isolated, and safe to integrate with **minimal** setup.
+It records **metadata** about gestures, scrolls, navigation, and layout
+geometry. It does **not** capture text values, form values, screenshots, or
+sensitive user content.
 
-> [!warning]
-> 
-> This package is in beta and some things may break your app.
+> [!IMPORTANT]
+>
+> This package is currently consumed from **Git**. Pub.dev publication will come
+> later, once the V2 runtime is validated.
 
+## What It Captures
 
-## Features
+- **Action events**: `tap`, `doubleTap`, `longPress`.
+- **Exploration events**: `drag`, `pinch`, `scrollStart`, `scrollEnd`.
+- **LOM snapshots**: spatial structure of the active route.
+- **Session chunks**: periodic payloads sent to the configured endpoint.
+- **Debug overlay**: optional visualization of captured LOM bounds.
 
-*   Captures the user behavior as the **taps, double-taps, scrolls, long presses and zooms** gestures in real time.
-*   Serialize widget trees and viewport positions efficiently.
-*   Build-in HTTP upload of session data.
+## Installation
 
-## Installing
-
-Add the dependency in your `pubspec.yaml`:
+Add the package to your app `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -25,102 +30,120 @@ dependencies:
     git: https://github.com/opentech-ux/session-recorder-flutter.git
 ```
 
-Now in your Dart code, you can use:
+Then import the public API:
 
 ```dart
 import 'package:session_recorder_flutter/session_recorder.dart';
 ```
 
-## Usage
+## Compatibility
 
-For proper integration of Session Recorder Flutter, the implementation is divided into three main components:
+- **Dart**: `>=3.0.0 <4.0.0`
+- **Flutter**: `>=3.10.0`
 
-*   **Logic layer:** responsible for handling the internal mechanisms that analyze user interactions and session data.
-*   **Navigator layer:** responsible for handling the navigation between routes to capture correctly the Widget Tree.
-*   **UI layer:** focuses on detecting, visualizing, and transmitting user behavior directly from the widget tree.
+## Basic Usage
 
-This separation ensures clean architecture, improved scalability, and easier debugging when integrating with complex Flutter applications.
+The integration has three parts:
 
-> [!note]
->  
-> Every components are completely __MANDATORY__.
-
-
-### Logic Layer
-
-Access the `SessionRecorder` instance via `SessionRecorder.instance`.
-
-Then, invoke the `init()` method in your `main` method.
+1. Initialize `SessionRecorder`.
+2. Wrap the app with `SessionRecorderWidget`.
+3. Attach `SessionNavigatorObserver` to the navigator.
 
 ```dart
 void main() {
-    // Important to add it before calling init method
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-    final params = SessionRecorderParams(
-        endpoint: 'https://api.example.com/session',
-    );
+  SessionRecorder.init(
+    const SessionRecorderConfig(
+      endpoint: 'https://demo-client.ux-key.com/endpoint',
+      debugLog: true,
+    ),
+  );
 
-    SessionRecorder.instance.init(params);
-
-    runApp(MyApp());
+  runApp(
+    SessionRecorderWidget(
+      child: MaterialApp(
+        navigatorObservers: [SessionNavigatorObserver()],
+        home: const HomeScreen(),
+      ),
+    ),
+  );
 }
 ```
 
-The `init()` method requires the `SessionRecorderParams` object, which is the customizable configuration for the client.
+> [!IMPORTANT]
+>
+> Call `SessionRecorder.init()` **once**, during app startup. Do not call it from
+> a widget `build()` method or from frequent callbacks.
 
-There are some parameters to configure : 
+## Router Usage
 
-*   `endpoint:` The backend endpoint (URI) that receives session data.
-*   `disable`: Disable the session recording behavior __only for debugging__.
-
-Check the class documentation for more details.
-
-> [!important]
-> 
-> * `init` must be called only once — ideally from `main()`.
-> You don’t need to wrap it in `WidgetsBinding.instance.addPostFrameCallback`, since `init` already handles that internally.
-> * The `endpoint` URI String is provided by our customizable __API__
-> * The `disable` is useful for development, testing, or when you need to temporarily stop analytics without removing the widget or service initialization. But has to be [false] in dev mode.
-
-
-### Navigator Layer
-
-To capture every Widget Tree correctly, provide the `SessionRecorderObserver` in your `MaterialApp` observers list.
+For `MaterialApp.router`, attach `SessionNavigatorObserver` to your router
+configuration:
 
 ```dart
-return MaterialApp(
-    navigatorObservers: [
-        SessionRecorderObserver(),
-    ],
-    [...]
-)
-```
-
-In case of using another Navigator Package like [go_router](https://pub.dev/packages/go_router). You may attach multiple observers (e.g., when using multiple `ShellRoute` navigators).
-
-```dart
-return MaterialApp.router(
+SessionRecorderWidget(
+  child: MaterialApp.router(
     routerConfig: GoRouter(
-        observers: [SessionRecorderObserver()],
-        routes: [...],
+      observers: [SessionNavigatorObserver()],
+      routes: [
+        // ...
+      ],
     ),
+  ),
 );
 ```
 
-### UI Layer
+For nested navigators, such as `ShellRoute`, attach one observer per navigator
+that should trigger LOM captures.
 
-To start capturing the user behavior, provide the `SessionRecorderWidget` in your `MaterialApp.builder`.
+## Configuration
 
 ```dart
-return MaterialApp(
-    navigatorObservers: [SessionRecorderObserver()],
-    builder: (context, child) => SessionRecorderWidget(
-        child: child!,
-    ),
+const SessionRecorderConfig(
+  endpoint: 'https://demo-client.ux-key.com/endpoint',
+  debugLog: true,
+  debugShowTree: false,
+  debugSendSession: false,
 );
 ```
-> [!important]
-> 
-> This widget must be set **only once** in the entire app.
 
+Options:
+
+- `endpoint`: backend endpoint that receives session chunks.
+- `debugLog`: enables SDK internal logs.
+- `debugShowTree`: paints captured LOM bounds in debug builds.
+- `debugSendSession`: sends chunks in debug mode. Release builds always send.
+
+## Endpoint Format
+
+The production endpoint format is:
+
+```text
+https://[subdomain].ux-key.com/endpoint
+```
+
+Example:
+
+```text
+https://demo-client.ux-key.com/endpoint
+```
+
+> [!WARNING]
+>
+> Endpoint validation can be temporarily disabled while testing local endpoints.
+> Before publishing or releasing the SDK, re-enable `SessionRecorderConfig.validate()`
+> inside `SessionRecorder.init()`.
+
+## Runtime Notes
+
+- `SessionRecorderWidget` should be installed **once** in the app tree.
+- Chunks are sent periodically; user interactions do not force immediate HTTP uploads.
+- In debug mode, chunks are not sent unless `debugSendSession` is `true`.
+- The payload contains layout geometry and zone identifiers, not private UI content.
+
+> [!NOTE]
+>
+> During scroll, the SDK keeps the sequence
+> `scrollStart -> drag... -> scrollEnd`. The `drag` points represent the scroll
+> trajectory and are interpreted as part of the same scroll exploration.

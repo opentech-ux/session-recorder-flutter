@@ -32,7 +32,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   SessionRecorder.init(
-    SessionRecorderConfig(endpoint: 'https://example.ux-key.com/endpoint'),
+    SessionRecorderConfig(endpoint: 'https://demo-client.ux-key.com/endpoint'),
   );
 
   runApp(
@@ -65,9 +65,11 @@ Règles :
 - `SessionRecorder.engine` est marqué `@internal` et ne doit pas être utilisé par le client.
 - Avant initialisation, ou après une erreur d'initialisation, le SDK fonctionne en mode no-op.
 
-Note actuelle :
+Règle endpoint :
 
-- `SessionRecorderConfig.validate()` existe, mais son appel est actuellement commenté dans `SessionRecorder.init`.
+- `SessionRecorderConfig.validate()` existe, mais son appel est temporairement commenté dans `SessionRecorder.init` pour permettre les tests sur endpoint local.
+- La cible de publication reste strictement `https://[subdomain].ux-key.com/endpoint`.
+- Avant publication, la validation doit être réactivée afin qu'un endpoint invalide fasse échouer l'initialisation et repasse le SDK en mode no-op.
 
 ## SessionRecorderConfig
 
@@ -86,7 +88,7 @@ Règles actuelles :
 
 - En debug, les données ne sont pas envoyées par défaut.
 - En release, `shouldSend` vaut toujours `true`.
-- Si `endpoint` est vide, le reporter ne démarre pas son timer.
+- Tant que `validate()` est commenté, un endpoint invalide peut arriver jusqu'au reporter.
 
 ## SessionRecorderWidget
 
@@ -134,4 +136,3 @@ Responsabilités :
 - interrompre les collectors pour enregistrer les gestes/scrolls en cours avant changement d'écran.
 
 Il peut être installé plusieurs fois, notamment dans des configurations `GoRouter` avec plusieurs navigators.
-

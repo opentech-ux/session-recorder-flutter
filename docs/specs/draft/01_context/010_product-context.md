@@ -27,7 +27,7 @@ void main() {
 
   // 1. Initialisation
   SessionRecorder.init(
-    SessionRecorderConfig(endpoint: "https://api.example.com/endpoint"),
+    SessionRecorderConfig(endpoint: "https://demo-client.ux-key.com/endpoint"),
   );
 
   runApp(

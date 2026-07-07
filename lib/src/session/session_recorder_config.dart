@@ -10,7 +10,7 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 ///
 /// ```dart
 ///   final params = SessionRecorderConfig(
-///       endpoint: 'https://api.com/endpoint',
+///       endpoint: 'https://demo-client.ux-key.com/endpoint',
 ///       debugLog: true,
 ///   );
 /// ```
@@ -24,7 +24,9 @@ class SessionRecorderConfig {
   /// This URL is provided by the the __company__ and must support **POST**
   /// requests for session uploads.
   ///
-  /// __If empty or invalid URL, a `[FormatException]` is show__
+  /// __If empty or not matching the official endpoint format,
+  /// `[validate]` throws a `[FormatException]`. During `[SessionRecorder.init]`,
+  /// invalid configuration makes the SDK fall back to no-op mode.__
   final String endpoint;
 
   /// Whether to show the debug logs.

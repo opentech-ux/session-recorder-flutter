@@ -101,6 +101,7 @@ Comportement actuel de `LomTreeInspector` :
 - Si la signature existe déjà dans le cache, un `LomRef` est retourné.
 - Sinon, un nouveau `Lom` est créé avec un UUID v7.
 - La signature et l'id du LOM sont stockés dans le cache.
+- Le contexte conserve localement les arbres complets connus pour continuer à résoudre les zones même lorsqu'un `LomRef` léger est envoyé.
 
 Note d'implémentation :
 
@@ -151,7 +152,5 @@ Règles :
 
 ## Limites actuelles
 
-- Si le LOM courant est un `LomRef` sans `root`, `TapTreeFinder` ne peut pas résoudre la zone et les actions retombent à `z0`.
 - Le fallback brute-force existe, mais l'architecture attend que le client fournisse un `SessionNavigatorObserver`.
 - La déduplication actuelle est cache-first : les signatures connues produisent un `LomRef`.
-

@@ -43,15 +43,17 @@ Le découpage actuel est une bonne base pour publier une version 2, mais il rest
 
 Les sujets les plus importants ne sont pas des refactors massifs : ils concernent surtout la fiabilité du reporting, la précision des événements, la cohérence de publication et la couverture de tests.
 
-## Priorité P0 - À traiter avant publication pub
+## Priorité P0 - Version 2
+
+Statut : les points P0 ci-dessous ont été traités dans le runtime V2, sauf la validation complète par commandes locales, qui reste à refaire car les commandes Flutter/Dart ont expiré dans l'environnement de revue.
 
 ### Mettre à jour README, CHANGELOG et exemples publics
 
 État actuel :
 
-- Le `README.md` décrit encore l'API V1 (`SessionRecorder.instance`, `SessionRecorderParams`, `SessionRecorderObserver`).
-- Le code V2 expose `SessionRecorder.init`, `SessionRecorderConfig`, `SessionNavigatorObserver` et `SessionRecorderWidget`.
-- Le `CHANGELOG.md` ne contient pas encore d'entrée `2.0.0`.
+- Le `README.md` décrit l'API V2 réelle : `SessionRecorder.init`, `SessionRecorderConfig`, `SessionNavigatorObserver` et `SessionRecorderWidget`.
+- Le `CHANGELOG.md` contient une entrée `2.0.0`.
+- Les exemples utilisent le format d'endpoint strict.
 
 Risque :
 
@@ -69,7 +71,7 @@ Cible :
 État actuel :
 
 - Les commandes d'analyse n'ont pas terminé dans la session de revue.
-- Le dossier `test/` contient seulement un test vide.
+- Le dossier `test/` contient des tests unitaires ciblés pour reporter, séparation de chunks, `LomRef` et sérialisation d'événements.
 
 Risque :
 
@@ -87,8 +89,8 @@ Cible :
 
 État actuel :
 
-- `pubspec.yaml` indique `sdk: ^3.9.0`.
-- `flutter: ">=1.17.0"` est beaucoup plus large et probablement trompeur.
+- `pubspec.yaml` indique `sdk: ">=3.0.0 <4.0.0"`.
+- `flutter: ">=3.10.0"` est aligné avec Dart 3 et les constructions du code actuel.
 
 Risque :
 
@@ -101,12 +103,18 @@ Cible :
 
 ### Corriger ou assumer la validation d'endpoint
 
+Statut V2 :
+
+- Cible V2 stricte : `SessionRecorder.init` doit appeler `SessionRecorderConfig.validate()` avant publication.
+- Le format accepté en publication reste `https://[subdomain].ux-key.com/endpoint`.
+- L'appel est temporairement commenté pendant les tests sur endpoint local.
+
 État actuel :
 
 - `SessionRecorderConfig.validate()` existe.
-- Son appel est commenté dans `SessionRecorder.init`.
+- Son appel est temporairement commenté dans `SessionRecorder.init`.
 - La regex force `https://[subdomain].ux-key.com/endpoint`.
-- Plusieurs exemples utilisent encore `api.example.com`.
+- Les exemples publics utilisent le format strict.
 
 Risque :
 
@@ -116,20 +124,23 @@ Risque :
 
 Cible :
 
-- Décider si l'endpoint doit être strictement `ux-key.com` ou générique.
-- Réactiver la validation ou supprimer la promesse de validation.
-- Placer le parsing d'URI dans une zone protégée.
-- Mettre à jour les specs et exemples.
+- Endpoint strict `ux-key.com` assumé pour la V2.
+- Parsing d'URI protégé dans le reporter.
+- Specs et exemples alignés.
 
 ### Rendre le reporter robuste
 
+Statut V2 :
+
+- Implémenté de manière minimaliste : garde anti-flush concurrent, timeout HTTP 5 secondes, file mémoire de 3 chunks et 1 retry.
+
 État actuel :
 
-- Le `Timer.periodic` appelle `_flush()` sans garde de concurrence.
-- Un flush lent peut chevaucher le flush suivant.
-- Il n'y a pas de timeout HTTP explicite.
-- `IOClient` n'est jamais fermé.
-- En cas d'échec d'envoi, le chunk est déjà extrait et perdu.
+- `_flush()` possède un garde de concurrence.
+- La requête HTTP applique un timeout de 5 secondes.
+- Une file mémoire courte conserve au maximum 3 chunks.
+- Chaque chunk a droit à 1 retry.
+- `IOClient` n'est pas encore fermé par un cycle de vie définitif du SDK.
 
 Risque :
 
@@ -140,13 +151,15 @@ Risque :
 
 Cible :
 
-- Ajouter un verrou `_isFlushing`.
-- Ajouter un timeout explicite à la requête HTTP.
-- Ajouter une méthode `dispose` ou `close` au reporter.
-- Décider si les chunks échoués doivent être définitivement jetés ou conservés en mémoire courte.
-- Encapsuler tout le chemin de `_send`, y compris `Uri.parse`, dans le `try`.
+- Garder le reporter non bloquant et sans persistance disque.
+- Ajouter une méthode `dispose` ou `close` au reporter en P1, quand le SDK aura un arrêt définitif.
 
-### Éviter la double capture drag/scroll
+### Assumer la séquence drag/scroll
+
+Décision V2 :
+
+- La séquence `scrollStart`, `drag...`, `scrollEnd` est conservée et représente une exploration de scroll.
+- Les `drag` ne sont pas supprimés pendant un scroll, car ils portent la trajectoire utile.
 
 État actuel :
 
@@ -156,24 +169,25 @@ Cible :
 
 Risque :
 
-- Les données comportementales surestiment les explorations.
-- Le backend doit deviner si un drag est un vrai drag ou un scroll déjà capturé.
+- Le backend doit interpréter explicitement `scrollStart`, `drag...`, `scrollEnd` comme une seule exploration de scroll.
 
 Cible :
 
-- Ajouter une coordination entre `ScrollCollector` et `GestureCollector`.
-- Marquer un pointeur comme scrollable lorsque le scroll démarre.
-- Supprimer ou reclassifier le drag correspondant.
-- Tester les cas scroll vertical, scroll horizontal, nested scroll et drag hors scrollable.
+- Conserver cette règle dans les specs et les tests.
+- Ne pas ajouter `scrollUpdate` dans cette étape.
+- Garder un `drag` hors séquence scroll comme exploration autonome.
 
 ### Résoudre le problème `LomRef` et `zone`
 
+Statut V2 :
+
+- Implémenté : le contexte conserve localement les roots connus et utilise une version locale résoluble du `LomRef`.
+
 État actuel :
 
-- `ContextImpl.recordLom` remplace `_currentLom` par le dernier `LomAbstract`.
-- Un `LomRef` peut ne pas contenir de `root`.
-- `TapTreeFinder` ne peut pas résoudre de zone sans `root`.
-- Les actions retombent alors à `z0`.
+- `ContextImpl` conserve un cache local `lomId -> Root`.
+- Le payload continue à envoyer un `LomRef` léger.
+- Le hit-test local utilise un `LomRef` enrichi avec son `root` connu.
 
 Risque :
 
@@ -181,25 +195,22 @@ Risque :
 
 Cible :
 
-- Garder un cache local `lomId -> Root` ou `signature -> Root`.
-- Envoyer un `LomRef` léger dans le payload, mais conserver localement l'arbre complet pour le hit-test.
-- Ne pas remplacer le LOM courant résoluble par un `LomRef` sans `root`.
+- Conserver cette séparation entre payload léger et état local résoluble.
+- Ajouter `lom_ref` aux événements en P2, à la fin du format `ae`/`ee`.
 
 ### Vérifier la capture après pop de navigation
 
 État actuel :
 
-- `didPop` appelle `_handleCapture(previousRoute)`.
-- Pour une transition pop, l'animation importante peut être celle de la route poppée, pas celle de `previousRoute`.
+- `didPop` capture `previousRoute`, mais attend l'animation de la route retirée.
 
 Risque :
 
-- La capture LOM après retour écran peut arriver avant la fin réelle de l'animation.
+- Un test widget dédié reste nécessaire pour verrouiller le comportement.
 
 Cible :
 
 - Tester push, pop, replace et nested navigators.
-- Pour `didPop`, attendre la fin de l'animation inverse de la route retirée si nécessaire.
 - Ajouter un test widget dédié aux transitions de route.
 
 ## Priorité P1 - À traiter avant une V2 stable
@@ -411,7 +422,7 @@ Cible :
 - Double tap.
 - Long press.
 - Drag hors scrollable.
-- Scroll sans double capture drag.
+- Scroll avec séquence `scrollStart`, `drag...`, `scrollEnd`.
 - Navigation push/pop/replace avec capture LOM après animation.
 - Capture mutation UI avec debounce/cooldown.
 
@@ -435,6 +446,5 @@ Cible :
 
 ## Conclusion
 
-La V2 est proche d'une base publiable, mais elle ne doit pas encore être considérée comme stable sans traiter les points P0.
-Les algorithmes actuels sont globalement raisonnables pour une première V2, mais les deux risques fonctionnels les plus importants sont la double capture drag/scroll et la perte de `zone` lorsque le LOM courant devient un `LomRef` sans arbre local.
-
+La V2 est proche d'une base publiable, mais elle ne doit pas encore être considérée comme stable sans refaire les validations locales complètes.
+Les points P0 runtime ont été traités de manière minimaliste ; les risques restants sont surtout la couverture widget, le dispose définitif des ressources et les évolutions P1/P2.

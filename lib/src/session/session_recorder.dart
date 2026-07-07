@@ -24,7 +24,7 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
 ///   final config = SessionRecorderConfig(
-///     endpoint: 'https://api.example.com/endpoint',
+///     endpoint: 'https://demo-client.ux-key.com/endpoint',
 ///     debugLog: true,
 ///   );
 ///
@@ -42,7 +42,7 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 ///
 ///   SessionRecorder.init(
 ///     SessionRecorderConfig(
-///       endpoint: 'https://api.example.com/endpoint',
+///       endpoint: 'https://demo-client.ux-key.com/endpoint',
 ///       debugLog: true,
 ///     ),
 ///   );
@@ -113,10 +113,10 @@ class SessionRecorder {
     }
 
     try {
-      // TODO uncomment this :
-      // config.validate();
-
       SessionLogger.configure(configuration: config);
+
+      // TODO: Re-enable before publishing. Kept disabled for local endpoint tests.
+      // config.validate();
 
       _engine = SessionRecorderEngine(config);
       _engine.start();

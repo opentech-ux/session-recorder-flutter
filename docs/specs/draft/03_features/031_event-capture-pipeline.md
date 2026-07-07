@@ -126,6 +126,13 @@ Règles actuelles :
 - `ScrollEndNotification` crée un `ScrollExplorationEvent` phase end.
 - `forceRecordCollector` force un scroll end si un scroll est encore actif.
 
+Interprétation payload :
+
+- pendant un scroll tactile, les points `drag` émis par le `Listener` sont conservés ;
+- la séquence `scrollStart`, `drag...`, `scrollEnd` représente une seule exploration de scroll côté backend ;
+- un `drag` hors séquence scroll reste une exploration autonome ;
+- aucun `scrollUpdate` n'est ajouté au payload actuel.
+
 ## Viewport de scroll
 
 Le scroll collector calcule deux rectangles :
@@ -154,4 +161,3 @@ Ce drain ajoute les événements manquants au chunk courant, mais ne force pas u
 - Les scroll updates ne sont pas sérialisés comme événements séparés.
 - Les événements d'exploration ne portent pas de `zone`.
 - Les performances (`pnt`) ne sont pas capturées.
-

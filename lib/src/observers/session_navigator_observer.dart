@@ -57,7 +57,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
     super.didPop(route, previousRoute);
     _setAttached();
     if (previousRoute == null) return;
-    _handleCapture(previousRoute);
+    _handleCapture(previousRoute, waitForRoute: route);
   }
 
   @override
@@ -79,11 +79,14 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   /// Suppresses auto-captures and waits for `route`'s animation to settle,
   /// then captures the tree from the route's subtree element.
-  void _handleCapture(Route<dynamic> route) {
+  void _handleCapture(Route<dynamic> route, {Route<dynamic>? waitForRoute}) {
     SessionRecorder.engine.context.setCurrentlyNavigating();
     SessionRecorder.engine.controller.interrupt();
 
-    final animation = (route is TransitionRoute) ? route.animation : null;
+    final routeToWait = waitForRoute ?? route;
+    final animation = (routeToWait is TransitionRoute)
+        ? routeToWait.animation
+        : null;
 
     void capture() {
       WidgetsBinding.instance.addPostFrameCallback((_) {

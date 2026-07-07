@@ -38,6 +38,8 @@ Règles :
 - `_timer` : timer périodique actif ou `null`.
 - `_interval` : 10 secondes.
 - `_httpClient` : `IOClient` basé sur `HttpClient`.
+- une file mémoire courte de chunks en attente.
+- un garde de flush empêchant les envois concurrents.
 
 Démarrage :
 
@@ -60,7 +62,8 @@ Timer tick
       -> null si chunk vide
       -> chunk fermé si non vide
     -> return si shouldSend == false
-    -> _send(chunk)
+    -> enqueue chunk si non nul
+    -> drain de la file mémoire
 ```
 
 Point important :
@@ -68,6 +71,8 @@ Point important :
 - En debug, si `debugSendSession` vaut `false`, `shouldSend` vaut `false`.
 - Dans ce cas, `_flush()` extrait quand même le chunk puis le jette sans envoyer.
 - Ce comportement évite les envois de test involontaires, mais signifie que les données debug ne sont pas conservées.
+- Si un envoi est déjà en cours, un nouveau tick de flush est ignoré.
+- Les chunks échoués peuvent être conservés en mémoire courte pour un seul retry.
 
 ## Envoi réseau
 
@@ -78,6 +83,14 @@ Point important :
 - exécute un `POST`;
 - ajoute le header `Content-Type: application/json; charset=UTF-8`;
 - considère les status hors `2xx` comme erreurs HTTP.
+- applique un timeout HTTP de 5 secondes.
+
+Retry :
+
+- la file mémoire conserve au maximum 3 chunks ;
+- chaque chunk échoué a droit à 1 retry ;
+- si la file est pleine, le chunk le plus ancien est abandonné ;
+- aucune persistance disque n'est utilisée.
 
 Erreurs interceptées :
 
@@ -90,8 +103,8 @@ Erreurs interceptées :
 Comportement actuel :
 
 - Les erreurs sont loggées via `SessionLogger.error`.
-- Il n'existe pas de retry.
-- Il n'existe pas de queue persistante.
+- Il existe une seule tentative de retry en mémoire par chunk.
+- Il n'existe pas de queue persistante sur disque.
 - En debug, les certificats invalides sont acceptés par `badCertificateCallback`.
 
 ## Endpoint et validation
@@ -105,9 +118,13 @@ https://[subdomain].ux-key.com/endpoint
 État actuel :
 
 - La méthode existe.
-- L'appel est commenté dans `SessionRecorder.init`.
+- L'appel est temporairement commenté dans `SessionRecorder.init` pour permettre les tests sur endpoint local.
 - Si l'endpoint est vide, le reporter ne démarre pas.
-- Si l'endpoint est invalide mais non vide, l'erreur peut arriver au moment de l'envoi.
+- Tant que `validate()` est commenté, un endpoint invalide est traité par le reporter et échoue sans bloquer l'application.
+
+Règle :
+
+- avant publication, le format accepté doit redevenir strictement `https://[subdomain].ux-key.com/endpoint`.
 
 ## Lifecycle applicatif
 

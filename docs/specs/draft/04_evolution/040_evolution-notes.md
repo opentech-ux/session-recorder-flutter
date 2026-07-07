@@ -103,7 +103,7 @@ Contraintes :
 État actuel :
 
 - `SessionRecorderConfig.validate()` existe.
-- L'appel est commenté dans `SessionRecorder.init`.
+- L'appel est temporairement commenté dans `SessionRecorder.init` pour les tests sur endpoint local.
 
 Cible possible :
 
@@ -146,4 +146,3 @@ Zones à couvrir en priorité :
 - Ne pas introduire de capture de texte ou de valeur utilisateur.
 - Mesurer l'impact UI avant toute capture plus fréquente.
 - Documenter tout changement de payload dans les specs stables.
-
