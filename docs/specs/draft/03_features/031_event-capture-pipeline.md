@@ -50,7 +50,7 @@ Gestes pris en charge :
 Règle de performance :
 
 - le collector de gestes n'utilise pas de `Timer` ;
-- les actions sont évaluées à partir des événements pointeur et des drains explicites.
+- les actions et explorations sont évaluées à partir des événements pointeur et des drains explicites.
 
 ## PointerTrace et TimedPosition
 
@@ -96,11 +96,12 @@ Si aucune zone n'est trouvée, la valeur de repli est `z0`.
 
 Règle double tap :
 
-- chaque tap est enregistré immédiatement pour garder une latence basse ;
-- les taps récents sont gardés dans `_lastTaps` pendant `doubleTapTimeout` ;
-- si un second tap valide arrive près d'un tap récent, un `DoubleTapActionEvent` est émis ;
+- chaque tap est enregistré immédiatement pour garder une latence basse et ne pas retarder le flush réseau ;
+- les taps récents restent dans `_lastTaps` pendant `doubleTapTimeout` pour détecter un éventuel `doubleTap` ;
+- si un second tap valide arrive près d'un tap récent, un `DoubleTapActionEvent` est émis en plus du tap déjà enregistré ;
 - plusieurs taps récents peuvent coexister pour supporter le double tap avec deux doigts ou plus ;
-- aucun timer n'est utilisé pour différer ou émettre une action.
+- dans le chunk, un `doubleTap` est inséré juste après le `tap` compatible qui l'a déclenché lorsque ce tap existe encore dans le chunk.
+- si le `tap` d'origine a déjà été envoyé dans un chunk précédent, le `doubleTap` reste dans le chunk courant ; le flush réseau n'est pas retardé.
 
 ## Détection des explorations
 

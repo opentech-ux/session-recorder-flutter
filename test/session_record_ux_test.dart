@@ -136,7 +136,7 @@ void main() {
   });
 
   group('GestureCollector', () {
-    test('detects double tap from multiple recent taps without timers', () {
+    test('keeps multi-touch double taps grouped with their origin tap', () {
       final context = _FakeContext([]);
       final collector = GestureCollector(
         engine: _FakeEngine(
@@ -159,8 +159,10 @@ void main() {
         const PointerUpEvent(pointer: 2, position: Offset(30, 30)),
       );
 
-      expect(context.actionsEvents, hasLength(2));
-      expect(context.actionsEvents, everyElement(isA<TapActionEvent>()));
+      expect(
+        context.actionsEvents.map((event) => event.actionType),
+        [GesturesType.tap, GesturesType.tap],
+      );
 
       collector.onPointerDown(
         const PointerDownEvent(pointer: 3, position: Offset(11, 11)),
@@ -176,10 +178,14 @@ void main() {
         const PointerUpEvent(pointer: 4, position: Offset(31, 31)),
       );
 
-      expect(context.actionsEvents, hasLength(4));
       expect(
-        context.actionsEvents.whereType<DoubleTapActionEvent>(),
-        hasLength(2),
+        context.actionsEvents.map((event) => event.actionType),
+        [
+          GesturesType.tap,
+          GesturesType.doubleTap,
+          GesturesType.tap,
+          GesturesType.doubleTap,
+        ],
       );
     });
 
@@ -355,6 +361,7 @@ class _FakeContext implements SessionRecorderContext {
   _FakeContext(this._chunks);
 
   final List<Chunk?> _chunks;
+  final Chunk _actionsChunk = Chunk();
   final List<ActionEvent> actionsEvents = [];
   final List<ExplorationEvent> explorationEvents = [];
   int extractCount = 0;
@@ -392,7 +399,10 @@ class _FakeContext implements SessionRecorderContext {
 
   @override
   void recordAction(ActionEvent action) {
-    actionsEvents.add(action);
+    _actionsChunk.addActionEvent(action);
+    actionsEvents
+      ..clear()
+      ..addAll(_actionsChunk.actionsEvents);
   }
 
   @override

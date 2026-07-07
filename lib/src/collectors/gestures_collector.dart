@@ -246,6 +246,9 @@ class GestureCollector {
     int? tapFoundIndex;
     for (var i = 0; i < _lastTaps.length; i++) {
       final tap = _lastTaps[i];
+      final elapsed = currentTimestamp - tap.lastTimestamp;
+      if (elapsed > doubleTapTimeout.inMilliseconds) continue;
+
       final distance = (currentPosition - tap.lastPosition).distance;
 
       if (distance < doubleTapSlop) {

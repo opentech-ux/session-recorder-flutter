@@ -285,14 +285,15 @@ Cible :
 - Les taps récents sont conservés dans `_lastTaps` pendant `doubleTapTimeout`.
 - Plusieurs taps récents peuvent coexister pour supporter le double tap multi-touch.
 - Aucun `Timer` n'est utilisé dans `GestureCollector`.
+- Dans le chunk, un `doubleTap` est groupé juste après le `tap` compatible quand celui-ci existe encore dans le même chunk.
 
 Risque :
 
-- Un double tap peut être représenté par un `tap` immédiat suivi d'un `doubleTap`, afin d'éviter toute attente artificielle côté UI.
+- Un double tap produit `tap + doubleTap`, ce qui doit être interprété comme une série cohérente et non comme deux actions indépendantes.
 
 Cible :
 
-- Conserver la règle : pas de timer dans les gestes et support multi-touch via historique de taps.
+- Conserver la priorité latence : tap immédiat, flush non retardé, double tap détecté comme événement additionnel et ordonné avec son tap d'origine.
 
 ### Dédupliquer le dernier point du sampling
 

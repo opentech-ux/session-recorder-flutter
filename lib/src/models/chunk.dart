@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import 'models.dart';
@@ -36,7 +37,40 @@ class Chunk {
 
   /// Add a [ActionEvent] to the [Chunk]
   void addActionEvent(ActionEvent actionEvent) {
+    if (actionEvent is DoubleTapActionEvent) {
+      final tapIndex = _findDoubleTapOrigin(actionEvent);
+      if (tapIndex != null) {
+        actionsEvents.insert(tapIndex + 1, actionEvent);
+        return;
+      }
+    }
+
     actionsEvents.add(actionEvent);
+  }
+
+  /// Finds the tap that originated a double tap, when it is still in this chunk.
+  int? _findDoubleTapOrigin(DoubleTapActionEvent doubleTap) {
+    int? index;
+    double? bestDistance;
+
+    for (var i = 0; i < actionsEvents.length; i++) {
+      final action = actionsEvents[i];
+      if (action is! TapActionEvent) continue;
+      if (action.zone != doubleTap.zone) continue;
+
+      final elapsed = doubleTap.timestampRelative - action.timestampRelative;
+      if (elapsed < 0 || elapsed > doubleTapTimeout.inMilliseconds) continue;
+
+      final distance = (doubleTap.position - action.position).distance;
+      if (distance > doubleTapSlop) continue;
+
+      if (bestDistance == null || distance < bestDistance) {
+        bestDistance = distance;
+        index = i;
+      }
+    }
+
+    return index;
   }
 
   String toJson() => json.encode(toMap());
