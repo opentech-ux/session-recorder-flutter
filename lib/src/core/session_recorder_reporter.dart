@@ -37,13 +37,13 @@ class SessionRecorderReporter {
   final Queue<_QueuedChunk> _pendingChunks = Queue<_QueuedChunk>();
 
   /// Full LOMs rescued when their original chunk is dropped.
-  final Map<String, Lom> _rescuedLoms = {};
+  final LinkedHashMap<String, Lom> _rescuedLoms = LinkedHashMap();
 
   /// Small cap to avoid memory growth during network failures.
   static const int _maxPendingChunks = 3;
 
   /// Keeps the LOM rescue cache bounded.
-  static const int _maxRescuedLoms = 3;
+  static const int _maxRescuedLoms = 64;
 
   /// One retry keeps the reporter resilient without blocking the app.
   static const int _maxRetries = 1;
@@ -192,10 +192,7 @@ class SessionRecorderReporter {
     for (final lom in chunk.loms) {
       if (lom is! Lom || lom.root == null) continue;
 
-      _rescuedLoms[lom.id] = lom;
-      if (_rescuedLoms.length > _maxRescuedLoms) {
-        _rescuedLoms.remove(_rescuedLoms.keys.first);
-      }
+      _rememberRescuedLom(lom);
     }
   }
 
@@ -226,6 +223,15 @@ class SessionRecorderReporter {
     for (final lom in chunk.loms) {
       if (lom is Lom) _rescuedLoms.remove(lom.id);
     }
+  }
+
+  void _rememberRescuedLom(Lom lom) {
+    _rescuedLoms.remove(lom.id);
+    if (_rescuedLoms.length >= _maxRescuedLoms) {
+      _rescuedLoms.remove(_rescuedLoms.keys.first);
+    }
+
+    _rescuedLoms[lom.id] = lom;
   }
 }
 

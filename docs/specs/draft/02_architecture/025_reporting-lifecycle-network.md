@@ -91,6 +91,7 @@ Retry :
 - la file mémoire conserve au maximum 3 chunks ;
 - chaque chunk échoué a droit à 1 retry ;
 - si la file est pleine, le chunk le plus ancien est abandonné ;
+- les LOM complets abandonnés sont gardés dans une cache mémoire bornée, séparée du cache de déduplication, afin de remplacer un futur `LomRef` si le serveur ne connaît pas encore ce ref ;
 - aucune persistance disque n'est utilisée.
 
 Erreurs interceptées :
@@ -149,7 +150,8 @@ Dispose interne :
 - `SessionRecorderWidget.dispose` draine les collectors ;
 - la callback d'interruption du controller est nettoyée avec `onInterrupt(null)` ;
 - le reporting est arrêté et le reporter interne est fermé ;
-- le detector LOM restaure son hook `onBuildScheduled` si possible.
+- le detector LOM restaure son hook `onBuildScheduled` si possible ;
+- le contexte nettoie les références locales au LOM courant, aux roots connus, à la route courante et au chunk en mémoire.
 
 Limite actuelle :
 

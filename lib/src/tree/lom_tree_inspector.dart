@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 
 import 'package:uuid/uuid.dart';
@@ -14,7 +16,8 @@ class LomTreeInspector {
   }
 
   String _lastSignature = "";
-  final Map<String, String> _cache = {};
+  final LinkedHashMap<String, String> _cache = LinkedHashMap();
+  static const int _maxCachedSignatures = 4096;
 
   late LomTreeConfig _config;
 
@@ -47,7 +50,7 @@ class LomTreeInspector {
     final isSameAsLast = signature == _lastSignature;
 
     if (isSameAsLast && !comesFromNavigation) {
-      final cacheId = _cache[signature];
+      final cacheId = _findCachedLomId(signature);
       if (cacheId == null) return null;
 
       // Refresh local hit-test data without adding network noise.
@@ -58,8 +61,8 @@ class LomTreeInspector {
       );
     }
 
-    if (_cache.containsKey(signature)) {
-      final String cacheId = _cache[signature]!;
+    final cacheId = _findCachedLomId(signature);
+    if (cacheId != null) {
       _lastSignature = signature;
 
       return LomRef(
@@ -79,10 +82,27 @@ class LomTreeInspector {
       root: root,
     );
 
-    _cache[signature] = lomId;
+    _rememberSignature(signature, lomId);
     _lastSignature = signature;
 
     return lom;
+  }
+
+  /// Keeps signature cache bounded during long sessions.
+  void _rememberSignature(String signature, String lomId) {
+    if (_cache.containsKey(signature)) {
+      _cache.remove(signature);
+    } else if (_cache.length >= _maxCachedSignatures) {
+      _cache.remove(_cache.keys.first);
+    }
+
+    _cache[signature] = lomId;
+  }
+
+  String? _findCachedLomId(String signature) {
+    final lomId = _cache.remove(signature);
+    if (lomId != null) _cache[signature] = lomId;
+    return lomId;
   }
 
   static List<Root> _visitElement(

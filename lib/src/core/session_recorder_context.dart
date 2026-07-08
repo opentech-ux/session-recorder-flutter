@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
@@ -96,8 +98,7 @@ class ContextImpl implements SessionRecorderContext {
 
   ContextImpl(this._engine) {
     _currentSession = Session();
-    _currentChunk = Chunk();
-    _currentChunk.sId = _currentSession.id;
+    _currentChunk = _createChunk();
   }
 
   final TapTreeFinder _finder = const TapTreeFinder();
@@ -111,7 +112,8 @@ class ContextImpl implements SessionRecorderContext {
   LomAbstract? _currentLom;
 
   /// Known LOM roots kept locally for zone resolution.
-  final Map<String, Root> _lomRoots = {};
+  final LinkedHashMap<String, Root> _lomRoots = LinkedHashMap();
+  static const int _maxKnownLoms = 64;
 
   Element? _currentRouteElement;
 
@@ -133,6 +135,13 @@ class ContextImpl implements SessionRecorderContext {
   void dispose() {
     _detector?.dispose();
     _detector = null;
+    _currentLom = null;
+    _currentRouteElement = null;
+    _lomRoots.clear();
+    _screenViewport = Rect.zero;
+    _scrollPhysicalBounds = Rect.zero;
+    _scrollVirtualCanvas = Rect.zero;
+    _currentChunk = _createChunk();
   }
 
   @override
@@ -174,9 +183,9 @@ class ContextImpl implements SessionRecorderContext {
     if (lom == null) return;
 
     // Keep payload refs light while preserving local hit-test data.
-    final root = lom.root ?? _lomRoots[lom.id];
+    final root = lom.root ?? _findKnownLomRoot(lom.id);
     if (root != null) {
-      _lomRoots[lom.id] = root;
+      _rememberLomRoot(lom.id, root);
       _currentLom = lom.root == null
           ? LomRef(id: lom.id, timestamp: lom.timestamp, root: root)
           : lom;
@@ -220,9 +229,27 @@ class ContextImpl implements SessionRecorderContext {
 
     final chunk = _currentChunk;
 
-    _currentChunk = Chunk();
-    _currentChunk.sId = _currentSession.id;
+    _currentChunk = _createChunk();
 
     return chunk;
+  }
+
+  Chunk _createChunk() => Chunk()..sId = _currentSession.id;
+
+  /// Keeps the local LOM cache bounded.
+  void _rememberLomRoot(String id, Root root) {
+    if (_lomRoots.containsKey(id)) {
+      _lomRoots.remove(id);
+    } else if (_lomRoots.length >= _maxKnownLoms) {
+      _lomRoots.remove(_lomRoots.keys.first);
+    }
+
+    _lomRoots[id] = root;
+  }
+
+  Root? _findKnownLomRoot(String id) {
+    final root = _lomRoots.remove(id);
+    if (root != null) _lomRoots[id] = root;
+    return root;
   }
 }

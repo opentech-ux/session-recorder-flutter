@@ -116,6 +116,8 @@ Comportement actuel de `LomTreeInspector` :
 - Si la signature est connue mais non consécutive, un `LomRef` peut être retourné.
 - Sinon, un nouveau `Lom` est créé avec un UUID v7 et stocké dans le cache.
 - Le contexte conserve localement les arbres complets connus pour continuer à résoudre les zones même lorsqu'un `LomRef` léger est envoyé.
+- Le cache de signatures est un LRU large et léger (`signature -> lomId`) afin de conserver la déduplication même si l'utilisateur revient beaucoup plus tard sur un écran connu.
+- Le cache de roots est un LRU plus petit (`lomId -> Root`) parce qu'il garde des arbres complets uniquement pour la résolution locale de `zone`.
 
 Note d'implémentation :
 
@@ -150,6 +152,7 @@ Mécanisme :
 2. Récupérer les `RenderBox` touchés et leurs hash codes.
 3. Comparer ces hash codes aux `objectId` des `Root`.
 4. Retourner le `Root` le plus profond dans le chemin de hit-test.
+5. Si le hit-test ne permet pas de trouver un `objectId`, utiliser les bounds du LOM courant comme fallback géométrique.
 
 Cette résolution est utilisée par `GestureCollector` pour remplir `zone` dans les actions.
 

@@ -118,7 +118,7 @@ Le contexte expose deux mécanismes spatiaux :
 
 Point important :
 
-- La résolution de `zone` dépend du LOM courant et de son arbre `Root`. Si le LOM courant ne contient pas de `root`, la zone retombe à `z0` côté collector.
+- La résolution de `zone` dépend du LOM courant et de son arbre `Root`. Les `LomRef` gardent un `root` local quand il est disponible ; si aucun arbre résoluble n'existe, la zone retombe à `z0` côté collector.
 
 ## SessionRecorderController
 
@@ -160,4 +160,3 @@ Règles actuelles :
 - À expiration, le controller arrête le reporting.
 - Le prochain ping repasse l'état en actif et relance le reporting.
 - Les captures LOM seules ne ping pas l'inactivité.
-

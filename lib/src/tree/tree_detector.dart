@@ -117,6 +117,8 @@ class TreeDetector {
       _lastOnBuildScheduled = null;
       _installedOnBuildScheduled = null;
     }
+
+    notifier.dispose();
   }
 
   void captureTree(bool comesFromNavigation) {

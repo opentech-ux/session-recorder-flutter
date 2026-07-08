@@ -24,7 +24,9 @@ class TapTreeFinder {
     if (lom.root == null) return const TapTreeResult(null);
 
     final paths = _getHitPaths(position);
-    if (paths.isEmpty) return const TapTreeResult(null);
+    if (paths.isEmpty) {
+      return TapTreeResult(_findDeepestByBounds([lom.root!], position));
+    }
 
     final hitsId = {
       for (int i = 0; i < paths.length; i++)

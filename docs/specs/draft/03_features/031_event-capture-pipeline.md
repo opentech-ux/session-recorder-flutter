@@ -126,6 +126,7 @@ Le collector gère plusieurs transitions :
 - `longPress` peut être émis puis transformé en `drag` si le pointeur se déplace.
 - `drag` peut être émis puis transformé en `pinch` si plusieurs pointeurs forment un zoom.
 - Lorsqu'un pinch se termine et qu'un pointeur reste actif, ce pointeur peut être converti en pointeur orphelin pour éviter un faux tap.
+- Lors d'un drain forcé, un `longPress` immobile déjà qualifié est émis avant de nettoyer le pointeur.
 
 Ces transitions permettent de conserver les segments significatifs sans attendre la fin complète de tous les pointeurs.
 
@@ -136,6 +137,7 @@ Ces transitions permettent de conserver les segments significatifs sans attendre
 Règles actuelles :
 
 - `OverscrollNotification` est ignoré.
+- Les notifications qui ne sont pas `ScrollStartNotification`, `ScrollUpdateNotification` ou `ScrollEndNotification` n'actualisent pas le viewport de scroll.
 - `ScrollStartNotification` crée un `ScrollExplorationEvent` phase start.
 - `ScrollUpdateNotification` met à jour le viewport actif mais ne crée pas d'événement.
 - `ScrollEndNotification` crée un `ScrollExplorationEvent` phase end.

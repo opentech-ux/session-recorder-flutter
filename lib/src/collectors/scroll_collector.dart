@@ -23,6 +23,11 @@ class ScrollCollector {
     final context = notification.context;
 
     if (context == null || notification is OverscrollNotification) return false;
+    if (notification is! ScrollStartNotification &&
+        notification is! ScrollUpdateNotification &&
+        notification is! ScrollEndNotification) {
+      return false;
+    }
 
     final scrollMetrics = notification.metrics;
 

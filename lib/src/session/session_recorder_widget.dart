@@ -58,7 +58,7 @@ class SessionRecorderWidget extends StatefulWidget {
     required Widget Function(SessionNavigatorObserver observer) builder,
   }) {
     final observer = SessionNavigatorObserver();
-    return SessionRecorderWidget(child: builder(observer));
+    return SessionRecorderWidget(key: key, child: builder(observer));
   }
 
   @override

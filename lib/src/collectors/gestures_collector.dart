@@ -147,6 +147,9 @@ class GestureCollector {
   void _evaluatePointer(PointerTrace p) {
     if (p.type == GesturesType.pinch || p.type == GesturesType.drag) {
       _emitExplorations(p);
+    } else if (p.type == GesturesType.longPress ||
+        (p.duration >= longPressTimeout && p.distance < touchSlop)) {
+      _evaluateLongPress(p);
     } else if (p.distance >= touchSlop) {
       p.setType(GesturesType.drag);
       _emitExplorations(p);
