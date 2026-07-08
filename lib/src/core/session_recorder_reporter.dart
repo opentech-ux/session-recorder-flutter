@@ -36,8 +36,14 @@ class SessionRecorderReporter {
   /// Short memory queue for chunks waiting to be sent.
   final Queue<_QueuedChunk> _pendingChunks = Queue<_QueuedChunk>();
 
+  /// Full LOMs rescued when their original chunk is dropped.
+  final Map<String, Lom> _rescuedLoms = {};
+
   /// Small cap to avoid memory growth during network failures.
   static const int _maxPendingChunks = 3;
+
+  /// Keeps the LOM rescue cache bounded.
+  static const int _maxRescuedLoms = 3;
 
   /// One retry keeps the reporter resilient without blocking the app.
   static const int _maxRetries = 1;
@@ -72,6 +78,7 @@ class SessionRecorderReporter {
     _isClosed = true;
     stop();
     _pendingChunks.clear();
+    _rescuedLoms.clear();
     _httpClient.close();
   }
 
@@ -107,7 +114,8 @@ class SessionRecorderReporter {
   /// Adds a chunk to the bounded memory queue.
   void _enqueue(Chunk chunk) {
     if (_pendingChunks.length >= _maxPendingChunks) {
-      _pendingChunks.removeFirst();
+      final dropped = _pendingChunks.removeFirst();
+      _rescueFullLoms(dropped.chunk);
       SessionLogger.warning("Dropping oldest pending chunk");
     }
 
@@ -118,17 +126,21 @@ class SessionRecorderReporter {
   Future<void> _drainQueue() async {
     while (_pendingChunks.isNotEmpty) {
       final queued = _pendingChunks.first;
+      _replaceUnknownRefsWithFullLoms(queued.chunk);
+
       final sent = await _send(queued.chunk);
 
       if (_isClosed) return;
 
       if (sent) {
+        _forgetSentFullLoms(queued.chunk);
         _pendingChunks.removeFirst();
         continue;
       }
 
       queued.retries += 1;
       if (queued.retries > _maxRetries) {
+        _rescueFullLoms(queued.chunk);
         _pendingChunks.removeFirst();
         SessionLogger.error("Dropping chunk after retry");
         continue;
@@ -173,6 +185,47 @@ class SessionRecorderReporter {
     }
 
     return false;
+  }
+
+  /// Keeps full LOMs available for future refs.
+  void _rescueFullLoms(Chunk chunk) {
+    for (final lom in chunk.loms) {
+      if (lom is! Lom || lom.root == null) continue;
+
+      _rescuedLoms[lom.id] = lom;
+      if (_rescuedLoms.length > _maxRescuedLoms) {
+        _rescuedLoms.remove(_rescuedLoms.keys.first);
+      }
+    }
+  }
+
+  /// Sends the full LOM again when the server may not know its ref.
+  void _replaceUnknownRefsWithFullLoms(Chunk chunk) {
+    if (_rescuedLoms.isEmpty || chunk.loms.isEmpty) return;
+
+    final fullIds = <String>{
+      for (final lom in chunk.loms)
+        if (lom is Lom) lom.id,
+    };
+
+    for (var i = 0; i < chunk.loms.length; i++) {
+      final lom = chunk.loms[i];
+      if (lom is! LomRef) continue;
+      if (fullIds.contains(lom.id)) continue;
+
+      final rescued = _rescuedLoms[lom.id];
+      if (rescued == null) continue;
+
+      chunk.loms[i] = rescued;
+      fullIds.add(lom.id);
+    }
+  }
+
+  /// Stops rescuing a LOM once a full version was sent.
+  void _forgetSentFullLoms(Chunk chunk) {
+    for (final lom in chunk.loms) {
+      if (lom is Lom) _rescuedLoms.remove(lom.id);
+    }
   }
 }
 

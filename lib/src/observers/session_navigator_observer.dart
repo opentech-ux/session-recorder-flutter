@@ -84,9 +84,8 @@ class SessionNavigatorObserver extends NavigatorObserver {
     SessionRecorder.engine.controller.interrupt();
 
     final routeToWait = waitForRoute ?? route;
-    final animation = (routeToWait is TransitionRoute)
-        ? routeToWait.animation
-        : null;
+    final animation =
+        (routeToWait is TransitionRoute) ? routeToWait.animation : null;
 
     void capture() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,8 +94,6 @@ class SessionNavigatorObserver extends NavigatorObserver {
         SessionRecorder.engine.context.setCurrentRouteElement(
           elementFromContext,
         );
-
-        if (elementFromContext == null) return;
 
         SessionRecorder.engine.context.captureTree(true);
       });
@@ -109,16 +106,31 @@ class SessionNavigatorObserver extends NavigatorObserver {
       return;
     }
 
+    bool didCapture = false;
+
+    void scheduleCapture() {
+      if (didCapture) return;
+
+      didCapture = true;
+      capture();
+    }
+
     late final AnimationStatusListener listener;
     listener = (AnimationStatus status) {
       if (status == AnimationStatus.completed ||
           status == AnimationStatus.dismissed) {
         animation.removeStatusListener(listener);
-        capture();
+        scheduleCapture();
       }
     };
 
     animation.addStatusListener(listener);
+
+    if (animation.status == AnimationStatus.completed ||
+        animation.status == AnimationStatus.dismissed) {
+      animation.removeStatusListener(listener);
+      scheduleCapture();
+    }
   }
 
   /// Finds the best available `[Element]` from the `route` subtree context.

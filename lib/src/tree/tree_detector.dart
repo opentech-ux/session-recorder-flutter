@@ -16,7 +16,7 @@ class TreeDetector {
 
   TreeDetector({required SessionRecorderEngine engine})
     : _engine = engine,
-      _inspector = LomTreeInspector(engine.config);
+      _inspector = LomTreeInspector();
 
   bool _isRunning = false;
 

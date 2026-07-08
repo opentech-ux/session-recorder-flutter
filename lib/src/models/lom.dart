@@ -60,3 +60,13 @@ class LomRef extends LomAbstract {
   @override
   String toString() => 'LomRef(id: $id, timestamp: $timestamp)';
 }
+
+@internal
+class LocalLomRef extends LomRef {
+  /// Internal ref used only to refresh zone resolution.
+  const LocalLomRef({
+    required super.id,
+    required super.timestamp,
+    required super.root,
+  });
+}

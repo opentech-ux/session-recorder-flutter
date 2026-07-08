@@ -182,6 +182,8 @@ class ContextImpl implements SessionRecorderContext {
           : lom;
     }
 
+    if (lom is LocalLomRef) return;
+
     _currentChunk.addLom(lom);
 
     SessionLogger.verbose("LOM SAVED - ${lom.id}");

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:uuid/uuid.dart';
 
-import 'package:session_recorder_flutter/src/session/session_recorder_config.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_hasher.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_config.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
@@ -10,16 +9,14 @@ import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Captures the visible widget tree as a list of [Root]s.
 class LomTreeInspector {
-  LomTreeInspector(SessionRecorderConfig config) {
+  LomTreeInspector() {
     _config = const LomTreeConfig();
-    _sessionRecorderConfig = config;
   }
 
   String _lastSignature = "";
   final Map<String, String> _cache = {};
 
   late LomTreeConfig _config;
-  late SessionRecorderConfig _sessionRecorderConfig;
 
   /// Captures the widget tree starting from `[Element]`.
   LomAbstract? captureLom(
@@ -49,7 +46,17 @@ class LomTreeInspector {
     final signature = LomTreeHasher.signatureRoots([root]);
     final isSameAsLast = signature == _lastSignature;
 
-    if (isSameAsLast && !comesFromNavigation) return null;
+    if (isSameAsLast && !comesFromNavigation) {
+      final cacheId = _cache[signature];
+      if (cacheId == null) return null;
+
+      // Refresh local hit-test data without adding network noise.
+      return LocalLomRef(
+        id: cacheId,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        root: root,
+      );
+    }
 
     if (_cache.containsKey(signature)) {
       final String cacheId = _cache[signature]!;
@@ -58,7 +65,7 @@ class LomTreeInspector {
       return LomRef(
         id: cacheId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
-        root: (_sessionRecorderConfig.debugShowTree) ? root : null,
+        root: root,
       );
     }
 
