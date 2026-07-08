@@ -54,7 +54,10 @@ class ControllerImpl implements SessionRecorderController {
   VoidCallback? _onCollectorInterrupt;
 
   @override
-  bool get isNavigationAttached => _observers.any((o) => o.navigator != null);
+  bool get isNavigationAttached {
+    _removeDisposedObservers();
+    return _observers.any((o) => o.navigator != null);
+  }
 
   late final InactivityDetector _inactivity = InactivityDetector(
     onActive: startReporting,
@@ -67,7 +70,7 @@ class ControllerImpl implements SessionRecorderController {
 
   @override
   void registerObserver(SessionNavigatorObserver observer) {
-    _observers.removeWhere((obs) => obs.isDisposed);
+    _removeDisposedObservers();
     if (!_observers.contains(observer)) _observers.add(observer);
   }
 
@@ -99,6 +102,11 @@ class ControllerImpl implements SessionRecorderController {
     stopReporting();
     _reporter?.close();
     _reporter = null;
+    _observers.clear();
+  }
+
+  /// Clears observers detached from their Navigator.
+  void _removeDisposedObservers() {
     _observers.removeWhere((observer) => observer.isDisposed);
   }
 }

@@ -40,11 +40,17 @@ class TapActionEvent extends ActionEvent {
 }
 
 class DoubleTapActionEvent extends ActionEvent {
+  /// Internal origin used only to keep tap/doubleTap ordering coherent.
+  final int? originTimestampRelative;
+  final Offset? originPosition;
+
   const DoubleTapActionEvent({
     required super.timestampRelative,
     required super.zone,
     required super.viewport,
     required super.position,
+    this.originTimestampRelative,
+    this.originPosition,
   }) : super(actionType: GesturesType.doubleTap);
 }
 

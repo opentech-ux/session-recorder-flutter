@@ -36,7 +36,7 @@ class TapTreeFinder {
     final match = _findDeepest(hitsId, [lom.root!]);
 
     if (match == null) {
-      return TapTreeResult(null);
+      return TapTreeResult(_findDeepestByBounds([lom.root!], position));
     }
 
     return TapTreeResult(match.root);
@@ -44,16 +44,19 @@ class TapTreeFinder {
 
   /// Runs Flutter's own hit test and returns all entries in the hit path.
   List<HitTestEntry> _getHitPaths(Offset position) {
-    final HitTestResult hitTestResult = HitTestResult();
-    final RenderView renderView = RendererBinding.instance.renderViews.first;
+    for (final renderView in RendererBinding.instance.renderViews) {
+      final HitTestResult hitTestResult = HitTestResult();
 
-    RendererBinding.instance.hitTestInView(
-      hitTestResult,
-      position,
-      renderView.flutterView.viewId,
-    );
+      RendererBinding.instance.hitTestInView(
+        hitTestResult,
+        position,
+        renderView.flutterView.viewId,
+      );
 
-    return hitTestResult.path.toList();
+      if (hitTestResult.path.isNotEmpty) return hitTestResult.path.toList();
+    }
+
+    return const [];
   }
 
   /// Walks `roots` depth-first, returning the root with the lowest depth index.
@@ -72,6 +75,19 @@ class TapTreeFinder {
       }
 
       found = _findDeepest(hitsId, root.children, found: found);
+    }
+
+    return found;
+  }
+
+  /// Geometry fallback when RenderObject ids changed after a rebuild.
+  Root? _findDeepestByBounds(List<Root> roots, Offset position) {
+    Root? found;
+
+    for (final root in roots) {
+      if (!root.box.contains(position)) continue;
+
+      found = _findDeepestByBounds(root.children, position) ?? root;
     }
 
     return found;

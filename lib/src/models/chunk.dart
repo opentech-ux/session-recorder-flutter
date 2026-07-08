@@ -50,6 +50,19 @@ class Chunk {
 
   /// Finds the tap that originated a double tap, when it is still in this chunk.
   int? _findDoubleTapOrigin(DoubleTapActionEvent doubleTap) {
+    final originTimestamp = doubleTap.originTimestampRelative;
+    if (originTimestamp != null) {
+      final originPosition = doubleTap.originPosition;
+      for (var i = actionsEvents.length - 1; i >= 0; i--) {
+        final action = actionsEvents[i];
+        if (action is TapActionEvent &&
+            action.timestampRelative == originTimestamp &&
+            (originPosition == null || action.position == originPosition)) {
+          return i;
+        }
+      }
+    }
+
     int? index;
     double? bestDistance;
 

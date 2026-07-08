@@ -30,6 +30,7 @@ class LomTreeHasher {
     s = _hashCombine(s, _bucket(root.box.topLeft.dy));
     s = _hashCombine(s, _bucket(root.box.width));
     s = _hashCombine(s, _bucket(root.box.height));
+    s = _hashCombine(s, root.children.length);
 
     return s;
   }

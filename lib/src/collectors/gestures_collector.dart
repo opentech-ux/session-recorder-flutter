@@ -244,6 +244,7 @@ class GestureCollector {
     );
 
     int? tapFoundIndex;
+    double? bestDistance;
     for (var i = 0; i < _lastTaps.length; i++) {
       final tap = _lastTaps[i];
       final elapsed = currentTimestamp - tap.lastTimestamp;
@@ -251,17 +252,22 @@ class GestureCollector {
 
       final distance = (currentPosition - tap.lastPosition).distance;
 
-      if (distance < doubleTapSlop) {
+      if (distance < doubleTapSlop &&
+          (bestDistance == null || distance < bestDistance)) {
+        bestDistance = distance;
         tapFoundIndex = i;
-        break;
       }
     }
 
     if (tapFoundIndex == null) return false;
 
+    final originTap = _lastTaps.removeAt(tapFoundIndex);
     pointerTrace.setType(GesturesType.doubleTap);
-    _emitAction(pointerTrace);
-    _lastTaps.removeAt(tapFoundIndex);
+    _emitAction(
+      pointerTrace,
+      doubleTapOriginTimestampRelative: originTap.firstTimestamp,
+      doubleTapOriginPosition: originTap.firstPosition,
+    );
 
     return true;
   }
@@ -308,8 +314,16 @@ class GestureCollector {
     }
   }
 
-  void _emitAction(PointerTrace pointerTrace) {
-    final action = _createActionEvent(pointerTrace);
+  void _emitAction(
+    PointerTrace pointerTrace, {
+    int? doubleTapOriginTimestampRelative,
+    Offset? doubleTapOriginPosition,
+  }) {
+    final action = _createActionEvent(
+      pointerTrace,
+      doubleTapOriginTimestampRelative: doubleTapOriginTimestampRelative,
+      doubleTapOriginPosition: doubleTapOriginPosition,
+    );
     _engine.context.recordAction(action);
   }
 
@@ -318,7 +332,11 @@ class GestureCollector {
   /// - `[TapActionEvent]`
   /// - `[DoubleTapActionEvent]`
   /// - `[LongPressActionEvent]`
-  ActionEvent _createActionEvent(PointerTrace pointer) {
+  ActionEvent _createActionEvent(
+    PointerTrace pointer, {
+    int? doubleTapOriginTimestampRelative,
+    Offset? doubleTapOriginPosition,
+  }) {
     final TimedPosition firstPosition = pointer.first;
 
     final root = _engine.context.findRoot(firstPosition.position);
@@ -339,6 +357,8 @@ class GestureCollector {
           timestampRelative: firstPosition.timestamp,
           viewport: firstPosition.viewport,
           position: firstPosition.position,
+          originTimestampRelative: doubleTapOriginTimestampRelative,
+          originPosition: doubleTapOriginPosition,
         );
       default:
         return TapActionEvent(
