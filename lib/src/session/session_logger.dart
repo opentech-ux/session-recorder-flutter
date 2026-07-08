@@ -97,6 +97,8 @@ class SessionLogger {
 
   @internal
   static void error(String message, [Object? e, StackTrace? s]) {
+    if (!_config.debugLog && kReleaseMode) return;
+
     _delegate(SessionLogLevel.error, message, error: e, stackTrace: s);
   }
 }

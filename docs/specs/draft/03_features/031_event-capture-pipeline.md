@@ -157,6 +157,7 @@ Le scroll collector calcule deux rectangles :
 
 Ces rectangles sont stockés dans `ContextImpl`.
 Ensuite, les gestes pointeur utilisent `resolveViewport(position)` pour savoir si la position appartient au viewport écran ou au viewport virtuel de scroll.
+Après `ScrollEndNotification` ou un drain forcé, le viewport de scroll est remis à zéro pour éviter qu'une géométrie ancienne soit réutilisée.
 
 ## Drain des collectors
 

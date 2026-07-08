@@ -188,5 +188,5 @@ Note :
 Règles :
 
 - `info`, `verbose` et `warning` respectent `debugLog`.
-- `error` est toujours délégué.
+- `error` est délégué en debug/profil ; en release, il respecte `debugLog`.
 - Le logger par défaut ne logge pas en release.

@@ -53,6 +53,8 @@ class ScrollCollector {
           phase: ScrollPhase.end,
         ),
       );
+
+      _clearScrollViewport();
     }
 
     return false;
@@ -114,6 +116,13 @@ class ScrollCollector {
 
       _isScrolling = false;
       _activeViewportBounds = null;
+      _clearScrollViewport();
     }
+  }
+
+  /// Clears stale scroll geometry after the scroll session ends.
+  void _clearScrollViewport() {
+    _engine.context.setScrollPhysicalBounds(Rect.zero);
+    _engine.context.setScrollVirtualCanvas(Rect.zero);
   }
 }

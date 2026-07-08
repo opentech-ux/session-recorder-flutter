@@ -30,13 +30,16 @@ class LomTreeOverlay extends StatelessWidget {
       valueListenable: notifier,
       builder: (context, lom, _) {
         if (lom == null) return child;
+        final root = lom.root;
+        if (root == null) return child;
+
         return Stack(
           alignment: Alignment.topLeft,
           children: [
             child,
             Positioned.fill(
               child: IgnorePointer(
-                child: CustomPaint(painter: _TreePainter([lom.root!])),
+                child: CustomPaint(painter: _TreePainter([root])),
               ),
             ),
           ],
