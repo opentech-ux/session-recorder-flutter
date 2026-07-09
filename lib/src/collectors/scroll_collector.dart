@@ -43,6 +43,7 @@ class ScrollCollector {
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
           phase: ScrollPhase.start,
+          lomRef: _engine.context.currentLomRef ?? '',
         ),
       );
     } else if (notification is ScrollUpdateNotification) {
@@ -56,6 +57,7 @@ class ScrollCollector {
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: rect,
           phase: ScrollPhase.end,
+          lomRef: _engine.context.currentLomRef ?? '',
         ),
       );
 
@@ -116,6 +118,7 @@ class ScrollCollector {
           timestamp: DateTime.now().millisecondsSinceEpoch,
           viewport: _activeViewportBounds!,
           phase: ScrollPhase.end,
+          lomRef: _engine.context.currentLomRef ?? '',
         ),
       );
 

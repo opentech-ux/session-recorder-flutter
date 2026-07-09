@@ -7,11 +7,13 @@ abstract class ExplorationEvent {
   final int timestamp;
   final Rect viewport;
   final GesturesType explorationType;
+  final String lomRef;
 
   const ExplorationEvent({
     required this.timestamp,
     required this.viewport,
     required this.explorationType,
+    required this.lomRef,
   });
 
   @protected
@@ -34,6 +36,7 @@ class DragExplorationEvent extends ExplorationEvent {
     required this.pointer,
     required super.viewport,
     required this.position,
+    required super.lomRef,
   }) : super(explorationType: GesturesType.drag);
 
   @override
@@ -44,6 +47,7 @@ class DragExplorationEvent extends ExplorationEvent {
       pointer,
       viewportStringLT,
       '${position.dx.toInt()},${position.dy.toInt()}',
+      lomRef,
     ].join(':');
   }
 
@@ -63,6 +67,7 @@ class PinchExplorationEvent extends ExplorationEvent {
     required super.viewport,
     required this.endTimestamp,
     required this.positions,
+    required super.lomRef,
   }) : super(explorationType: GesturesType.pinch);
 
   @override
@@ -77,6 +82,7 @@ class PinchExplorationEvent extends ExplorationEvent {
       viewportStringLT,
       positionsString,
       endTimestamp.toString(),
+      lomRef,
     ].join(':');
   }
 
@@ -92,6 +98,7 @@ class ScrollExplorationEvent extends ExplorationEvent {
     required super.timestamp,
     required super.viewport,
     required this.phase,
+    required super.lomRef,
   }) : super(explorationType: GesturesType.scroll);
 
   @override
@@ -100,7 +107,9 @@ class ScrollExplorationEvent extends ExplorationEvent {
         ? GesturesType.scrollEnd.name
         : GesturesType.scrollStart.name;
 
-    return [timestamp.toString(), typeName, viewportStringLTWH].join(':');
+    return [timestamp.toString(), typeName, viewportStringLTWH, lomRef].join(
+      ':',
+    );
   }
 
   @override

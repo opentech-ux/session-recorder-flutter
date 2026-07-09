@@ -49,8 +49,10 @@ class PointerTrace {
     this.type = type;
   }
 
-  void add(Offset position, {required Rect viewport}) {
-    positions.add(TimedPosition(position, viewport: viewport));
+  void add(Offset position, {required Rect viewport, String lomRef = ''}) {
+    positions.add(
+      TimedPosition(position, viewport: viewport, lomRef: lomRef),
+    );
   }
 
   void clear() {
@@ -65,7 +67,11 @@ class PointerTrace {
       pointer: pointer,
       type: newType,
       isOrphanedPointer: isOrphanedPointer,
-    )..add(lastPosition, viewport: positions.last.viewport);
+    )..add(
+        lastPosition,
+        viewport: positions.last.viewport,
+        lomRef: positions.last.lomRef,
+      );
   }
 
   @override
@@ -77,13 +83,14 @@ class TimedPosition {
   final int timestamp;
   final Offset position;
   final Rect viewport;
+  final String lomRef;
 
-  TimedPosition(this.position, {required this.viewport})
+  TimedPosition(this.position, {required this.viewport, this.lomRef = ''})
     : timestamp = DateTime.now().millisecondsSinceEpoch;
 
   @override
   String toString() =>
-      'TimedPosition(timestamp: $timestamp, position: $position, viewport: $viewport)';
+      'TimedPosition(timestamp: $timestamp, position: $position, viewport: $viewport, lomRef: $lomRef)';
 }
 
 @immutable

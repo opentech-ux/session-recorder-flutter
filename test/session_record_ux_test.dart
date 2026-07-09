@@ -83,7 +83,7 @@ void main() {
   });
 
   group('LOM references', () {
-    test('keep a local root for zone resolution while serializing as ref', () {
+    test('tracks the current LOM ref without adding local refs to chunks', () {
       final engine = SessionRecorderEngine(const SessionRecorderConfig());
       final context = engine.context as ContextImpl;
       final root = Root(
@@ -98,39 +98,41 @@ void main() {
       context.recordLom(
         Lom(id: 'lom-1', timestamp: 1, width: 10, height: 10, root: root),
       );
-      context.recordLom(const LomRef(id: 'lom-1', timestamp: 2));
+      context.recordLom(
+        LocalLomRef(id: 'lom-1', timestamp: 2, root: root),
+      );
 
       final current = context.currentLomForTest;
 
       expect(current, isA<LomRef>());
-      expect(current?.root, same(root));
+      expect(context.currentLomRef, 'lom-1');
       expect(current?.toMap(), {'ref': 'lom-1', 'ts': 2});
     });
   });
 
   group('ActionEvent payloads', () {
     test('serializes tap, double tap, and long press', () {
-      expect(_tap().concatenateString(), '1:tap:z1:0,0:2,3');
+      expect(_tap().concatenateString(), '1:tap:0,0:2,3:lom-1');
 
       expect(
         const DoubleTapActionEvent(
           timestampRelative: 2,
-          zone: 'z2',
           viewport: Rect.fromLTWH(10, 20, 100, 200),
           position: Offset(4, 5),
+          lomRef: 'lom-2',
         ).concatenateString(),
-        '2:doubleTap:z2:10,20:4,5',
+        '2:doubleTap:10,20:4,5:lom-2',
       );
 
       expect(
         const LongPressActionEvent(
           timestampRelative: 3,
-          zone: 'z3',
           viewport: Rect.fromLTWH(1, 2, 100, 200),
           position: Offset(9, 10),
+          lomRef: 'lom-3',
           duration: Duration(milliseconds: 450),
         ).concatenateString(),
-        '3:longPress:z3:1,2:9,10:450',
+        '3:longPress:1,2:9,10:450:lom-3',
       );
     });
   });
@@ -209,7 +211,7 @@ void main() {
 
   group('ExplorationEvent payloads', () {
     test('serializes drag, pinch, scroll start, and scroll end', () {
-      expect(_drag().concatenateString(), '10:drag:7:0,100:20,180');
+      expect(_drag().concatenateString(), '10:drag:7:0,100:20,180:lom-1');
 
       expect(
         const PinchExplorationEvent(
@@ -218,8 +220,9 @@ void main() {
           viewport: Rect.fromLTWH(0, 0, 320, 640),
           endTimestamp: 80,
           positions: [Offset(10, 10), Offset(20, 20)],
+          lomRef: 'lom-2',
         ).concatenateString(),
-        '20:pinch:2:0,0:10,10|20,20:80',
+        '20:pinch:2:0,0:10,10|20,20:80:lom-2',
       );
 
       expect(
@@ -227,8 +230,9 @@ void main() {
           timestamp: 100,
           viewport: Rect.fromLTWH(0, 100, 320, 640),
           phase: ScrollPhase.start,
+          lomRef: 'lom-3',
         ).concatenateString(),
-        '100:scrollStart:0,100,320,640',
+        '100:scrollStart:0,100,320,640:lom-3',
       );
 
       expect(
@@ -236,8 +240,9 @@ void main() {
           timestamp: 200,
           viewport: Rect.fromLTWH(0, 100, 320, 640),
           phase: ScrollPhase.end,
+          lomRef: 'lom-3',
         ).concatenateString(),
-        '200:scrollEnd:0,100,320,640',
+        '200:scrollEnd:0,100,320,640:lom-3',
       );
     });
   });
@@ -258,9 +263,9 @@ Chunk _chunk() {
 TapActionEvent _tap() {
   return const TapActionEvent(
     timestampRelative: 1,
-    zone: 'z1',
     viewport: Rect.zero,
     position: Offset(2, 3),
+    lomRef: 'lom-1',
   );
 }
 
@@ -271,6 +276,7 @@ DragExplorationEvent _drag() {
     pointer: 7,
     viewport: Rect.fromLTWH(0, 100, 320, 640),
     position: Offset(20, 180),
+    lomRef: 'lom-1',
   );
 }
 
@@ -395,7 +401,7 @@ class _FakeContext implements SessionRecorderContext {
   void dispose() {}
 
   @override
-  Root? findRoot(Offset position) => null;
+  String? get currentLomRef => 'lom-1';
 
   @override
   void recordAction(ActionEvent action) {

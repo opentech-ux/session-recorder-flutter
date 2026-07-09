@@ -58,6 +58,7 @@ class GestureCollector {
     pointerTrace.add(
       position,
       viewport: _engine.context.resolveViewport(position),
+      lomRef: _engine.context.currentLomRef ?? '',
     );
 
     if (pointerTrace.type != GesturesType.pinch &&
@@ -165,7 +166,11 @@ class GestureCollector {
     GesturesType type = GesturesType.tap,
   ]) =>
       _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-        ..add(position, viewport: _engine.context.resolveViewport(position));
+        ..add(
+          position,
+          viewport: _engine.context.resolveViewport(position),
+          lomRef: _engine.context.currentLomRef ?? '',
+        );
 
   /// Update the Pinch Metrics Baseline
   void _updatePinchMetrics() {
@@ -330,7 +335,7 @@ class GestureCollector {
     _engine.context.recordAction(action);
   }
 
-  /// Creates and returns the `[ActionEvent]` object with its zone.
+  /// Creates and returns the `[ActionEvent]` object with its LOM ref.
   ///
   /// - `[TapActionEvent]`
   /// - `[DoubleTapActionEvent]`
@@ -342,33 +347,30 @@ class GestureCollector {
   }) {
     final TimedPosition firstPosition = pointer.first;
 
-    final root = _engine.context.findRoot(firstPosition.position);
-    int rootId = root?.id ?? 0;
-
     switch (pointer.type) {
       case GesturesType.longPress:
         return LongPressActionEvent(
-          zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
           duration: pointer.duration,
           viewport: firstPosition.viewport,
           position: firstPosition.position,
+          lomRef: firstPosition.lomRef,
         );
       case GesturesType.doubleTap:
         return DoubleTapActionEvent(
-          zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
           viewport: firstPosition.viewport,
           position: firstPosition.position,
+          lomRef: firstPosition.lomRef,
           originTimestampRelative: doubleTapOriginTimestampRelative,
           originPosition: doubleTapOriginPosition,
         );
       default:
         return TapActionEvent(
-          zone: "z$rootId",
           timestampRelative: firstPosition.timestamp,
           viewport: firstPosition.viewport,
           position: firstPosition.position,
+          lomRef: firstPosition.lomRef,
         );
     }
   }
@@ -411,6 +413,7 @@ class GestureCollector {
           pointer: pointer.pointer,
           viewport: touchDrag.viewport,
           position: touchDrag.position,
+          lomRef: touchDrag.lomRef,
         ),
       ),
     );
@@ -429,6 +432,7 @@ class GestureCollector {
       endTimestamp: pointer.lastTimestamp,
       viewport: pointer.first.viewport,
       positions: sampledPositions.map((p) => p.position).toList(),
+      lomRef: pointer.first.lomRef,
     );
 
     return pinch;

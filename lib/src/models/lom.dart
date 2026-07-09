@@ -63,7 +63,7 @@ class LomRef extends LomAbstract {
 
 @internal
 class LocalLomRef extends LomRef {
-  /// Internal ref used only to refresh zone resolution.
+  /// Internal ref used only to refresh the current LOM without network noise.
   const LocalLomRef({
     required super.id,
     required super.timestamp,

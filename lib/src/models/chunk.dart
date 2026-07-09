@@ -69,7 +69,7 @@ class Chunk {
     for (var i = 0; i < actionsEvents.length; i++) {
       final action = actionsEvents[i];
       if (action is! TapActionEvent) continue;
-      if (action.zone != doubleTap.zone) continue;
+      if (action.lomRef != doubleTap.lomRef) continue;
 
       final elapsed = doubleTap.timestampRelative - action.timestampRelative;
       if (elapsed < 0 || elapsed > doubleTapTimeout.inMilliseconds) continue;

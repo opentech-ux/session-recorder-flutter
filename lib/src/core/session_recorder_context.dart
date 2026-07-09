@@ -1,12 +1,9 @@
-import 'dart:collection';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
-import 'package:session_recorder_flutter/src/tree/tap_tree_resolver.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// Internal contract for spatial calculations, tree analysis, and data recording.
@@ -37,7 +34,9 @@ abstract interface class SessionRecorderContext {
 
   /// Determine which viewport to use based on the finger's position.
   Rect resolveViewport(Offset position);
-  Root? findRoot(Offset position);
+
+  /// Current LOM id used to bind events to their screen snapshot.
+  String? get currentLomRef;
 
   void recordLom(LomAbstract? lom);
   void recordAction(ActionEvent action);
@@ -61,7 +60,7 @@ class NoOpContext implements SessionRecorderContext {
   @override
   Rect resolveViewport(Offset p) => Rect.zero;
   @override
-  Root? findRoot(Offset p) => null;
+  String? get currentLomRef => null;
   @override
   Element? get currentRouteElement => null;
   @override
@@ -101,8 +100,6 @@ class ContextImpl implements SessionRecorderContext {
     _currentChunk = _createChunk();
   }
 
-  final TapTreeFinder _finder = const TapTreeFinder();
-
   late Rect _screenViewport = Rect.zero;
   late Rect _scrollPhysicalBounds = Rect.zero;
   late Rect _scrollVirtualCanvas = Rect.zero;
@@ -110,10 +107,6 @@ class ContextImpl implements SessionRecorderContext {
   late Chunk _currentChunk;
   late Session _currentSession;
   LomAbstract? _currentLom;
-
-  /// Known LOM roots kept locally for zone resolution.
-  final LinkedHashMap<String, Root> _lomRoots = LinkedHashMap();
-  static const int _maxKnownLoms = 64;
 
   Element? _currentRouteElement;
 
@@ -137,7 +130,6 @@ class ContextImpl implements SessionRecorderContext {
     _detector = null;
     _currentLom = null;
     _currentRouteElement = null;
-    _lomRoots.clear();
     _screenViewport = Rect.zero;
     _scrollPhysicalBounds = Rect.zero;
     _scrollVirtualCanvas = Rect.zero;
@@ -158,6 +150,9 @@ class ContextImpl implements SessionRecorderContext {
   Rect get scrollVirtualCanvas => _scrollVirtualCanvas;
   @override
   void setScrollVirtualCanvas(Rect sVC) => _scrollVirtualCanvas = sVC;
+
+  @override
+  String? get currentLomRef => _currentLom?.id;
 
   @override
   Rect resolveViewport(Offset position) {
@@ -182,28 +177,13 @@ class ContextImpl implements SessionRecorderContext {
   void recordLom(LomAbstract? lom) {
     if (lom == null) return;
 
-    // Keep payload refs light while preserving local hit-test data.
-    final root = lom.root ?? _findKnownLomRoot(lom.id);
-    if (root != null) {
-      _rememberLomRoot(lom.id, root);
-      _currentLom = lom.root == null
-          ? LomRef(id: lom.id, timestamp: lom.timestamp, root: root)
-          : lom;
-    }
+    _currentLom = lom;
 
     if (lom is LocalLomRef) return;
 
     _currentChunk.addLom(lom);
 
     SessionLogger.verbose("LOM SAVED - ${lom.id}");
-  }
-
-  @override
-  Root? findRoot(Offset position) {
-    if (_currentLom == null) return null;
-
-    final tapTreeResult = _finder.find(_currentLom!, position);
-    return tapTreeResult.didTap ? tapTreeResult.target : null;
   }
 
   @override
@@ -235,21 +215,4 @@ class ContextImpl implements SessionRecorderContext {
   }
 
   Chunk _createChunk() => Chunk()..sId = _currentSession.id;
-
-  /// Keeps the local LOM cache bounded.
-  void _rememberLomRoot(String id, Root root) {
-    if (_lomRoots.containsKey(id)) {
-      _lomRoots.remove(id);
-    } else if (_lomRoots.length >= _maxKnownLoms) {
-      _lomRoots.remove(_lomRoots.keys.first);
-    }
-
-    _lomRoots[id] = root;
-  }
-
-  Root? _findKnownLomRoot(String id) {
-    final root = _lomRoots.remove(id);
-    if (root != null) _lomRoots[id] = root;
-    return root;
-  }
 }
