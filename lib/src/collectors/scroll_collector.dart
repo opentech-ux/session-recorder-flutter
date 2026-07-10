@@ -32,11 +32,17 @@ class ScrollCollector {
     final scrollMetrics = notification.metrics;
 
     final rect = _captureViewportGeometry(context, scrollMetrics);
-    if (rect == null) return false;
+    if (rect == null) {
+      if (notification is ScrollEndNotification) {
+        _engine.context.setCurrentlyScrolling(false);
+      }
+      return false;
+    }
 
     if (notification is ScrollStartNotification) {
       _isScrolling = true;
       _activeViewportBounds = rect;
+      _engine.context.setCurrentlyScrolling(true);
 
       _engine.context.recordExploration(
         ScrollExplorationEvent(
@@ -60,6 +66,8 @@ class ScrollCollector {
           lomRef: _engine.context.currentLomRef ?? '',
         ),
       );
+
+      _engine.context.setCurrentlyScrolling(false);
 
       _clearScrollViewport();
     }
@@ -112,7 +120,9 @@ class ScrollCollector {
 
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
-    if (_isScrolling && _activeViewportBounds != null) {
+    if (!_isScrolling) return;
+
+    if (_activeViewportBounds != null) {
       _engine.context.recordExploration(
         ScrollExplorationEvent(
           timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -121,11 +131,12 @@ class ScrollCollector {
           lomRef: _engine.context.currentLomRef ?? '',
         ),
       );
-
-      _isScrolling = false;
-      _activeViewportBounds = null;
-      _clearScrollViewport();
     }
+
+    _isScrolling = false;
+    _activeViewportBounds = null;
+    _engine.context.setCurrentlyScrolling(false);
+    _clearScrollViewport();
   }
 
   /// Clears stale scroll geometry after the scroll session ends.

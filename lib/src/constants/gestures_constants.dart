@@ -20,6 +20,7 @@ final double scrollSlop = 10.0;
 
 const Duration kDebounceTime = Duration(milliseconds: 300);
 const Duration kCooldownTime = Duration(milliseconds: 400);
+const Duration kScrollCaptureSettleTime = Duration(milliseconds: 600);
 
 const double doubleTapSlop = 18.0;
 

@@ -28,7 +28,9 @@ class TreeDetector {
 
   bool _isBuilded = false;
   bool _isNavigating = false;
+  bool _isScrolling = false;
   bool _isNotifierLocked = false;
+  DateTime _ignoreScrollBuildsUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Timer used to handle debouncing of widget tree captures.
   ///
@@ -48,6 +50,18 @@ class TreeDetector {
 
   @pragma('vm:prefer-inline')
   void setCurrentlyNavigating() => _isNavigating = true;
+
+  void setCurrentlyScrolling(bool isScrolling) {
+    _isScrolling = isScrolling;
+    _debounce?.cancel();
+
+    if (!isScrolling) {
+      _ignoreScrollBuildsUntil = DateTime.now().add(kScrollCaptureSettleTime);
+    }
+  }
+
+  bool get _isScrollCaptureSuppressed =>
+      _isScrolling || DateTime.now().isBefore(_ignoreScrollBuildsUntil);
 
   /// Starts watching for tree changes.
   void detect() {
@@ -73,13 +87,15 @@ class TreeDetector {
     void onBuildScheduled() {
       _lastOnBuildScheduled?.call();
 
-      if (!_isRunning || _isNavigating) return;
+      if (!_isRunning || _isNavigating || _isScrollCaptureSuppressed) return;
 
       if (_isNotifierLocked) return;
 
       _debounce?.cancel();
       _debounce = Timer(kDebounceTime, () {
-        if (!_isRunning || _isNavigating) return;
+        if (!_isRunning || _isNavigating || _isScrollCaptureSuppressed) {
+          return;
+        }
 
         captureTree(false);
       });
@@ -110,7 +126,9 @@ class TreeDetector {
 
     _isBuilded = false;
     _isNavigating = false;
+    _isScrolling = false;
     _isNotifierLocked = false;
+    _ignoreScrollBuildsUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
     // Keep forwarding intact if another callback wrapped ours after install.
     if (didRestoreHook || buildOwner == null) {
@@ -123,6 +141,8 @@ class TreeDetector {
 
   void captureTree(bool comesFromNavigation) {
     if (comesFromNavigation) _isNavigating = true;
+
+    if (!comesFromNavigation && _isScrollCaptureSuppressed) return;
 
     final now = DateTime.now();
     if (!comesFromNavigation &&

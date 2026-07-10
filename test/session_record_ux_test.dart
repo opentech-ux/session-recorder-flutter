@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -14,6 +13,7 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder_config.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
+import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 
 void main() {
   setUp(() {
@@ -98,15 +98,105 @@ void main() {
       context.recordLom(
         Lom(id: 'lom-1', timestamp: 1, width: 10, height: 10, root: root),
       );
-      context.recordLom(
-        LocalLomRef(id: 'lom-1', timestamp: 2, root: root),
-      );
+      context.recordLom(LocalLomRef(id: 'lom-1', timestamp: 2, root: root));
 
       final current = context.currentLomForTest;
 
       expect(current, isA<LomRef>());
       expect(context.currentLomRef, 'lom-1');
       expect(current?.toMap(), {'ref': 'lom-1', 'ts': 2});
+    });
+
+    test('measures the complete materialized tree extent', () {
+      const root = Root(
+        id: 1,
+        objectId: 'root',
+        widgetType: 'Screen',
+        renderType: 'RenderBox',
+        box: Rect.fromLTWH(0, 0, 390, 720),
+        children: [
+          Root(
+            id: 2,
+            objectId: 'off-screen',
+            widgetType: 'Card',
+            renderType: 'RenderBox',
+            box: Rect.fromLTWH(12, 1800, 366, 80),
+            children: [],
+          ),
+        ],
+      );
+
+      expect(
+        LomTreeInspector.materializedContentSize(root),
+        const Size(390, 1880),
+      );
+    });
+
+    testWidgets('keeps an eager scroll tree stable across offsets', (
+      tester,
+    ) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      const scrollKey = Key('eager-scroll');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            width: 300,
+            height: 240,
+            child: SingleChildScrollView(
+              key: scrollKey,
+              controller: controller,
+              child: const Column(
+                children: [
+                  SizedBox(height: 300, child: Text('top')),
+                  SizedBox(height: 300, child: Text('middle')),
+                  SizedBox(height: 300, child: Text('bottom')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final inspector = LomTreeInspector();
+      final scrollElement = tester.element(find.byKey(scrollKey));
+      final initial = inspector.captureLom(
+        scrollElement,
+        comesFromNavigation: false,
+      );
+
+      controller.jumpTo(420);
+      await tester.pump();
+
+      final scrolled = inspector.captureLom(
+        scrollElement,
+        comesFromNavigation: false,
+      );
+
+      expect(initial, isA<Lom>());
+      expect(scrolled, isA<LomRef>());
+      expect(scrolled?.id, initial?.id);
+    });
+
+    test('maps viewport pixels back into content coordinates', () {
+      expect(
+        LomTreeInspector.viewportContentOffset(AxisDirection.down, 120),
+        const Offset(0, 120),
+      );
+      expect(
+        LomTreeInspector.viewportContentOffset(AxisDirection.up, 120),
+        const Offset(0, -120),
+      );
+      expect(
+        LomTreeInspector.viewportContentOffset(AxisDirection.right, 120),
+        const Offset(120, 0),
+      );
+      expect(
+        LomTreeInspector.viewportContentOffset(AxisDirection.left, 120),
+        const Offset(-120, 0),
+      );
     });
   });
 
@@ -161,10 +251,10 @@ void main() {
         const PointerUpEvent(pointer: 2, position: Offset(30, 30)),
       );
 
-      expect(
-        context.actionsEvents.map((event) => event.actionType),
-        [GesturesType.tap, GesturesType.tap],
-      );
+      expect(context.actionsEvents.map((event) => event.actionType), [
+        GesturesType.tap,
+        GesturesType.tap,
+      ]);
 
       collector.onPointerDown(
         const PointerDownEvent(pointer: 3, position: Offset(11, 11)),
@@ -180,15 +270,12 @@ void main() {
         const PointerUpEvent(pointer: 4, position: Offset(31, 31)),
       );
 
-      expect(
-        context.actionsEvents.map((event) => event.actionType),
-        [
-          GesturesType.tap,
-          GesturesType.doubleTap,
-          GesturesType.tap,
-          GesturesType.doubleTap,
-        ],
-      );
+      expect(context.actionsEvents.map((event) => event.actionType), [
+        GesturesType.tap,
+        GesturesType.doubleTap,
+        GesturesType.tap,
+        GesturesType.doubleTap,
+      ]);
     });
 
     test('does not duplicate the last sampled point', () {
@@ -427,6 +514,9 @@ class _FakeContext implements SessionRecorderContext {
 
   @override
   void setCurrentlyNavigating() {}
+
+  @override
+  void setCurrentlyScrolling(bool isScrolling) {}
 
   @override
   void setScreenViewport(Rect sV) {}

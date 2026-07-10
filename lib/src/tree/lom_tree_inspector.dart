@@ -1,6 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import 'package:uuid/uuid.dart';
 
@@ -31,7 +32,12 @@ class LomTreeInspector {
     if (!element.mounted) return null;
 
     final counter = _RootCounter();
-    final children = _visitElement(element, config: _config, counter: counter);
+    final children = _visitElement(
+      element,
+      config: _config,
+      counter: counter,
+      scrollOffset: Offset.zero,
+    );
 
     final Rect? rect = MathUtils.transformRect(element.renderObject);
 
@@ -73,12 +79,13 @@ class LomTreeInspector {
     }
 
     final String lomId = Uuid().v7();
+    final contentSize = materializedContentSize(root);
 
     final Lom lom = Lom(
       id: lomId,
       timestamp: DateTime.now().millisecondsSinceEpoch,
-      width: root.box.width.toInt(),
-      height: root.box.height.toInt(),
+      width: contentSize.width.ceil(),
+      height: contentSize.height.ceil(),
       root: root,
     );
 
@@ -86,6 +93,37 @@ class LomTreeInspector {
     _lastSignature = signature;
 
     return lom;
+  }
+
+  /// Measures the full extent of the render objects Flutter has materialized.
+  ///
+  /// Eager scrollables such as a `SingleChildScrollView` usually expose their
+  /// off-screen children, so the resulting size can exceed the route viewport.
+  /// Lazy slivers only contribute the children that currently exist.
+  @visibleForTesting
+  static Size materializedContentSize(Root root) {
+    var maxRight = root.box.right;
+    var maxBottom = root.box.bottom;
+
+    void visit(Root node) {
+      if (node.box.right.isFinite && node.box.right > maxRight) {
+        maxRight = node.box.right;
+      }
+      if (node.box.bottom.isFinite && node.box.bottom > maxBottom) {
+        maxBottom = node.box.bottom;
+      }
+
+      for (final child in node.children) {
+        visit(child);
+      }
+    }
+
+    visit(root);
+
+    return Size(
+      maxRight < root.box.width ? root.box.width : maxRight,
+      maxBottom < root.box.height ? root.box.height : maxBottom,
+    );
   }
 
   /// Keeps signature cache bounded during long sessions.
@@ -109,6 +147,7 @@ class LomTreeInspector {
     Element element, {
     required LomTreeConfig config,
     required _RootCounter counter,
+    required Offset scrollOffset,
   }) {
     final Widget widget = element.widget;
 
@@ -116,27 +155,31 @@ class LomTreeInspector {
 
     if (config.pruneAt.contains(widgetType)) return [];
 
+    final renderObject = element.renderObject;
+    final childScrollOffset = widget is RenderObjectWidget
+        ? scrollOffset + _scrollOffsetOf(renderObject)
+        : scrollOffset;
+
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
     if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, config, counter, childScrollOffset);
     }
 
     if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, config, counter, childScrollOffset);
     }
 
     if (!hasImportanteSemantic &&
         (widgetType.startsWith('_') ||
             config.ignoreAt.any((w) => widgetType.contains(w)))) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, config, counter, childScrollOffset);
     }
 
-    final renderObject = element.renderObject;
     final Rect? rect = MathUtils.transformRect(renderObject);
 
     if (rect == null || (rect.width == 0 && rect.height == 0)) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, config, counter, childScrollOffset);
     }
 
     return [
@@ -145,10 +188,45 @@ class LomTreeInspector {
         objectId: renderObject.hashCode.toRadixString(16),
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),
-        box: rect,
-        children: _visitChildrenFlat(element, config, counter),
+        box: rect.shift(scrollOffset),
+        children: _visitChildrenFlat(
+          element,
+          config,
+          counter,
+          childScrollOffset,
+        ),
       ),
     ];
+  }
+
+  static Offset _scrollOffsetOf(RenderObject? renderObject) {
+    if (renderObject is! RenderAbstractViewport) return Offset.zero;
+
+    try {
+      // SingleChildScrollView uses a private RenderAbstractViewport class,
+      // but its axisDirection and offset getters are public.
+      final dynamic viewport = renderObject;
+
+      return viewportContentOffset(
+        viewport.axisDirection as AxisDirection,
+        viewport.offset.pixels as double,
+      );
+    } catch (_) {
+      return Offset.zero;
+    }
+  }
+
+  @visibleForTesting
+  static Offset viewportContentOffset(
+    AxisDirection axisDirection,
+    double pixels,
+  ) {
+    return switch (axisDirection) {
+      AxisDirection.down => Offset(0, pixels),
+      AxisDirection.up => Offset(0, -pixels),
+      AxisDirection.right => Offset(pixels, 0),
+      AxisDirection.left => Offset(-pixels, 0),
+    };
   }
 
   /// Visite children in flat mode using heavy spread to avoid unnecessary lists
@@ -156,6 +234,7 @@ class LomTreeInspector {
     Element element,
     LomTreeConfig config,
     _RootCounter counter,
+    Offset scrollOffset,
   ) {
     final children = <Root>[];
     element.visitChildren((child) {
@@ -163,6 +242,7 @@ class LomTreeInspector {
         child,
         config: config,
         counter: counter,
+        scrollOffset: scrollOffset,
       );
       if (rootChildren.isNotEmpty) {
         children.addAll(rootChildren);

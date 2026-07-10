@@ -18,6 +18,7 @@ abstract interface class SessionRecorderContext {
   void captureTree(bool comesFromNavigation);
   ValueListenable<LomAbstract?>? get notifier;
   void setCurrentlyNavigating();
+  void setCurrentlyScrolling(bool isScrolling);
 
   /// The fixed display (0, 0, width, height).
   Rect get screenViewport;
@@ -89,6 +90,8 @@ class NoOpContext implements SessionRecorderContext {
   Chunk? extractChunk() => null;
   @override
   void setCurrentlyNavigating() {}
+  @override
+  void setCurrentlyScrolling(bool isScrolling) {}
 }
 
 @internal
@@ -199,6 +202,10 @@ class ContextImpl implements SessionRecorderContext {
 
   @override
   void setCurrentlyNavigating() => _detector?.setCurrentlyNavigating();
+
+  @override
+  void setCurrentlyScrolling(bool isScrolling) =>
+      _detector?.setCurrentlyScrolling(isScrolling);
 
   @override
   ValueNotifier<LomAbstract?>? get notifier => _detector?.notifier;
