@@ -132,38 +132,95 @@ void main() {
       );
     });
 
+    test('serializes the optional viewport anchor in LOM records', () {
+      const viewport = Offset(12.4, 1159.6);
+
+      expect(
+        const Lom(
+          id: 'lom-full',
+          timestamp: 2,
+          width: 390,
+          height: 2200,
+          viewportOffset: viewport,
+        ).toMap()['v'],
+        [12, 1160],
+      );
+
+      expect(
+        const LomRef(
+          id: 'lom-viewport',
+          timestamp: 3,
+          viewportOffset: viewport,
+        ).toMap(),
+        {
+          'ref': 'lom-viewport',
+          'ts': 3,
+          'v': [12, 1160],
+        },
+      );
+
+      expect(
+        const Root(
+          id: 1,
+          objectId: 'fixed',
+          widgetType: 'IconButton',
+          renderType: 'RenderBox',
+          box: Rect.fromLTWH(0, 0, 40, 40),
+          children: [],
+          coordinateSpace: LomCoordinateSpace.screen,
+        ).toMap()['s'],
+        's',
+      );
+    });
+
     testWidgets('keeps an eager scroll tree stable across offsets', (
       tester,
     ) async {
       final controller = ScrollController();
       addTearDown(controller.dispose);
+      const captureKey = Key('capture-root');
       const scrollKey = Key('eager-scroll');
 
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
           child: SizedBox(
+            key: captureKey,
             width: 300,
             height: 240,
-            child: SingleChildScrollView(
-              key: scrollKey,
-              controller: controller,
-              child: const Column(
-                children: [
-                  SizedBox(height: 300, child: Text('top')),
-                  SizedBox(height: 300, child: Text('middle')),
-                  SizedBox(height: 300, child: Text('bottom')),
-                ],
-              ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: SingleChildScrollView(
+                    key: scrollKey,
+                    controller: controller,
+                    child: const Column(
+                      children: [
+                        SizedBox(height: 300, child: Text('top')),
+                        SizedBox(height: 300, child: Text('middle')),
+                        SizedBox(height: 300, child: Text('bottom')),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: const SizedBox(width: 40, height: 40),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       );
 
       final inspector = LomTreeInspector();
-      final scrollElement = tester.element(find.byKey(scrollKey));
+      final captureElement = tester.element(find.byKey(captureKey));
       final initial = inspector.captureLom(
-        scrollElement,
+        captureElement,
         comesFromNavigation: false,
       );
 
@@ -171,13 +228,40 @@ void main() {
       await tester.pump();
 
       final scrolled = inspector.captureLom(
-        scrollElement,
+        captureElement,
         comesFromNavigation: false,
       );
 
       expect(initial, isA<Lom>());
+      expect(initial?.viewportOffset, Offset.zero);
+      final initialRoot = initial?.root;
+      expect(initialRoot?.coordinateSpace, LomCoordinateSpace.mixed);
+
+      Iterable<Root> flatten(Root node) sync* {
+        yield node;
+        for (final child in node.children) {
+          yield* flatten(child);
+        }
+      }
+
+      final initialNodes = flatten(initialRoot!).toList();
+      expect(
+        initialNodes.any(
+          (node) =>
+              node.widgetType == 'GestureDetector' &&
+              node.coordinateSpace == LomCoordinateSpace.screen,
+        ),
+        isTrue,
+      );
+      expect(
+        initialNodes.any(
+          (node) => node.coordinateSpace == LomCoordinateSpace.content,
+        ),
+        isTrue,
+      );
       expect(scrolled, isA<LomRef>());
       expect(scrolled?.id, initial?.id);
+      expect(scrolled?.viewportOffset, const Offset(0, 420));
     });
 
     test('maps viewport pixels back into content coordinates', () {

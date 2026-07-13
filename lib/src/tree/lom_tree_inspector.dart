@@ -31,26 +31,32 @@ class LomTreeInspector {
 
     if (!element.mounted) return null;
 
-    final counter = _RootCounter();
-    final children = _visitElement(
-      element,
-      config: _config,
-      counter: counter,
-      scrollOffset: Offset.zero,
-    );
-
     final Rect? rect = MathUtils.transformRect(element.renderObject);
 
     if (rect == null) return null;
 
+    // Locate the main scroll before building content coordinates.
+    final primaryViewport = _findPrimaryViewport(element, rect, _config);
+    final capture = _CaptureState();
+    final children = _visitElement(
+      element,
+      config: _config,
+      capture: capture,
+      primaryViewport: primaryViewport?.renderObject,
+      insidePrimaryViewport: false,
+      scrollOffset: Offset.zero,
+    );
+
     final Root root = Root(
-      id: counter.next(),
+      id: capture.nextId(),
       objectId: element.renderObject.hashCode.toRadixString(16),
       widgetType: element.widget.runtimeType.toString(),
       renderType: element.renderObject.runtimeType.toString(),
       box: rect,
       children: children,
+      coordinateSpace: _coordinateSpace(false, children),
     );
+    final viewportOffset = primaryViewport?.offset ?? Offset.zero;
 
     final signature = LomTreeHasher.signatureRoots([root]);
     final isSameAsLast = signature == _lastSignature;
@@ -64,6 +70,7 @@ class LomTreeInspector {
         id: cacheId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         root: root,
+        viewportOffset: viewportOffset,
       );
     }
 
@@ -75,6 +82,7 @@ class LomTreeInspector {
         id: cacheId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         root: root,
+        viewportOffset: viewportOffset,
       );
     }
 
@@ -87,6 +95,7 @@ class LomTreeInspector {
       width: contentSize.width.ceil(),
       height: contentSize.height.ceil(),
       root: root,
+      viewportOffset: viewportOffset,
     );
 
     _rememberSignature(signature, lomId);
@@ -146,9 +155,12 @@ class LomTreeInspector {
   static List<Root> _visitElement(
     Element element, {
     required LomTreeConfig config,
-    required _RootCounter counter,
+    required _CaptureState capture,
+    required RenderObject? primaryViewport,
+    required bool insidePrimaryViewport,
     required Offset scrollOffset,
   }) {
+    // Propagate the main viewport state and accumulated scroll down the tree.
     final Widget widget = element.widget;
 
     final String widgetType = widget.runtimeType.toString();
@@ -156,47 +168,146 @@ class LomTreeInspector {
     if (config.pruneAt.contains(widgetType)) return [];
 
     final renderObject = element.renderObject;
-    final childScrollOffset = widget is RenderObjectWidget
-        ? scrollOffset + _scrollOffsetOf(renderObject)
-        : scrollOffset;
+    final ownScrollOffset = widget is RenderObjectWidget
+        ? _scrollOffsetOf(renderObject)
+        : Offset.zero;
+
+    final childScrollOffset = scrollOffset + ownScrollOffset;
+    final childInsidePrimaryViewport =
+        insidePrimaryViewport ||
+        (widget is RenderObjectWidget &&
+            identical(renderObject, primaryViewport));
 
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
     if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
-      return _visitChildrenFlat(element, config, counter, childScrollOffset);
+      return _visitChildrenFlat(
+        element,
+        config,
+        capture,
+        primaryViewport,
+        childInsidePrimaryViewport,
+        childScrollOffset,
+      );
     }
 
     if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
-      return _visitChildrenFlat(element, config, counter, childScrollOffset);
+      return _visitChildrenFlat(
+        element,
+        config,
+        capture,
+        primaryViewport,
+        childInsidePrimaryViewport,
+        childScrollOffset,
+      );
     }
 
     if (!hasImportanteSemantic &&
         (widgetType.startsWith('_') ||
             config.ignoreAt.any((w) => widgetType.contains(w)))) {
-      return _visitChildrenFlat(element, config, counter, childScrollOffset);
+      return _visitChildrenFlat(
+        element,
+        config,
+        capture,
+        primaryViewport,
+        childInsidePrimaryViewport,
+        childScrollOffset,
+      );
     }
 
     final Rect? rect = MathUtils.transformRect(renderObject);
 
     if (rect == null || (rect.width == 0 && rect.height == 0)) {
-      return _visitChildrenFlat(element, config, counter, childScrollOffset);
+      return _visitChildrenFlat(
+        element,
+        config,
+        capture,
+        primaryViewport,
+        childInsidePrimaryViewport,
+        childScrollOffset,
+      );
     }
+
+    final children = _visitChildrenFlat(
+      element,
+      config,
+      capture,
+      primaryViewport,
+      childInsidePrimaryViewport,
+      childScrollOffset,
+    );
 
     return [
       Root(
-        id: counter.next(),
+        id: capture.nextId(),
         objectId: renderObject.hashCode.toRadixString(16),
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),
         box: rect.shift(scrollOffset),
-        children: _visitChildrenFlat(
-          element,
-          config,
-          counter,
-          childScrollOffset,
-        ),
+        children: children,
+        coordinateSpace: _coordinateSpace(insidePrimaryViewport, children),
       ),
     ];
+  }
+
+  static _PrimaryViewport? _findPrimaryViewport(
+    Element element,
+    Rect rootBox,
+    LomTreeConfig config,
+  ) {
+    // The largest visible viewport represents the route's main scroll.
+    _PrimaryViewport? primary;
+    var largestVisibleArea = -1.0;
+
+    void visit(Element current, Offset parentScrollOffset) {
+      final widget = current.widget;
+      final widgetType = widget.runtimeType.toString();
+      if (config.pruneAt.contains(widgetType)) return;
+
+      final renderObject = current.renderObject;
+      final ownScrollOffset = widget is RenderObjectWidget
+          ? _scrollOffsetOf(renderObject)
+          : Offset.zero;
+      final cumulativeScrollOffset = parentScrollOffset + ownScrollOffset;
+
+      if (widget is RenderObjectWidget &&
+          renderObject is RenderAbstractViewport) {
+        final viewportRect = MathUtils.transformRect(renderObject);
+        if (viewportRect != null) {
+          final visible = viewportRect.intersect(rootBox);
+          final visibleArea = visible.isEmpty
+              ? 0.0
+              : visible.width * visible.height;
+
+          if (visibleArea > largestVisibleArea) {
+            largestVisibleArea = visibleArea;
+            primary = _PrimaryViewport(
+              renderObject: renderObject,
+              offset: cumulativeScrollOffset,
+            );
+          }
+        }
+      }
+
+      current.visitChildren((child) => visit(child, cumulativeScrollOffset));
+    }
+
+    visit(element, Offset.zero);
+    return primary;
+  }
+
+  static LomCoordinateSpace _coordinateSpace(
+    bool insidePrimaryViewport,
+    List<Root> children,
+  ) {
+    // Outside the viewport, only ancestors joining both layers are mixed.
+    if (insidePrimaryViewport) return LomCoordinateSpace.content;
+
+    return children.any(
+          (child) => child.coordinateSpace != LomCoordinateSpace.screen,
+        )
+        ? LomCoordinateSpace.mixed
+        : LomCoordinateSpace.screen;
   }
 
   static Offset _scrollOffsetOf(RenderObject? renderObject) {
@@ -233,7 +344,9 @@ class LomTreeInspector {
   static List<Root> _visitChildrenFlat(
     Element element,
     LomTreeConfig config,
-    _RootCounter counter,
+    _CaptureState capture,
+    RenderObject? primaryViewport,
+    bool insidePrimaryViewport,
     Offset scrollOffset,
   ) {
     final children = <Root>[];
@@ -241,7 +354,9 @@ class LomTreeInspector {
       final rootChildren = _visitElement(
         child,
         config: config,
-        counter: counter,
+        capture: capture,
+        primaryViewport: primaryViewport,
+        insidePrimaryViewport: insidePrimaryViewport,
         scrollOffset: scrollOffset,
       );
       if (rootChildren.isNotEmpty) {
@@ -253,11 +368,20 @@ class LomTreeInspector {
   }
 }
 
-class _RootCounter {
+class _CaptureState {
   int _value = 0;
-  int next() => ++_value;
+
+  int nextId() => ++_value;
+
   void clear() => _value = 0;
 
   @override
   String toString() => "value: $_value";
+}
+
+class _PrimaryViewport {
+  final RenderObject renderObject;
+  final Offset offset;
+
+  const _PrimaryViewport({required this.renderObject, required this.offset});
 }

@@ -213,7 +213,14 @@ class SessionRecorderReporter {
       final rescued = _rescuedLoms[lom.id];
       if (rescued == null) continue;
 
-      chunk.loms[i] = rescued;
+      chunk.loms[i] = Lom(
+        id: rescued.id,
+        timestamp: lom.timestamp,
+        width: rescued.width,
+        height: rescued.height,
+        root: rescued.root,
+        viewportOffset: lom.viewportOffset ?? rescued.viewportOffset,
+      );
       fullIds.add(lom.id);
     }
   }
