@@ -1,10 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:session_recorder_flutter/src/collectors/gestures_collector.dart';
-import 'package:session_recorder_flutter/src/collectors/scroll_collector.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_context.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_controller.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
@@ -83,27 +82,6 @@ void main() {
     });
   });
 
-  group('Navigation capture', () {
-    test('coalesces nested navigator transitions into one capture', () {
-      final engine = _FakeEngine.empty();
-      final controller = ControllerImpl(engine);
-      var interrupts = 0;
-      controller.onInterrupt(() => interrupts++);
-
-      controller.beginNavigation();
-      controller.beginNavigation();
-      controller.finishNavigation(null);
-
-      expect(engine.context.navigationCaptureCount, 0);
-
-      controller.finishNavigation(null);
-
-      expect(interrupts, 1);
-      expect(engine.context.navigatingCount, 1);
-      expect(engine.context.navigationCaptureCount, 1);
-    });
-  });
-
   group('LOM references', () {
     test('tracks the current LOM ref without adding local refs to chunks', () {
       final engine = SessionRecorderEngine(const SessionRecorderConfig());
@@ -154,219 +132,27 @@ void main() {
       );
     });
 
-    test('serializes the optional viewport anchor in LOM records', () {
-      const viewport = Offset(12.4, 1159.6);
-      final lomMap = const Lom(
-        id: 'lom-full',
-        timestamp: 2,
-        width: 390,
-        height: 2200,
-        viewportOffset: viewport,
-      ).toMap();
-
-      expect(lomMap['v'], [12, 1160]);
-
-      expect(
-        const LomRef(
-          id: 'lom-viewport',
-          timestamp: 3,
-          viewportOffset: viewport,
-        ).toMap(),
-        {
-          'ref': 'lom-viewport',
-          'ts': 3,
-          'v': [12, 1160],
-        },
-      );
-
-      expect(
-        const Root(
-          id: 1,
-          objectId: 'fixed',
-          widgetType: 'IconButton',
-          renderType: 'RenderBox',
-          box: Rect.fromLTWH(0, 0, 40, 40),
-          children: [],
-          coordinateSpace: LomCoordinateSpace.screen,
-        ).toMap()['s'],
-        's',
-      );
-    });
-
     testWidgets('keeps an eager scroll tree stable across offsets', (
       tester,
     ) async {
       final controller = ScrollController();
       addTearDown(controller.dispose);
-      const captureKey = Key('capture-root');
       const scrollKey = Key('eager-scroll');
 
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
           child: SizedBox(
-            key: captureKey,
-            width: 300,
-            height: 240,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: SingleChildScrollView(
-                    key: scrollKey,
-                    controller: controller,
-                    child: const Column(
-                      children: [
-                        SizedBox(height: 300, child: Text('top')),
-                        SizedBox(height: 300, child: Text('middle')),
-                        SizedBox(height: 300, child: Text('bottom')),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: const SizedBox(width: 40, height: 40),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-      final inspector = LomTreeInspector();
-      final captureElement = tester.element(find.byKey(captureKey));
-      final initial = inspector.captureLom(
-        captureElement,
-        comesFromNavigation: false,
-      );
-
-      controller.jumpTo(420);
-      await tester.pump();
-
-      final scrolled = inspector.captureLom(
-        captureElement,
-        comesFromNavigation: false,
-      );
-
-      expect(initial, isA<Lom>());
-      expect(initial?.viewportOffset, Offset.zero);
-      final initialRoot = initial?.root;
-      expect(initialRoot?.coordinateSpace, LomCoordinateSpace.mixed);
-
-      Iterable<Root> flatten(Root node) sync* {
-        yield node;
-        for (final child in node.children) {
-          yield* flatten(child);
-        }
-      }
-
-      final initialNodes = flatten(initialRoot!).toList();
-      expect(
-        initialNodes.any(
-          (node) =>
-              node.widgetType == 'GestureDetector' &&
-              node.coordinateSpace == LomCoordinateSpace.screen,
-        ),
-        isTrue,
-      );
-      expect(
-        initialNodes.any(
-          (node) => node.coordinateSpace == LomCoordinateSpace.content,
-        ),
-        isTrue,
-      );
-      expect(scrolled, isA<LomRef>());
-      expect(scrolled?.id, initial?.id);
-      expect(scrolled?.viewportOffset, const Offset(0, 420));
-    });
-
-    testWidgets('does not promote a small carousel to route viewport', (
-      tester,
-    ) async {
-      final controller = ScrollController();
-      addTearDown(controller.dispose);
-      const captureKey = Key('carousel-only-root');
-
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: SizedBox(
-            key: captureKey,
-            width: 300,
-            height: 240,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                height: 80,
-                child: SingleChildScrollView(
-                  controller: controller,
-                  scrollDirection: Axis.horizontal,
-                  child: const SizedBox(width: 800, height: 80),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      controller.jumpTo(200);
-      await tester.pump();
-
-      final lom = LomTreeInspector().captureLom(
-        tester.element(find.byKey(captureKey)),
-        comesFromNavigation: false,
-      );
-
-      expect(lom?.viewportOffset, Offset.zero);
-    });
-
-    testWidgets('keeps a nested carousel offset local', (tester) async {
-      final verticalController = ScrollController();
-      final horizontalController = ScrollController();
-      addTearDown(verticalController.dispose);
-      addTearDown(horizontalController.dispose);
-      const captureKey = Key('nested-capture-root');
-      const cardKey = Key('nested-card');
-
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: SizedBox(
-            key: captureKey,
             width: 300,
             height: 240,
             child: SingleChildScrollView(
-              controller: verticalController,
-              child: Column(
+              key: scrollKey,
+              controller: controller,
+              child: const Column(
                 children: [
-                  SizedBox(
-                    height: 100,
-                    child: SingleChildScrollView(
-                      controller: horizontalController,
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: 800,
-                        height: 100,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: 240,
-                              child: GestureDetector(
-                                key: cardKey,
-                                onTap: () {},
-                                child: const SizedBox(width: 80, height: 80),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 500),
+                  SizedBox(height: 300, child: Text('top')),
+                  SizedBox(height: 300, child: Text('middle')),
+                  SizedBox(height: 300, child: Text('bottom')),
                 ],
               ),
             ),
@@ -374,158 +160,24 @@ void main() {
         ),
       );
 
-      Iterable<Root> flatten(Root node) sync* {
-        yield node;
-        for (final child in node.children) {
-          yield* flatten(child);
-        }
-      }
-
       final inspector = LomTreeInspector();
-      final captureElement = tester.element(find.byKey(captureKey));
-      final cardObjectId = tester
-          .element(find.byKey(cardKey))
-          .renderObject
-          .hashCode
-          .toRadixString(16);
+      final scrollElement = tester.element(find.byKey(scrollKey));
       final initial = inspector.captureLom(
-        captureElement,
+        scrollElement,
         comesFromNavigation: false,
       );
-      final initialCard = flatten(
-        initial!.root!,
-      ).firstWhere((node) => node.objectId == cardObjectId);
 
-      verticalController.jumpTo(200);
-      horizontalController.jumpTo(120);
+      controller.jumpTo(420);
       await tester.pump();
 
       final scrolled = inspector.captureLom(
-        captureElement,
-        comesFromNavigation: false,
-      );
-      final scrolledCard = flatten(
-        scrolled!.root!,
-      ).firstWhere((node) => node.objectId == cardObjectId);
-
-      expect(scrolled.viewportOffset, const Offset(0, 200));
-      expect(scrolledCard.box.left, initialCard.box.left - 120);
-      expect(scrolledCard.box.top, initialCard.box.top);
-    });
-
-    testWidgets('keeps TabBarView page offsets local', (tester) async {
-      const captureKey = Key('tab-capture-root');
-      const activeKey = Key('active-tab-content');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Center(
-            child: SizedBox(
-              key: captureKey,
-              width: 300,
-              height: 240,
-              child: DefaultTabController(
-                length: 3,
-                initialIndex: 2,
-                child: TabBarView(
-                  children: [
-                    const SizedBox(),
-                    const SizedBox(),
-                    Center(
-                      child: ElevatedButton(
-                        key: activeKey,
-                        onPressed: null,
-                        child: const Text('active'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final activeObjectId = tester
-          .element(find.byKey(activeKey))
-          .renderObject
-          .hashCode
-          .toRadixString(16);
-      final lom = LomTreeInspector().captureLom(
-        tester.element(find.byKey(captureKey)),
+        scrollElement,
         comesFromNavigation: false,
       );
 
-      Iterable<Root> flatten(Root node) sync* {
-        yield node;
-        for (final child in node.children) {
-          yield* flatten(child);
-        }
-      }
-
-      expect(lom?.viewportOffset, Offset.zero);
-      expect(
-        flatten(lom!.root!).any((node) => node.objectId == activeObjectId),
-        isTrue,
-      );
-    });
-
-    testWidgets('skips hidden Offstage branches', (tester) async {
-      const captureKey = Key('offstage-capture-root');
-      const hiddenKey = Key('hidden-offstage-content');
-      const visibleKey = Key('visible-offstage-content');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: SizedBox(
-            key: captureKey,
-            width: 300,
-            height: 240,
-            child: Stack(
-              children: [
-                Offstage(
-                  offstage: true,
-                  child: ElevatedButton(
-                    key: hiddenKey,
-                    onPressed: null,
-                    child: const Text('hidden'),
-                  ),
-                ),
-                Offstage(
-                  child: ElevatedButton(
-                    key: visibleKey,
-                    onPressed: null,
-                    child: const Text('visible'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      String objectId(Key key) => tester
-          .element(find.byKey(key))
-          .renderObject
-          .hashCode
-          .toRadixString(16);
-      final lom = LomTreeInspector().captureLom(
-        tester.element(find.byKey(captureKey)),
-        comesFromNavigation: false,
-      );
-
-      Iterable<Root> flatten(Root node) sync* {
-        yield node;
-        for (final child in node.children) {
-          yield* flatten(child);
-        }
-      }
-
-      final ids = flatten(lom!.root!).map((node) => node.objectId).toSet();
-      expect(ids, contains(objectId(visibleKey)));
-      expect(ids, isNot(contains(objectId(hiddenKey))));
+      expect(initial, isA<Lom>());
+      expect(scrolled, isA<LomRef>());
+      expect(scrolled?.id, initial?.id);
     });
 
     test('maps viewport pixels back into content coordinates', () {
@@ -572,51 +224,6 @@ void main() {
         ).concatenateString(),
         '3:longPress:1,2:9,10:450:lom-3',
       );
-    });
-  });
-
-  group('ScrollCollector', () {
-    testWidgets('captures the active TabBarView page after it settles', (
-      tester,
-    ) async {
-      final context = _FakeContext([]);
-      final collector = ScrollCollector(
-        engine: _FakeEngine(
-          config: const SessionRecorderConfig(),
-          context: context,
-        ),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DefaultTabController(
-            length: 2,
-            child: Scaffold(
-              appBar: AppBar(
-                bottom: const TabBar(
-                  tabs: [
-                    Tab(text: 'First'),
-                    Tab(key: Key('second-tab'), text: 'Second'),
-                  ],
-                ),
-              ),
-              body: NotificationListener<ScrollNotification>(
-                onNotification: collector.handleScrollNotification,
-                child: const TabBarView(
-                  children: [Text('first page'), Text('second page')],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('second-tab')));
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(milliseconds: 650));
-      await tester.pump();
-
-      expect(context.uiCaptureCount, 1);
     });
   });
 
@@ -709,22 +316,20 @@ void main() {
         const ScrollExplorationEvent(
           timestamp: 100,
           viewport: Rect.fromLTWH(0, 100, 320, 640),
-          offset: Offset.zero,
           phase: ScrollPhase.start,
           lomRef: 'lom-3',
         ).concatenateString(),
-        '100:scrollStart:0,100,320,640:0,0:lom-3',
+        '100:scrollStart:0,100,320,640:lom-3',
       );
 
       expect(
         const ScrollExplorationEvent(
           timestamp: 200,
           viewport: Rect.fromLTWH(0, 100, 320, 640),
-          offset: Offset(0, 480),
           phase: ScrollPhase.end,
           lomRef: 'lom-3',
         ).concatenateString(),
-        '200:scrollEnd:0,100,320,640:0,480:lom-3',
+        '200:scrollEnd:0,100,320,640:lom-3',
       );
     });
   });
@@ -820,12 +425,6 @@ class _FakeEngine implements SessionRecorderEngineInternal {
 /// Minimal controller stub for reporter tests.
 class _FakeController implements SessionRecorderController {
   @override
-  void beginNavigation() {}
-
-  @override
-  void finishNavigation(Element? routeElement) {}
-
-  @override
   bool get isNavigationAttached => false;
 
   @override
@@ -859,9 +458,6 @@ class _FakeContext implements SessionRecorderContext {
   final List<ActionEvent> actionsEvents = [];
   final List<ExplorationEvent> explorationEvents = [];
   int extractCount = 0;
-  int navigatingCount = 0;
-  int navigationCaptureCount = 0;
-  int uiCaptureCount = 0;
 
   @override
   Chunk? extractChunk() {
@@ -883,13 +479,10 @@ class _FakeContext implements SessionRecorderContext {
   Rect get scrollPhysicalBounds => Rect.zero;
 
   @override
-  void captureTree(bool comesFromNavigation) {
-    if (comesFromNavigation) {
-      navigationCaptureCount++;
-    } else {
-      uiCaptureCount++;
-    }
-  }
+  Rect get scrollVirtualCanvas => Rect.zero;
+
+  @override
+  void captureTree(bool comesFromNavigation) {}
 
   @override
   void dispose() {}
@@ -920,7 +513,7 @@ class _FakeContext implements SessionRecorderContext {
   void setCurrentRouteElement(Element? element) {}
 
   @override
-  void setCurrentlyNavigating() => navigatingCount++;
+  void setCurrentlyNavigating() {}
 
   @override
   void setCurrentlyScrolling(bool isScrolling) {}
@@ -930,6 +523,9 @@ class _FakeContext implements SessionRecorderContext {
 
   @override
   void setScrollPhysicalBounds(Rect sPB) {}
+
+  @override
+  void setScrollVirtualCanvas(Rect sVC) {}
 
   @override
   void start() {}

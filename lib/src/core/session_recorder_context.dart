@@ -29,6 +29,10 @@ abstract interface class SessionRecorderContext {
   Rect get scrollPhysicalBounds;
   void setScrollPhysicalBounds(Rect sPB);
 
+  /// The giant scroll with the negative top.
+  Rect get scrollVirtualCanvas;
+  void setScrollVirtualCanvas(Rect sVC);
+
   /// Determine which viewport to use based on the finger's position.
   Rect resolveViewport(Offset position);
 
@@ -69,9 +73,13 @@ class NoOpContext implements SessionRecorderContext {
   @override
   Rect get scrollPhysicalBounds => Rect.zero;
   @override
+  Rect get scrollVirtualCanvas => Rect.zero;
+  @override
   void setScreenViewport(Rect sV) {}
   @override
   void setScrollPhysicalBounds(Rect sPB) {}
+  @override
+  void setScrollVirtualCanvas(Rect sVC) {}
   @override
   void captureTree(bool comesFromNavigation) {}
   @override
@@ -97,6 +105,7 @@ class ContextImpl implements SessionRecorderContext {
 
   late Rect _screenViewport = Rect.zero;
   late Rect _scrollPhysicalBounds = Rect.zero;
+  late Rect _scrollVirtualCanvas = Rect.zero;
 
   late Chunk _currentChunk;
   late Session _currentSession;
@@ -126,6 +135,7 @@ class ContextImpl implements SessionRecorderContext {
     _currentRouteElement = null;
     _screenViewport = Rect.zero;
     _scrollPhysicalBounds = Rect.zero;
+    _scrollVirtualCanvas = Rect.zero;
     _currentChunk = _createChunk();
   }
 
@@ -140,11 +150,16 @@ class ContextImpl implements SessionRecorderContext {
   void setScrollPhysicalBounds(Rect sPB) => _scrollPhysicalBounds = sPB;
 
   @override
+  Rect get scrollVirtualCanvas => _scrollVirtualCanvas;
+  @override
+  void setScrollVirtualCanvas(Rect sVC) => _scrollVirtualCanvas = sVC;
+
+  @override
   String? get currentLomRef => _currentLom?.id;
 
   @override
   Rect resolveViewport(Offset position) {
-    if (_scrollPhysicalBounds.contains(position)) return _scrollPhysicalBounds;
+    if (_scrollPhysicalBounds.contains(position)) return _scrollVirtualCanvas;
 
     return _screenViewport;
   }

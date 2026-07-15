@@ -3,17 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Identifies whether a node follows the scroll content or the device screen.
-enum LomCoordinateSpace {
-  screen('s'),
-  content('c'),
-  mixed('m');
-
-  final String code;
-
-  const LomCoordinateSpace(this.code);
-}
-
 @immutable
 class Root {
   final int id;
@@ -22,7 +11,6 @@ class Root {
   final String renderType;
   final Rect box;
   final List<Root> children;
-  final LomCoordinateSpace coordinateSpace;
 
   const Root({
     required this.id,
@@ -31,7 +19,6 @@ class Root {
     required this.renderType,
     required this.box,
     required this.children,
-    this.coordinateSpace = LomCoordinateSpace.content,
   });
 
   Map<String, dynamic> toMap() {
@@ -46,7 +33,6 @@ class Root {
       'id': "z$id",
       'b': b,
       'c': children.map((x) => x.toMap()).toList(),
-      's': coordinateSpace.code,
     };
 
     if (kDebugMode) {
@@ -64,6 +50,5 @@ class Root {
   String toJson() => json.encode(toMap());
 
   @override
-  String toString() =>
-      'Root(id: $id, box: $box, coordinateSpace: $coordinateSpace, children: ${children.length})';
+  String toString() => 'Root(id: $id, box: $box, children: ${children.length})';
 }
