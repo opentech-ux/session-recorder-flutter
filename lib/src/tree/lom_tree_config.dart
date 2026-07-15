@@ -70,6 +70,7 @@ class LomTreeConfig {
       'Checkbox',
       'InkWell',
       'GestureDetector',
+      'BottomSheet',
       'Image',
       'Icon',
     },

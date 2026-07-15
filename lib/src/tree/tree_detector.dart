@@ -115,7 +115,8 @@ class TreeDetector {
     final buildOwner = WidgetsBinding.instance.buildOwner;
     final installedCallback = _installedOnBuildScheduled;
 
-    final didRestoreHook = _isBuilded &&
+    final didRestoreHook =
+        _isBuilded &&
         buildOwner != null &&
         installedCallback != null &&
         identical(buildOwner.onBuildScheduled, installedCallback);
@@ -142,12 +143,14 @@ class TreeDetector {
   void captureTree(bool comesFromNavigation) {
     if (comesFromNavigation) _isNavigating = true;
 
-    if (!comesFromNavigation && _isScrollCaptureSuppressed) return;
+    if (!comesFromNavigation && (_isNavigating || _isScrollCaptureSuppressed)) {
+      return;
+    }
 
     final now = DateTime.now();
-    if (!comesFromNavigation &&
-        now.difference(_lastCaptureTime).inMilliseconds <
-        kCooldownTime.inMilliseconds) {
+    final elapsed = now.difference(_lastCaptureTime);
+    if (!comesFromNavigation && elapsed < kCooldownTime) {
+      _scheduleAfterCooldown(kCooldownTime - elapsed);
       return;
     }
 
@@ -183,6 +186,14 @@ class TreeDetector {
     } finally {
       if (comesFromNavigation) _isNavigating = false;
     }
+  }
+
+  void _scheduleAfterCooldown(Duration delay) {
+    _debounce?.cancel();
+    _debounce = Timer(delay, () {
+      if (!_isRunning || _isNavigating || _isScrollCaptureSuppressed) return;
+      captureTree(false);
+    });
   }
 
   Element? _getSafeElement() {

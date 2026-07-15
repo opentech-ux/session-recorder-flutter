@@ -93,10 +93,12 @@ class PinchExplorationEvent extends ExplorationEvent {
 
 class ScrollExplorationEvent extends ExplorationEvent {
   final ScrollPhase phase;
+  final Offset offset;
 
   const ScrollExplorationEvent({
     required super.timestamp,
     required super.viewport,
+    required this.offset,
     required this.phase,
     required super.lomRef,
   }) : super(explorationType: GesturesType.scroll);
@@ -107,12 +109,17 @@ class ScrollExplorationEvent extends ExplorationEvent {
         ? GesturesType.scrollEnd.name
         : GesturesType.scrollStart.name;
 
-    return [timestamp.toString(), typeName, viewportStringLTWH, lomRef].join(
-      ':',
-    );
+    final offsetString = '${offset.dx.toInt()},${offset.dy.toInt()}';
+    return [
+      timestamp.toString(),
+      typeName,
+      viewportStringLTWH,
+      offsetString,
+      lomRef,
+    ].join(':');
   }
 
   @override
   String toString() =>
-      'ScrollExplorationEvent(timestamp: $timestamp, viewport: $viewport, phase: $phase)';
+      'ScrollExplorationEvent(timestamp: $timestamp, viewport: $viewport, offset: $offset, phase: $phase)';
 }

@@ -160,23 +160,25 @@ class LomTreeInspector {
     required bool insidePrimaryViewport,
     required Offset scrollOffset,
   }) {
-    // Propagate the main viewport state and accumulated scroll down the tree.
+    // Propagate only the main viewport offset through content coordinates.
     final Widget widget = element.widget;
 
     final String widgetType = widget.runtimeType.toString();
 
+    if (widget is Offstage && widget.offstage) return [];
     if (config.pruneAt.contains(widgetType)) return [];
 
     final renderObject = element.renderObject;
-    final ownScrollOffset = widget is RenderObjectWidget
+    final isPrimaryViewport =
+        widget is RenderObjectWidget &&
+        identical(renderObject, primaryViewport);
+    final ownScrollOffset = isPrimaryViewport
         ? _scrollOffsetOf(renderObject)
         : Offset.zero;
 
     final childScrollOffset = scrollOffset + ownScrollOffset;
     final childInsidePrimaryViewport =
-        insidePrimaryViewport ||
-        (widget is RenderObjectWidget &&
-            identical(renderObject, primaryViewport));
+        insidePrimaryViewport || isPrimaryViewport;
 
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
@@ -258,20 +260,30 @@ class LomTreeInspector {
     // The largest visible viewport represents the route's main scroll.
     _PrimaryViewport? primary;
     var largestVisibleArea = -1.0;
+    final rootArea = rootBox.width * rootBox.height;
 
-    void visit(Element current, Offset parentScrollOffset) {
+    void visit(
+      Element current,
+      Offset parentScrollOffset,
+      Axis? pendingPagerAxis,
+    ) {
       final widget = current.widget;
       final widgetType = widget.runtimeType.toString();
+      if (widget is Offstage && widget.offstage) return;
       if (config.pruneAt.contains(widgetType)) return;
 
       final renderObject = current.renderObject;
-      final ownScrollOffset = widget is RenderObjectWidget
+      final pagerAxis = _localPagerAxis(widget) ?? pendingPagerAxis;
+      final viewportAxis = _viewportAxisOf(renderObject);
+      final isPagerViewport = pagerAxis != null && viewportAxis == pagerAxis;
+      final ownScrollOffset = widget is RenderObjectWidget && !isPagerViewport
           ? _scrollOffsetOf(renderObject)
           : Offset.zero;
       final cumulativeScrollOffset = parentScrollOffset + ownScrollOffset;
 
       if (widget is RenderObjectWidget &&
-          renderObject is RenderAbstractViewport) {
+          renderObject is RenderAbstractViewport &&
+          !isPagerViewport) {
         final viewportRect = MathUtils.transformRect(renderObject);
         if (viewportRect != null) {
           final visible = viewportRect.intersect(rootBox);
@@ -289,11 +301,36 @@ class LomTreeInspector {
         }
       }
 
-      current.visitChildren((child) => visit(child, cumulativeScrollOffset));
+      final childPagerAxis = isPagerViewport ? null : pagerAxis;
+      current.visitChildren(
+        (child) => visit(child, cumulativeScrollOffset, childPagerAxis),
+      );
     }
 
-    visit(element, Offset.zero);
-    return primary;
+    visit(element, Offset.zero, null);
+    return largestVisibleArea >= rootArea * 0.5 ? primary : null;
+  }
+
+  static Axis? _localPagerAxis(Widget widget) {
+    if (widget is PageView) return widget.scrollDirection;
+    if (widget is TabBarView || widget is CarouselView) {
+      return Axis.horizontal;
+    }
+    return null;
+  }
+
+  static Axis? _viewportAxisOf(RenderObject? renderObject) {
+    if (renderObject is! RenderAbstractViewport) return null;
+
+    try {
+      final dynamic viewport = renderObject;
+      return switch (viewport.axisDirection as AxisDirection) {
+        AxisDirection.up || AxisDirection.down => Axis.vertical,
+        AxisDirection.left || AxisDirection.right => Axis.horizontal,
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   static LomCoordinateSpace _coordinateSpace(
