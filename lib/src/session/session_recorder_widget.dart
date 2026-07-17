@@ -75,7 +75,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   @override
   void initState() {
     super.initState();
-    _gestures = GestureCollector();
+    _gestures = GestureCollector(viewportProvider: _resolvePointerViewport);
     _scrolls = ScrollCollector();
 
     SessionRecorder.engine.context.start();
@@ -122,6 +122,38 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     }
 
     return widget.child;
+  }
+
+  Rect? _resolvePointerViewport() {
+    final element = _captureElement;
+    if (element == null || !element.mounted) return null;
+
+    final view = View.maybeOf(element);
+    if (view == null) return null;
+
+    final devicePixelRatio = view.devicePixelRatio;
+    final physicalWidth = view.physicalSize.width;
+    final physicalHeight = view.physicalSize.height;
+
+    if (!devicePixelRatio.isFinite ||
+        devicePixelRatio <= 0 ||
+        !physicalWidth.isFinite ||
+        physicalWidth <= 0 ||
+        !physicalHeight.isFinite ||
+        physicalHeight <= 0) {
+      return null;
+    }
+
+    final logicalWidth = physicalWidth / devicePixelRatio;
+    final logicalHeight = physicalHeight / devicePixelRatio;
+    if (!logicalWidth.isFinite ||
+        logicalWidth <= 0 ||
+        !logicalHeight.isFinite ||
+        logicalHeight <= 0) {
+      return null;
+    }
+
+    return Rect.fromLTWH(0, 0, logicalWidth, logicalHeight);
   }
 
   @override

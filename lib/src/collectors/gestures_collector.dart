@@ -10,12 +10,17 @@ import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
 class GestureCollector {
   final SessionRecorderEngineInternal _engine;
+  final Rect? Function() _viewportProvider;
 
-  GestureCollector({SessionRecorderEngineInternal? engine})
-      : _engine = engine ?? SessionRecorder.engine;
+  GestureCollector({
+    SessionRecorderEngineInternal? engine,
+    required Rect? Function() viewportProvider,
+  }) : _engine = engine ?? SessionRecorder.engine,
+       _viewportProvider = viewportProvider;
 
   /// Tracks main active pointers for gesture detection and movement history
   final Map<int, PointerTrace> _pointers = {};
+  final Set<int> _ignoredPointers = {};
   final List<PointerTrace> _lastTaps = [];
   PinchMetricsBaseline? _pinchMetrics;
 
@@ -25,6 +30,8 @@ class GestureCollector {
 
     /// Add the first [PointerTrace]
     addPointer(pointer, details.position);
+
+    if (_ignoredPointers.contains(pointer)) return;
 
     _updatePinchMetrics();
   }
@@ -44,6 +51,8 @@ class GestureCollector {
     final int pointer = details.pointer;
     final Offset position = details.position;
 
+    if (_ignoredPointers.contains(pointer)) return;
+
     final PointerTrace? pointerTrace = _pointers[pointer];
 
     /// If for some reason the current `pointer` not exist in `_pointers`, we
@@ -55,9 +64,10 @@ class GestureCollector {
       return;
     }
 
+    final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
     pointerTrace.add(
       position,
-      viewport: _engine.context.resolveViewport(position),
+      viewport: viewport,
       lomRef: _engine.context.currentLomRef ?? '',
     );
 
@@ -116,11 +126,32 @@ class GestureCollector {
 
   /// Called whenever the pointer cancels in the screen (e.g. a phone call).
   void onPointerCancel(PointerCancelEvent details) {
-    final pointerTrace = _pointers.remove(details.pointer);
+    final pointer = details.pointer;
+    _ignoredPointers.remove(pointer);
+    final pointerTrace = _pointers.remove(pointer);
+    _lastTaps.removeWhere((tap) => tap.pointer == pointer);
 
     if (pointerTrace != null) {
-      _evaluatePointer(pointerTrace);
-      _lastTaps.removeWhere((tap) => tap.pointer == details.pointer);
+      if (pointerTrace.type == GesturesType.drag ||
+          pointerTrace.type == GesturesType.pinch) {
+        _emitExplorations(pointerTrace);
+      }
+
+      if (pointerTrace.type == GesturesType.pinch) {
+        final remainingPinchPointers = _pointers.values
+            .where((trace) => trace.type == GesturesType.pinch)
+            .toList();
+
+        if (remainingPinchPointers.length == 1) {
+          final remainingPointer = remainingPinchPointers.single;
+          _emitExplorations(remainingPointer);
+          _pointers[remainingPointer.pointer] = remainingPointer
+              .splitForTransition(
+                newType: GesturesType.tap,
+                isOrphanedPointer: true,
+              );
+        }
+      }
     }
 
     _updatePinchMetrics();
@@ -131,6 +162,7 @@ class GestureCollector {
     if (_pointers.isEmpty) {
       _pinchMetrics = null;
       _lastTaps.clear();
+      _ignoredPointers.clear();
       return;
     }
 
@@ -141,6 +173,7 @@ class GestureCollector {
     _pointers.clear();
     _pinchMetrics = null;
     _lastTaps.clear();
+    _ignoredPointers.clear();
   }
 
   /// Emit any valid gesture that is in progress to the record before
@@ -164,13 +197,22 @@ class GestureCollector {
     int pointer,
     Offset position, [
     GesturesType type = GesturesType.tap,
-  ]) =>
-      _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
-        ..add(
-          position,
-          viewport: _engine.context.resolveViewport(position),
-          lomRef: _engine.context.currentLomRef ?? '',
-        );
+  ]) {
+    final viewport = _viewportProvider();
+    if (viewport == null) {
+      _ignoredPointers.add(pointer);
+      return;
+    }
+
+    _ignoredPointers.remove(pointer);
+
+    _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
+      ..add(
+        position,
+        viewport: viewport,
+        lomRef: _engine.context.currentLomRef ?? '',
+      );
+  }
 
   /// Update the Pinch Metrics Baseline
   void _updatePinchMetrics() {
@@ -192,9 +234,17 @@ class GestureCollector {
   /// Finalizes the gesture logic based on previous movement analysis.
   void onPointerUp(PointerUpEvent details) {
     final int pointer = details.pointer;
+    _ignoredPointers.remove(pointer);
     final PointerTrace? pointerTrace = _pointers.remove(pointer);
 
     if (pointerTrace == null) return;
+
+    final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
+    pointerTrace.add(
+      details.position,
+      viewport: viewport,
+      lomRef: _engine.context.currentLomRef ?? '',
+    );
 
     // * PINCH
     if (pointerTrace.type == GesturesType.pinch) {
