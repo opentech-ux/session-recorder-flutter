@@ -12,9 +12,6 @@ abstract interface class SessionRecorderContext {
   void start();
   void dispose();
 
-  Element? get currentRouteElement;
-  void setCurrentRouteElement(Element? element);
-
   void captureTree(bool comesFromNavigation);
   ValueListenable<LomAbstract?>? get notifier;
   void setCurrentlyNavigating();
@@ -62,8 +59,6 @@ class NoOpContext implements SessionRecorderContext {
   @override
   String? get currentLomRef => null;
   @override
-  Element? get currentRouteElement => null;
-  @override
   void recordAction(ActionEvent action) {}
   @override
   void recordExploration(ExplorationEvent exploration) {}
@@ -83,8 +78,6 @@ class NoOpContext implements SessionRecorderContext {
   void captureTree(bool comesFromNavigation) {}
   @override
   ValueListenable<LomAbstract?>? get notifier => null;
-  @override
-  void setCurrentRouteElement(Element? element) {}
   @override
   Chunk? extractChunk() => null;
   @override
@@ -108,8 +101,6 @@ class ContextImpl implements SessionRecorderContext {
   late Session _currentSession;
   LomAbstract? _currentLom;
 
-  Element? _currentRouteElement;
-
   TreeDetector? _detector;
 
   /// Exposes the local LOM state for regression tests.
@@ -129,7 +120,6 @@ class ContextImpl implements SessionRecorderContext {
     _detector?.dispose();
     _detector = null;
     _currentLom = null;
-    _currentRouteElement = null;
     _screenViewport = Rect.zero;
     _scrollPhysicalBounds = Rect.zero;
     _scrollVirtualCanvas = Rect.zero;
@@ -187,15 +177,8 @@ class ContextImpl implements SessionRecorderContext {
   }
 
   @override
-  Element? get currentRouteElement => _currentRouteElement;
-
-  @override
   void captureTree(bool comesFromNavigation) =>
       _detector?.captureTree(comesFromNavigation);
-
-  @override
-  void setCurrentRouteElement(Element? element) =>
-      _currentRouteElement = element;
 
   @override
   void setCurrentlyNavigating() => _detector?.setCurrentlyNavigating();

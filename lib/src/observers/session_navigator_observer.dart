@@ -49,15 +49,14 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
     _setAttached();
-    _handleCapture(route);
+    _handleTransition(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
     _setAttached();
-    if (previousRoute == null) return;
-    _handleCapture(previousRoute, waitForRoute: route);
+    _handleTransition(route);
   }
 
   @override
@@ -65,7 +64,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     _setAttached();
     if (newRoute == null) return;
-    _handleCapture(newRoute);
+    _handleTransition(newRoute);
   }
 
   @override
@@ -77,42 +76,29 @@ class SessionNavigatorObserver extends NavigatorObserver {
   @pragma('vm:prefer-inline')
   void _setAttached() => _isAttached = true;
 
-  /// Suppresses auto-captures and waits for `route`'s animation to settle,
-  /// then captures the tree from the route's subtree element.
-  void _handleCapture(Route<dynamic> route, {Route<dynamic>? waitForRoute}) {
-    SessionRecorder.engine.context.setCurrentlyNavigating();
-    SessionRecorder.engine.controller.interrupt();
+  /// Reports navigation and waits for `route`'s animation to settle.
+  void _handleTransition(Route<dynamic> route) {
+    final controller = SessionRecorder.engine.controller;
+    controller.beginNavigation();
 
-    final routeToWait = waitForRoute ?? route;
-    final animation =
-        (routeToWait is TransitionRoute) ? routeToWait.animation : null;
+    final animation = (route is TransitionRoute) ? route.animation : null;
 
-    void capture() {
+    bool didFinish = false;
+
+    void finish() {
+      if (didFinish) return;
+      didFinish = true;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final elementFromContext = _contextOf(route);
-
-        SessionRecorder.engine.context.setCurrentRouteElement(
-          elementFromContext,
-        );
-
-        SessionRecorder.engine.context.captureTree(true);
+        controller.finishNavigation();
       });
     }
 
     if (animation == null ||
         animation.status == AnimationStatus.completed ||
         animation.status == AnimationStatus.dismissed) {
-      capture();
+      finish();
       return;
-    }
-
-    bool didCapture = false;
-
-    void scheduleCapture() {
-      if (didCapture) return;
-
-      didCapture = true;
-      capture();
     }
 
     late final AnimationStatusListener listener;
@@ -120,7 +106,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
       if (status == AnimationStatus.completed ||
           status == AnimationStatus.dismissed) {
         animation.removeStatusListener(listener);
-        scheduleCapture();
+        finish();
       }
     };
 
@@ -129,28 +115,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
     if (animation.status == AnimationStatus.completed ||
         animation.status == AnimationStatus.dismissed) {
       animation.removeStatusListener(listener);
-      scheduleCapture();
+      finish();
     }
-  }
-
-  /// Finds the best available `[Element]` from the `route` subtree context.
-  ///
-  /// ### Priority:
-  /// 1. `[ModalRoute.subtreeContext]` : the route's own mounted element.
-  /// 2. `[NavigatorObserver.navigator?.context]` : fallback if subtree not yet
-  ///   mounted.
-  /// 3. null : `[_contextOf]` falls back to the global root.
-  Element? _contextOf(Route<dynamic> route) {
-    if (route is ModalRoute) {
-      final context = route.subtreeContext;
-      if (context is Element && context.mounted) return context;
-    }
-
-    final navigatorContext = route.navigator?.context;
-    if (navigatorContext is Element && navigatorContext.mounted) {
-      return navigatorContext;
-    }
-
-    return null;
   }
 }

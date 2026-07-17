@@ -4,12 +4,15 @@ import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_reporter.dart';
 
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 /// Internal contract for managing lifecycle, timers, and navigation state.
 @internal
 abstract interface class SessionRecorderController {
   void registerObserver(SessionNavigatorObserver observer);
   bool get isNavigationAttached;
+  void beginNavigation();
+  void finishNavigation();
 
   void startReporting();
   void stopReporting();
@@ -28,6 +31,10 @@ class NoOpController implements SessionRecorderController {
 
   @override
   void registerObserver(SessionNavigatorObserver o) {}
+  @override
+  void beginNavigation() {}
+  @override
+  void finishNavigation() {}
   @override
   void startReporting() {}
   @override
@@ -50,6 +57,8 @@ class ControllerImpl implements SessionRecorderController {
   ControllerImpl(this._engine);
 
   final List<SessionNavigatorObserver> _observers = [];
+  int _activeNavigationTransitions = 0;
+  bool _isDisposed = false;
 
   VoidCallback? _onCollectorInterrupt;
 
@@ -70,8 +79,40 @@ class ControllerImpl implements SessionRecorderController {
 
   @override
   void registerObserver(SessionNavigatorObserver observer) {
+    if (_isDisposed) return;
     _removeDisposedObservers();
     if (!_observers.contains(observer)) _observers.add(observer);
+  }
+
+  @override
+  void beginNavigation() {
+    if (_isDisposed) return;
+
+    final isFirstTransition = _activeNavigationTransitions == 0;
+    _activeNavigationTransitions += 1;
+
+    if (!isFirstTransition) return;
+
+    _engine.context.setCurrentlyNavigating();
+    interrupt();
+  }
+
+  @override
+  void finishNavigation() {
+    if (_isDisposed || _activeNavigationTransitions == 0) return;
+
+    _activeNavigationTransitions -= 1;
+    if (_activeNavigationTransitions != 0) return;
+
+    try {
+      _engine.context.captureTree(true);
+    } catch (error, stackTrace) {
+      SessionLogger.error(
+        "Navigation capture failed",
+        error,
+        stackTrace,
+      );
+    }
   }
 
   @override
@@ -98,6 +139,8 @@ class ControllerImpl implements SessionRecorderController {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _activeNavigationTransitions = 0;
     _onCollectorInterrupt = null;
     stopReporting();
     _reporter?.close();
