@@ -11,7 +11,10 @@ abstract interface class SessionRecorderContext {
   void start();
   void dispose();
 
-  void captureTree(bool comesFromNavigation);
+  void captureTree(
+    bool comesFromNavigation, {
+    bool bypassCooldown = false,
+  });
   ValueListenable<LomAbstract?>? get notifier;
   void setCurrentlyNavigating();
   void setScrollActive(bool isActive);
@@ -45,7 +48,10 @@ class NoOpContext implements SessionRecorderContext {
   @override
   void recordLom(LomAbstract? lom) {}
   @override
-  void captureTree(bool comesFromNavigation) {}
+  void captureTree(
+    bool comesFromNavigation, {
+    bool bypassCooldown = false,
+  }) {}
   @override
   ValueListenable<LomAbstract?>? get notifier => null;
   @override
@@ -120,8 +126,14 @@ class ContextImpl implements SessionRecorderContext {
   }
 
   @override
-  void captureTree(bool comesFromNavigation) =>
-      _detector?.captureTree(comesFromNavigation);
+  void captureTree(
+    bool comesFromNavigation, {
+    bool bypassCooldown = false,
+  }) =>
+      _detector?.captureTree(
+        comesFromNavigation,
+        bypassCooldown: bypassCooldown,
+      );
 
   @override
   void setCurrentlyNavigating() => _detector?.setCurrentlyNavigating();

@@ -39,36 +39,31 @@ class ScrollCollector {
       return false;
     }
 
-    final scrollMetrics = notification.metrics;
-
     if (notification is ScrollStartNotification) {
-      _handleScrollStart(notification.context, scrollMetrics);
+      _handleScrollStart(notification);
     } else if (notification is ScrollUpdateNotification) {
-      _handleScrollUpdate(notification.context, scrollMetrics);
+      _handleScrollUpdate(notification.context, notification.metrics);
     } else if (notification is ScrollEndNotification) {
-      _handleScrollEnd(notification.context, scrollMetrics);
+      _handleScrollEnd(notification.context, notification.metrics);
     }
 
     return false;
   }
 
-  void _handleScrollStart(
-    BuildContext? context,
-    ScrollMetrics scrollMetrics,
-  ) {
-    final rect = _captureViewportGeometry(context);
-    final offset = _effectiveOffset(scrollMetrics);
-    if (rect == null || offset == null) return;
+  void _handleScrollStart(ScrollStartNotification notification) {
+    _cancelPendingCapture();
 
     if (_isScrolling) {
       try {
-        _finishSession();
+        _finishSession(scheduleCapture: false);
       } catch (_) {
-        // Scroll collection stays fail-open.
+        _releaseSuppressionAndReset();
       }
     }
 
-    _cancelPendingCapture();
+    final rect = _captureViewportGeometry(notification.context);
+    final offset = _effectiveOffset(notification.metrics);
+    if (rect == null || offset == null) return;
 
     _isScrolling = true;
     _isValidated = false;
@@ -127,12 +122,47 @@ class ScrollCollector {
   Rect? _captureViewportGeometry(BuildContext? context) {
     if (context == null) return null;
 
-    final renderObject = context.findRenderObject();
-    final rect = MathUtils.transformRect(renderObject);
+    try {
+      final view = View.maybeOf(context);
+      if (view == null) return null;
 
-    if (rect == null || !rect.isFinite || rect.isEmpty) return null;
+      final devicePixelRatio = view.devicePixelRatio;
+      final physicalSize = view.physicalSize;
+      if (!devicePixelRatio.isFinite ||
+          devicePixelRatio <= 0 ||
+          !physicalSize.width.isFinite ||
+          !physicalSize.height.isFinite ||
+          physicalSize.width <= 0 ||
+          physicalSize.height <= 0) {
+        return null;
+      }
 
-    return rect;
+      final viewportWidth = physicalSize.width / devicePixelRatio;
+      final viewportHeight = physicalSize.height / devicePixelRatio;
+      if (!viewportWidth.isFinite ||
+          !viewportHeight.isFinite ||
+          viewportWidth <= 0 ||
+          viewportHeight <= 0) {
+        return null;
+      }
+
+      final renderObject = context.findRenderObject();
+      final rect = MathUtils.transformRect(renderObject);
+
+      if (rect == null || !rect.isFinite || rect.isEmpty) return null;
+
+      final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
+      final visibleRect = rect.intersect(viewport);
+      if (!visibleRect.isFinite ||
+          visibleRect.width <= 0 ||
+          visibleRect.height <= 0) {
+        return null;
+      }
+
+      return visibleRect;
+    } catch (_) {
+      return null;
+    }
   }
 
   Offset? _effectiveOffset(ScrollMetrics scrollMetrics) {
@@ -195,7 +225,7 @@ class ScrollCollector {
     _resetSessionState();
   }
 
-  void _finishSession() {
+  void _finishSession({bool scheduleCapture = true}) {
     var shouldCapture = false;
 
     try {
@@ -218,7 +248,7 @@ class ScrollCollector {
       _releaseSuppressionAndReset();
     }
 
-    if (shouldCapture) _scheduleStabilizedCapture();
+    if (shouldCapture && scheduleCapture) _scheduleStabilizedCapture();
   }
 
   void _releaseSuppressionAndReset() {
@@ -248,7 +278,7 @@ class ScrollCollector {
       _captureTimer = null;
 
       try {
-        _engine.context.captureTree(false);
+        _engine.context.captureTree(false, bypassCooldown: true);
       } catch (_) {
         // Tree capture stays fail-open.
       }

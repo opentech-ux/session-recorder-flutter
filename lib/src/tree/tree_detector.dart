@@ -145,11 +145,15 @@ class TreeDetector {
     notifier.dispose();
   }
 
-  void captureTree(bool comesFromNavigation) {
+  void captureTree(
+    bool comesFromNavigation, {
+    bool bypassCooldown = false,
+  }) {
     if (comesFromNavigation) _isNavigating = true;
 
     final now = DateTime.now();
     if (!comesFromNavigation &&
+        !bypassCooldown &&
         now.difference(_lastCaptureTime).inMilliseconds <
         kCooldownTime.inMilliseconds) {
       return;
