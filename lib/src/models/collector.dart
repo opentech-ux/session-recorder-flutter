@@ -15,12 +15,11 @@ class PointerTrace {
     this.isOrphanedPointer = false,
   }) : positions = positions ?? [];
 
-  TimedPosition get first => positions.isNotEmpty
-      ? positions.first
-      : TimedPosition(Offset.zero, viewport: Rect.zero);
-  TimedPosition get last => positions.isNotEmpty
-      ? positions.last
-      : TimedPosition(Offset.zero, viewport: Rect.zero);
+  /// Requires this trace to contain at least one real position.
+  TimedPosition get first => positions.first;
+
+  /// Requires this trace to contain at least one real position.
+  TimedPosition get last => positions.last;
 
   Offset get firstPosition => first.position;
   Offset get lastPosition => last.position;

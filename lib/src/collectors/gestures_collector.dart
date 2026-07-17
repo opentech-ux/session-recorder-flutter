@@ -64,6 +64,11 @@ class GestureCollector {
       return;
     }
 
+    if (pointerTrace.isEmpty) {
+      _updatePinchMetrics();
+      return;
+    }
+
     final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
     pointerTrace.add(
       position,
@@ -132,25 +137,14 @@ class GestureCollector {
     _lastTaps.removeWhere((tap) => tap.pointer == pointer);
 
     if (pointerTrace != null) {
-      if (pointerTrace.type == GesturesType.drag ||
-          pointerTrace.type == GesturesType.pinch) {
+      if (!pointerTrace.isEmpty &&
+          (pointerTrace.type == GesturesType.drag ||
+              pointerTrace.type == GesturesType.pinch)) {
         _emitExplorations(pointerTrace);
       }
 
       if (pointerTrace.type == GesturesType.pinch) {
-        final remainingPinchPointers = _pointers.values
-            .where((trace) => trace.type == GesturesType.pinch)
-            .toList();
-
-        if (remainingPinchPointers.length == 1) {
-          final remainingPointer = remainingPinchPointers.single;
-          _emitExplorations(remainingPointer);
-          _pointers[remainingPointer.pointer] = remainingPointer
-              .splitForTransition(
-                newType: GesturesType.tap,
-                isOrphanedPointer: true,
-              );
-        }
+        _preserveRemainingPinchPointer();
       }
     }
 
@@ -167,6 +161,7 @@ class GestureCollector {
     }
 
     for (var p in _pointers.values) {
+      if (p.isEmpty) continue;
       _evaluatePointer(p);
     }
 
@@ -216,6 +211,21 @@ class GestureCollector {
 
   /// Update the Pinch Metrics Baseline
   void _updatePinchMetrics() {
+    var removedPinchPointer = false;
+    final emptyPointers = _pointers.entries
+        .where((entry) => entry.value.isEmpty)
+        .toList();
+
+    for (final entry in emptyPointers) {
+      _pointers.remove(entry.key);
+      _ignoredPointers.add(entry.key);
+      if (entry.value.type == GesturesType.pinch) {
+        removedPinchPointer = true;
+      }
+    }
+
+    if (removedPinchPointer) _preserveRemainingPinchPointer();
+
     if (_pointers.length >= 2) {
       _pinchMetrics = PinchMetricsBaseline(
         initialPositions: _pointers.map(
@@ -238,6 +248,14 @@ class GestureCollector {
     final PointerTrace? pointerTrace = _pointers.remove(pointer);
 
     if (pointerTrace == null) return;
+
+    if (pointerTrace.isEmpty) {
+      if (pointerTrace.type == GesturesType.pinch) {
+        _preserveRemainingPinchPointer();
+      }
+      _updatePinchMetrics();
+      return;
+    }
 
     final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
     pointerTrace.add(
@@ -283,13 +301,16 @@ class GestureCollector {
     // * DOUBLE TAP
     if (_evaluateDoubleTap(pointerTrace)) return;
 
-    _lastTaps.add(pointerTrace);
-    if (_lastTaps.length > 10) _lastTaps.removeAt(0);
+    if (!pointerTrace.isEmpty) {
+      _lastTaps.add(pointerTrace);
+      if (_lastTaps.length > 10) _lastTaps.removeAt(0);
+    }
 
     _emitAction(pointerTrace);
   }
 
   bool _evaluateDoubleTap(PointerTrace pointerTrace) {
+    _lastTaps.removeWhere((tap) => tap.isEmpty);
     if (_lastTaps.isEmpty) return false;
 
     final currentPosition = pointerTrace.lastPosition;
@@ -361,6 +382,23 @@ class GestureCollector {
     }
 
     _updatePinchMetrics();
+  }
+
+  void _preserveRemainingPinchPointer() {
+    final remainingPinchPointers = _pointers.values
+        .where(
+          (trace) => trace.type == GesturesType.pinch && !trace.isEmpty,
+        )
+        .toList();
+
+    if (remainingPinchPointers.length != 1) return;
+
+    final remainingPointer = remainingPinchPointers.single;
+    _emitExplorations(remainingPointer);
+    _pointers[remainingPointer.pointer] = remainingPointer.splitForTransition(
+      newType: GesturesType.tap,
+      isOrphanedPointer: true,
+    );
   }
 
   void _emitExplorations(PointerTrace pointerTrace) {
