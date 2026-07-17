@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
@@ -9,20 +11,28 @@ import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 /// Collects scroll position data and emits one [ScrollSessionEndEvent] per
 /// gesture.
 class ScrollCollector {
+  static const double _movementTolerance = 1.0;
+  static const Duration _captureStabilization = Duration(milliseconds: 600);
+
   final SessionRecorderEngineInternal _engine;
 
   ScrollCollector({SessionRecorderEngineInternal? engine})
     : _engine = engine ?? SessionRecorder.engine;
 
   bool _isScrolling = false;
+  bool _isValidated = false;
+  bool _isDisposed = false;
+  ScrollExplorationEvent? _provisionalStart;
   Rect? _activeViewportBounds;
+  Offset? _initialOffset;
+  Offset? _activeOffset;
+  Timer? _captureTimer;
 
   /// Handles incoming [ScrollNotification] events to detect and record scroll
   /// interactions.
   bool handleScrollNotification(ScrollNotification notification) {
-    final context = notification.context;
-
-    if (context == null || notification is OverscrollNotification) return false;
+    if (_isDisposed) return false;
+    if (notification is OverscrollNotification) return false;
     if (notification is! ScrollStartNotification &&
         notification is! ScrollUpdateNotification &&
         notification is! ScrollEndNotification) {
@@ -31,106 +41,223 @@ class ScrollCollector {
 
     final scrollMetrics = notification.metrics;
 
-    final rect = _captureViewportGeometry(context, scrollMetrics);
-    if (rect == null) return false;
-
     if (notification is ScrollStartNotification) {
-      _isScrolling = true;
-      _activeViewportBounds = rect;
-
-      _engine.context.recordExploration(
-        ScrollExplorationEvent(
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          viewport: rect,
-          phase: ScrollPhase.start,
-          lomRef: _engine.context.currentLomRef ?? '',
-        ),
-      );
+      _handleScrollStart(notification.context, scrollMetrics);
     } else if (notification is ScrollUpdateNotification) {
-      _activeViewportBounds = rect;
+      _handleScrollUpdate(notification.context, scrollMetrics);
     } else if (notification is ScrollEndNotification) {
-      _isScrolling = false;
-      _activeViewportBounds = null;
-
-      _engine.context.recordExploration(
-        ScrollExplorationEvent(
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          viewport: rect,
-          phase: ScrollPhase.end,
-          lomRef: _engine.context.currentLomRef ?? '',
-        ),
-      );
-
-      _clearScrollViewport();
+      _handleScrollEnd(notification.context, scrollMetrics);
     }
 
     return false;
   }
 
-  /// Computes and updates the current viewport rectangle for a scrollable
-  /// position.
-  Rect? _captureViewportGeometry(
-    BuildContext context,
+  void _handleScrollStart(
+    BuildContext? context,
     ScrollMetrics scrollMetrics,
   ) {
-    final renderObject = context.findRenderObject();
-    final physicalRect = MathUtils.transformRect(renderObject);
+    final rect = _captureViewportGeometry(context);
+    final offset = _effectiveOffset(scrollMetrics);
+    if (rect == null || offset == null) return;
 
-    if (physicalRect == null) return null;
+    if (_isScrolling) {
+      try {
+        _finishSession();
+      } catch (_) {
+        // Scroll collection stays fail-open.
+      }
+    }
+
+    _cancelPendingCapture();
+
+    _isScrolling = true;
+    _isValidated = false;
+    _activeViewportBounds = rect;
+    _initialOffset = offset;
+    _activeOffset = offset;
+    _provisionalStart = ScrollExplorationEvent(
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      viewport: rect,
+      phase: ScrollPhase.start,
+      offset: offset,
+      lomRef: _engine.context.currentLomRef ?? '',
+    );
+    _engine.context.setScrollActive(true);
+  }
+
+  void _handleScrollUpdate(
+    BuildContext? context,
+    ScrollMetrics scrollMetrics,
+  ) {
+    if (!_isScrolling) return;
+
+    final rect = _captureViewportGeometry(context);
+    if (rect != null) _activeViewportBounds = rect;
+
+    final offset = _effectiveOffset(scrollMetrics);
+    if (offset == null) return;
+
+    _activeOffset = offset;
+    _validateMovement(offset);
+  }
+
+  void _handleScrollEnd(
+    BuildContext? context,
+    ScrollMetrics scrollMetrics,
+  ) {
+    if (!_isScrolling) return;
 
     try {
-      double contentWidth = physicalRect.width;
-      double contentHeight = physicalRect.height;
-      double contentLeft = physicalRect.left;
-      double contentTop = physicalRect.top;
+      final rect = _captureViewportGeometry(context);
+      if (rect != null) _activeViewportBounds = rect;
 
-      if (scrollMetrics.axis == Axis.vertical) {
-        contentHeight =
-            scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
-        contentTop = physicalRect.top - scrollMetrics.pixels;
-      } else {
-        contentWidth =
-            scrollMetrics.maxScrollExtent + scrollMetrics.viewportDimension;
-        contentLeft = physicalRect.left - scrollMetrics.pixels;
+      final offset = _effectiveOffset(scrollMetrics);
+      if (offset != null) {
+        _activeOffset = offset;
+        _validateMovement(offset);
       }
 
-      final virtualRect = Rect.fromLTWH(
-        contentLeft,
-        contentTop,
-        contentWidth,
-        contentHeight,
-      );
+      _finishSession();
+    } catch (_) {
+      _releaseSuppressionAndReset();
+    }
+  }
 
-      _engine.context.setScrollPhysicalBounds(physicalRect);
-      _engine.context.setScrollVirtualCanvas(virtualRect);
+  /// Computes the visible viewport rectangle for a scrollable.
+  Rect? _captureViewportGeometry(BuildContext? context) {
+    if (context == null) return null;
 
-      return virtualRect;
-    } catch (e) {
+    final renderObject = context.findRenderObject();
+    final rect = MathUtils.transformRect(renderObject);
+
+    if (rect == null || !rect.isFinite || rect.isEmpty) return null;
+
+    return rect;
+  }
+
+  Offset? _effectiveOffset(ScrollMetrics scrollMetrics) {
+    try {
+      final pixels = scrollMetrics.pixels;
+      final min = scrollMetrics.minScrollExtent;
+      final max = scrollMetrics.maxScrollExtent;
+
+      if (pixels.isNaN || min.isNaN || max.isNaN || min > max) return null;
+
+      final effectivePixels = pixels.clamp(min, max).toDouble();
+      if (!effectivePixels.isFinite) return null;
+
+      return scrollMetrics.axis == Axis.horizontal
+          ? Offset(effectivePixels, 0)
+          : Offset(0, effectivePixels);
+    } catch (_) {
       return null;
     }
   }
 
+  void _validateMovement(Offset offset) {
+    if (_isValidated) return;
+
+    final initialOffset = _initialOffset;
+    final provisionalStart = _provisionalStart;
+    if (initialOffset == null || provisionalStart == null) return;
+
+    if ((offset - initialOffset).distance <= _movementTolerance) return;
+
+    _engine.context.recordExploration(provisionalStart);
+    _isValidated = true;
+  }
+
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
-    if (_isScrolling && _activeViewportBounds != null) {
-      _engine.context.recordExploration(
-        ScrollExplorationEvent(
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          viewport: _activeViewportBounds!,
-          phase: ScrollPhase.end,
-          lomRef: _engine.context.currentLomRef ?? '',
-        ),
-      );
+    if (_isDisposed || !_isScrolling) return;
 
-      _isScrolling = false;
-      _activeViewportBounds = null;
-      _clearScrollViewport();
+    try {
+      _finishSession();
+    } catch (_) {
+      _releaseSuppressionAndReset();
     }
   }
 
-  /// Clears stale scroll geometry after the scroll session ends.
-  void _clearScrollViewport() {
-    _engine.context.setScrollPhysicalBounds(Rect.zero);
-    _engine.context.setScrollVirtualCanvas(Rect.zero);
+  void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _cancelPendingCapture();
+
+    if (_isScrolling) {
+      try {
+        _engine.context.setScrollActive(false);
+      } finally {
+        _resetSessionState();
+      }
+      return;
+    }
+
+    _resetSessionState();
+  }
+
+  void _finishSession() {
+    var shouldCapture = false;
+
+    try {
+      final viewport = _activeViewportBounds;
+      final offset = _activeOffset;
+
+      if (_isValidated && viewport != null && offset != null) {
+        _engine.context.recordExploration(
+          ScrollExplorationEvent(
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            viewport: viewport,
+            phase: ScrollPhase.end,
+            offset: offset,
+            lomRef: _engine.context.currentLomRef ?? '',
+          ),
+        );
+        shouldCapture = true;
+      }
+    } finally {
+      _releaseSuppressionAndReset();
+    }
+
+    if (shouldCapture) _scheduleStabilizedCapture();
+  }
+
+  void _releaseSuppressionAndReset() {
+    try {
+      _engine.context.setScrollActive(false);
+    } finally {
+      _resetSessionState();
+    }
+  }
+
+  void _resetSessionState() {
+    _isScrolling = false;
+    _isValidated = false;
+    _provisionalStart = null;
+    _activeViewportBounds = null;
+    _initialOffset = null;
+    _activeOffset = null;
+  }
+
+  void _scheduleStabilizedCapture() {
+    if (_isDisposed) return;
+    _cancelPendingCapture();
+
+    late final Timer timer;
+    timer = Timer(_captureStabilization, () {
+      if (_isDisposed || !identical(_captureTimer, timer)) return;
+      _captureTimer = null;
+
+      try {
+        _engine.context.captureTree(false);
+      } catch (_) {
+        // Tree capture stays fail-open.
+      }
+    });
+    _captureTimer = timer;
+  }
+
+  void _cancelPendingCapture() {
+    _captureTimer?.cancel();
+    _captureTimer = null;
   }
 }

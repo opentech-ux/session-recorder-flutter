@@ -91,6 +91,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   @override
   void dispose() {
     _dispatchPendingEvents();
+    _scrolls.dispose();
     final captureElement = _captureElement;
     if (captureElement != null) {
       TreeDetector.clearCaptureElement(captureElement);

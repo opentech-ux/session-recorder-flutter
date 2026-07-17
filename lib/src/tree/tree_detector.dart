@@ -39,6 +39,7 @@ class TreeDetector {
 
   bool _isBuilded = false;
   bool _isNavigating = false;
+  bool _isScrollActive = false;
   bool _isNotifierLocked = false;
 
   /// Timer used to handle debouncing of widget tree captures.
@@ -59,6 +60,14 @@ class TreeDetector {
 
   @pragma('vm:prefer-inline')
   void setCurrentlyNavigating() => _isNavigating = true;
+
+  void setScrollActive(bool isActive) {
+    _isScrollActive = isActive;
+    if (isActive) {
+      _debounce?.cancel();
+      _debounce = null;
+    }
+  }
 
   /// Starts watching for tree changes.
   void detect() {
@@ -85,13 +94,13 @@ class TreeDetector {
     void onBuildScheduled() {
       _lastOnBuildScheduled?.call();
 
-      if (!_isRunning || _isNavigating) return;
+      if (!_isRunning || _isNavigating || _isScrollActive) return;
 
       if (_isNotifierLocked) return;
 
       _debounce?.cancel();
       _debounce = Timer(kDebounceTime, () {
-        if (!_isRunning || _isNavigating) return;
+        if (!_isRunning || _isNavigating || _isScrollActive) return;
 
         captureTree(false);
       });
@@ -122,6 +131,7 @@ class TreeDetector {
 
     _isBuilded = false;
     _isNavigating = false;
+    _isScrollActive = false;
     _isNotifierLocked = false;
     _captureElement = null;
     if (identical(_activeDetector, this)) _activeDetector = null;
