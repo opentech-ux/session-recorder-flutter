@@ -6,6 +6,7 @@ import 'package:session_recorder_flutter/src/observers/session_lifecycle_observe
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
+import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// {@template session_recorder_widget}
 /// Root widget that activates behavior tracking for the whole app.
@@ -69,6 +70,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     with WidgetsBindingObserver, SessionLifecycleObserver {
   late final GestureCollector _gestures;
   late final ScrollCollector _scrolls;
+  Element? _captureElement;
 
   @override
   void initState() {
@@ -81,13 +83,19 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     SessionRecorder.engine.controller.onInterrupt(_dispatchPendingEvents);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _verifyObserver();
+      if (!mounted) return;
+      SessionRecorder.engine.context.captureTree(false);
     });
   }
 
   @override
   void dispose() {
     _dispatchPendingEvents();
+    final captureElement = _captureElement;
+    if (captureElement != null) {
+      TreeDetector.clearCaptureElement(captureElement);
+      _captureElement = null;
+    }
     SessionRecorder.engine.controller.onInterrupt(null);
     SessionRecorder.engine.controller.dispose();
     SessionRecorder.engine.context.dispose();
@@ -102,47 +110,17 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     _scrolls.forceRecordCollector();
   }
 
-  /// Verifies that at least one `[SessionNavigatorObserver]` is attached
-  /// to a Navigator after the first frame.
-  void _verifyObserver() {
-    if (SessionRecorder.engine.controller.isNavigationAttached) return;
+  Widget _captureBoundary(BuildContext context) {
+    final element = context as Element;
+    final previous = _captureElement;
 
-    FlutterError.reportError(
-      FlutterErrorDetails(
-        exception: FlutterError(
-          'SessionNavigatorObserver was not attached to any Navigator.',
-        ),
-        library: 'session_recorder_flutter',
-        context: ErrorDescription(
-          'checking SessionNavigatorObserver attachment',
-        ),
-        informationCollector: () => <DiagnosticsNode>[
-          ErrorDescription(
-            'Pass the observer to MaterialApp.navigatorObservers:',
-          ),
-          ErrorHint(
-            '  SessionRecorder.observer(\n'
-            '    builder: (observer) => MaterialApp(\n'
-            '      navigatorObservers: [observer],  // ← required\n'
-            '      home: ...,\n'
-            '    ),\n'
-            '  );',
-          ),
-          ErrorDescription('\nOr if you are using GoRouter Navigator.'),
-          ErrorDescription('Pass the observer to GoRouter.observers:'),
-          ErrorHint(
-            '  SessionRecorderWidget(\n'
-            '    child: MaterialApp.router(\n'
-            '      routeConfig: GoRouter(\n'
-            '        observers: [SessionNavigatorObserver()], // ← required\n'
-            '      ),\n'
-            '      home: ...,\n'
-            '    ),\n'
-            '  );',
-          ),
-        ],
-      ),
-    );
+    if (!identical(previous, element)) {
+      if (previous != null) TreeDetector.clearCaptureElement(previous);
+      _captureElement = element;
+      TreeDetector.registerCaptureElement(element);
+    }
+
+    return widget.child;
   }
 
   @override
@@ -155,7 +133,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
         onPointerMove: _gestures.onPointerMove,
         onPointerUp: _gestures.onPointerUp,
         onPointerCancel: _gestures.onPointerCancel,
-        child: widget.child,
+        child: Builder(builder: _captureBoundary),
       ),
     );
 

@@ -11,6 +11,8 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
 /// Watches for widget tree structural changes and captures snapshots.
 
 class TreeDetector {
+  static TreeDetector? _activeDetector;
+
   final SessionRecorderEngine _engine;
   final LomTreeInspector _inspector;
 
@@ -19,12 +21,21 @@ class TreeDetector {
       _inspector = LomTreeInspector();
 
   bool _isRunning = false;
+  Element? _captureElement;
 
   @pragma('vm:prefer-inline')
   bool get isRunning => _isRunning;
 
-  @pragma('vm:prefer-inline')
-  Element? get currentRouteElement => _engine.context.currentRouteElement;
+  static void registerCaptureElement(Element element) {
+    _activeDetector?._captureElement = element;
+  }
+
+  static void clearCaptureElement(Element element) {
+    final detector = _activeDetector;
+    if (detector != null && identical(detector._captureElement, element)) {
+      detector._captureElement = null;
+    }
+  }
 
   bool _isBuilded = false;
   bool _isNavigating = false;
@@ -53,6 +64,7 @@ class TreeDetector {
   void detect() {
     if (_isRunning) return;
     _isRunning = true;
+    _activeDetector = this;
     _buildOrDefer();
   }
 
@@ -111,6 +123,8 @@ class TreeDetector {
     _isBuilded = false;
     _isNavigating = false;
     _isNotifierLocked = false;
+    _captureElement = null;
+    if (identical(_activeDetector, this)) _activeDetector = null;
 
     // Keep forwarding intact if another callback wrapped ours after install.
     if (didRestoreHook || buildOwner == null) {
@@ -132,11 +146,14 @@ class TreeDetector {
     }
 
     try {
-      final element = _getSafeElement();
+      final element = _captureElement;
 
-      if (element == null) {
+      if (element == null || !element.mounted) {
+        if (element != null && identical(_captureElement, element)) {
+          _captureElement = null;
+        }
         SessionLogger.warning(
-          "No route could be found to capture. Provide the `SessionNavigatorObserver`",
+          "The capture subtree is not available or is no longer mounted",
         );
         return;
       }
@@ -163,32 +180,6 @@ class TreeDetector {
     } finally {
       if (comesFromNavigation) _isNavigating = false;
     }
-  }
-
-  Element? _getSafeElement() {
-    if (currentRouteElement != null) return currentRouteElement;
-
-    Element? fallbackElement;
-
-    WidgetsBinding.instance.rootElement?.visitChildren((Element rootChild) {
-      void findNavigator(Element element) {
-        if (element.widget is Navigator) {
-          fallbackElement = element;
-          return;
-        }
-        element.visitChildren(findNavigator);
-      }
-
-      findNavigator(rootChild);
-    });
-
-    if (fallbackElement != null) {
-      SessionLogger.warning(
-        "The brute-force fallback was used to find the element. Please provide the `SessionNavigatorObserver` instance. For more information go to the GitHub's Repository",
-      );
-    }
-
-    return fallbackElement;
   }
 
   // static void _printTree(List<Root> nodes, int indent) {
