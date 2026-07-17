@@ -10,59 +10,34 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// {@template session_record_service}
-/// Main tracker coordinator for session interaction recording and tree capture.
+/// Public entry point for session interaction recording and tree capture.
 ///
-/// This class is the primary entry point of the package and the only object
-/// consumers are intended to call `[init()]` and `[configure()]` method from
-/// `[main()]`.
+/// Call [init] once from `main`, before `runApp`, then wrap the application
+/// subtree with `SessionRecorderWidget`.
 ///
-/// {@template session_record}
-/// ### Example usage
+/// ### Complete setup
+///
 /// ```dart
 /// void main() {
-///   // Important to add it before calling init method
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
-///   final config = SessionRecorderConfig(
-///     endpoint: 'https://demo-client.ux-key.com/endpoint',
-///     debugLog: true,
-///   );
+///   final config = SessionRecorderConfig();
 ///
 ///   SessionRecorder.init(config);
 ///
-///   runApp(MyApp());
-/// }
-/// ```
-///
-/// Or also could be as :
-/// ```dart
-/// void main() {
-///   // Important to add it before calling init method
-///   WidgetsFlutterBinding.ensureInitialized();
-///
-///   SessionRecorder.init(
-///     SessionRecorderConfig(
-///       endpoint: 'https://demo-client.ux-key.com/endpoint',
-///       debugLog: true,
+///   runApp(
+///     SessionRecorderWidget(
+///       child: const App(),
 ///     ),
 ///   );
-///
-///   runApp(MyApp());
 /// }
 /// ```
 ///
-/// There is **no need to wrap it inside**
-/// `[WidgetsBinding.instance.addPostFrameCallback()]`, since `[init()]`
-///    already ensures the call is deferred until the first frame is rendered.
-/// {@endtemplate}
-///
-/// This method performs several heavy operations.
-/// Therefore, it **must not be called from any widget build method,
-/// hot path, or frequent callback**, doing so may cause UI freezes
-/// or dropped frames.
-///
-/// Call `[init()]` **only once**, and **only after** the app’s root widget
-/// (`MaterialApp`, `CupertinoApp`, etc.) has been fully mounted.
+/// `WidgetsFlutterBinding.ensureInitialized()` prepares Flutter. [init]
+/// starts the engine, context, reporting, and inactivity tracking.
+/// `SessionRecorderWidget` installs the collectors, provides the application
+/// subtree used for captures, and requests one initial capture after the first
+/// frame. It does not start the context or reporting again.
 ///
 /// {@endtemplate}
 ///
@@ -89,23 +64,20 @@ class SessionRecorder {
   @internal
   static SessionRecorderEngineInternal get engine => _engine;
 
-  /// Initializes the session record.
-  ///
-  /// This method performs the initial setup required for the widget-tree
-  /// capture service:
-  ///
-  ///  - Ensure to call it from application startup in `[main()]`.
-  ///  - Write `[WidgetsFlutterBinding.ensureInitialized();]` before this method.
-  ///  - The scheduled listeners run after frames; avoid calling `[init()]` during
-  ///  an unstable `[build()]`.
-  ///  - Only set it **once**.
-  ///
-  /// {@macro session_record}
-  ///
-  /// See also
-  ///  - `[SessionRecorderConfig]`: More information on what can be shared.
-  ///
-  /// Throws `[ArgumentError]` if `[SessionRecorderConfig]` are invalid.
+  /// Initializes session recording.
+///
+  /// Call this method once from `main`, after
+  /// `WidgetsFlutterBinding.ensureInitialized()` and before `runApp`.
+///
+  /// This starts the engine, context, reporting, and inactivity tracking.
+  /// The initial capture after the first frame is requested by
+  /// `SessionRecorderWidget`; applications do not need to defer [init].
+///
+  /// Configuration and initialization errors are caught internally. When
+  /// initialization fails, the SDK continues in no-op mode.
+///
+/// See also
+///  - `[SessionRecorderConfig]`: More information on what can be shared.
   static void init(SessionRecorderConfig config) {
     if (_engine.isEnabled) {
       SessionLogger.warning("SessionRecorder already initialized");

@@ -9,51 +9,46 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// {@template session_recorder_widget}
-/// Root widget that activates behavior tracking for the whole app.
-///
-/// You should use `[SessionRecorderWidget]` as a wrapper to `[MaterialApp]`.
-///
-/// The widget itself does not contain heavy logic; instead, it collects the
-/// data to internal collectors such as `[GestureCollector]` and
-/// `[ScrollCollector]`.
-///
-/// ## Setup — choose one based on your router
-///
-/// ### 1. Standard Flutter Navigator
-///
-/// Wrap the `[MaterialApp]` with the `.observer` method to has already the
-/// `[SessionNavigatorObserver]` instance and pass it to `navigatorObservers`
-/// ```dart
-/// return SessionRecorderWidget.observer(
-///   builder: (observer) => MaterialApp(
-///     navigatorObservers: [observer],
-///     home: const HomeScreen(),
-///   ),
-/// );
-/// ```
-/// ### 2. No factory method
+/// Root wrapper that activates behavior tracking for the application subtree.
 ///
 /// ```dart
-/// return SessionRecorderWidget(
-///   child: MaterialApp(
-///     navigatorObservers: [SessionNavigatorObserver()],
-///     home: const HomeScreen(),
-///   ),
+/// SessionRecorderWidget(
+///   child: const App(),
 /// );
 /// ```
 ///
-/// __IMPORTANT:__ This widget must be set **only once** in the entire app.
+/// It installs the pointer and scroll collectors, provides the stable subtree
+/// used by tree capture, and requests exactly one initial capture after the
+/// first frame. Later captures caused by UI mutations remain managed by the
+/// internal tree detector.
 ///
-/// Adding multiple `[SessionRecorderWidget]` instances can lead to duplicated
-/// event captures, inconsistent state, and performance degradation.
+/// This widget does not initialize or restart the engine, context, or
+/// reporting. Call `SessionRecorder.init` before `runApp`.
+///
+/// Install this wrapper only once. [SessionNavigatorObserver] is optional and
+/// is not required for the initial capture, gestures, scrolls, or ordinary UI
+/// mutations.
 /// {@endtemplate}
 class SessionRecorderWidget extends StatefulWidget {
   final Widget child;
 
-  /// {@macro session_recorder_widget}
+  /// Creates the root wrapper for [child].
   const SessionRecorderWidget({super.key, required this.child});
 
-  /// {@macro session_recorder_widget}
+  /// Creates an optional [SessionNavigatorObserver] and exposes it to
+  /// [builder] as a convenience for `MaterialApp.navigatorObservers`.
+  ///
+  /// ```dart
+  /// SessionRecorderWidget.observer(
+  ///   builder: (observer) => MaterialApp(
+  ///     navigatorObservers: [observer],
+  ///     home: const HomeScreen(),
+  ///   ),
+  /// );
+  /// ```
+  ///
+  /// This factory is not required for initial capture, gestures, scrolls, or
+  /// ordinary UI mutations.
   static Widget observer({
     Key? key,
     required Widget Function(SessionNavigatorObserver observer) builder,

@@ -3,18 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_observer}
-/// Listens to navigation events and schedules a widget tree capture once
-/// each route transition has fully settled.
+/// Optional observer that reports navigation transitions to the session
+/// recorder and coordinates a capture after those transitions have settled.
 ///
-/// ### Standard Navigator
+/// Add it only when precise post-navigation captures are wanted:
+///
 /// ```dart
-/// SessionRecorder.observer(
-///   builder: (observer) => MaterialApp(
-///     navigatorObservers: [observer],
-///     home: const HomeScreen(),
-///   ),
-/// );
+/// MaterialApp(
+///   navigatorObservers: [
+///     SessionNavigatorObserver(),
+///   ],
+///   home: const HomeScreen(),
+/// )
 /// ```
+///
+/// It is not required for initial capture, gestures, scrolls, or ordinary UI
+/// mutations.
 ///
 /// ### GoRouter with ShellRoutes
 /// You may attach multiple observers (e.g. when using multiple `[ShellRoute]`

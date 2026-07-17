@@ -3,16 +3,13 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 /// Configuration for the session context.
 ///
-/// Pass an instance to `[SessionRecorder.configure]` before calling
-/// `[SessionRecorderWidget]` or starting the app.
+/// Pass an instance to `SessionRecorder.init` before `runApp`.
 ///
 /// ### Example
 ///
 /// ```dart
-///   final params = SessionRecorderConfig(
-///       endpoint: 'https://demo-client.ux-key.com/endpoint',
-///       debugLog: true,
-///   );
+/// final config = SessionRecorderConfig(endpoint: 'https://demo-client.ux-key.com endpoint');
+/// SessionRecorder.init(config);
 /// ```
 /// See also
 ///  - `[SessionLogger]`: which defines the logging mechanism for the SDK's
