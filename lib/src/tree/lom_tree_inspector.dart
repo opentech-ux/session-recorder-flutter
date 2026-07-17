@@ -215,7 +215,6 @@ class LomTreeInspector {
 class _RootCounter {
   int _value = 0;
   int next() => ++_value;
-  void clear() => _value = 0;
 
   @override
   String toString() => "value: $_value";

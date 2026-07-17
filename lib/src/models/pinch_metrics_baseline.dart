@@ -19,12 +19,6 @@ class PinchMetricsBaseline {
     required this.initialPositions,
   });
 
-  factory PinchMetricsBaseline.zero() => PinchMetricsBaseline(
-    centroid: null,
-    avgDistance: null,
-    initialPositions: null,
-  );
-
   @override
   String toString() =>
       'PinchMetricsBaseline(centroid: $centroid, avgDistance: $avgDistance, initialPositions: $initialPositions)';

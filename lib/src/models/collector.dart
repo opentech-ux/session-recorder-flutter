@@ -92,23 +92,3 @@ class TimedPosition {
       'TimedPosition(timestamp: $timestamp, position: $position, viewport: $viewport, lomRef: $lomRef)';
 }
 
-@immutable
-class ViewportPosition {
-  final int timestamp;
-  final Rect viewport;
-
-  const ViewportPosition(this.timestamp, this.viewport);
-
-  @override
-  String toString() =>
-      'ViewportPosition(timestamp: $timestamp, viewport: $viewport)';
-}
-
-class ScrollSession {
-  final String id;
-  final List<double> positions;
-
-  ScrollSession({required double startPixel})
-    : id = DateTime.now().millisecondsSinceEpoch.toRadixString(36),
-      positions = [startPixel];
-}

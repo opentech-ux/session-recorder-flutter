@@ -10,6 +10,4 @@ enum GesturesType {
   scrollEnd,
 }
 
-enum ScrollPhase { start, update, end }
-
-enum NavigationType { none, push, pop, replace, remove }
+enum ScrollPhase { start, end }

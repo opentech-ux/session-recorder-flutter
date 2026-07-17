@@ -6,17 +6,11 @@ const double touchSlop = 8.0;
 /// The total pinch constant
 const double pinchSlop = 20.0;
 
-/// The total movement constant
-final double doubleTapTouchSlop = kDoubleTapTouchSlop;
-
 /// The maximum duration for a second touch
 final Duration doubleTapTimeout = kDoubleTapTimeout;
 
 /// The time before a long press gesture attempts to win.
 final Duration longPressTimeout = kLongPressTimeout;
-
-/// Minimum of pixels if scroll has moved
-final double scrollSlop = 10.0;
 
 const Duration kDebounceTime = Duration(milliseconds: 300);
 const Duration kCooldownTime = Duration(milliseconds: 400);
