@@ -26,66 +26,94 @@ class LomTreeInspector {
     Element? element, {
     required bool comesFromNavigation,
   }) {
-    if (element == null) return null;
+    if (element == null || !element.mounted) return null;
 
-    if (!element.mounted) return null;
+    try {
+      final view = View.maybeOf(element);
+      if (view == null) return null;
 
-    final counter = _RootCounter();
-    final children = _visitElement(element, config: _config, counter: counter);
+      final devicePixelRatio = view.devicePixelRatio;
+      final physicalSize = view.physicalSize;
 
-    final Rect? rect = MathUtils.transformRect(element.renderObject);
+      if (!devicePixelRatio.isFinite ||
+          devicePixelRatio <= 0 ||
+          !physicalSize.width.isFinite ||
+          !physicalSize.height.isFinite ||
+          physicalSize.width <= 0 ||
+          physicalSize.height <= 0) {
+        return null;
+      }
 
-    if (rect == null) return null;
+      final viewportWidth = physicalSize.width / devicePixelRatio;
+      final viewportHeight = physicalSize.height / devicePixelRatio;
 
-    final Root root = Root(
-      id: counter.next(),
-      objectId: element.renderObject.hashCode.toRadixString(16),
-      widgetType: element.widget.runtimeType.toString(),
-      renderType: element.renderObject.runtimeType.toString(),
-      box: rect,
-      children: children,
-    );
+      if (!viewportWidth.isFinite ||
+          !viewportHeight.isFinite ||
+          viewportWidth <= 0 ||
+          viewportHeight <= 0) {
+        return null;
+      }
 
-    final signature = LomTreeHasher.signatureRoots([root]);
-    final isSameAsLast = signature == _lastSignature;
+      final viewport = Rect.fromLTWH(
+        0,
+        0,
+        viewportWidth,
+        viewportHeight,
+      );
+      final counter = _RootCounter();
+      final roots = _visitElement(
+        element,
+        viewport: viewport,
+        config: _config,
+        counter: counter,
+      );
 
-    if (isSameAsLast && !comesFromNavigation) {
+      if (roots.length != 1) return null;
+      final root = roots.single;
+
+      final signature = LomTreeHasher.signatureRoots([root]);
+      final isSameAsLast = signature == _lastSignature;
+
+      if (isSameAsLast && !comesFromNavigation) {
+        final cacheId = _findCachedLomId(signature);
+        if (cacheId == null) return null;
+
+        // Refresh local hit-test data without adding network noise.
+        return LocalLomRef(
+          id: cacheId,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          root: root,
+        );
+      }
+
       final cacheId = _findCachedLomId(signature);
-      if (cacheId == null) return null;
+      if (cacheId != null) {
+        _lastSignature = signature;
 
-      // Refresh local hit-test data without adding network noise.
-      return LocalLomRef(
-        id: cacheId,
+        return LomRef(
+          id: cacheId,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          root: root,
+        );
+      }
+
+      final String lomId = Uuid().v7();
+
+      final Lom lom = Lom(
+        id: lomId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
+        width: viewportWidth.toInt(),
+        height: viewportHeight.toInt(),
         root: root,
       );
-    }
 
-    final cacheId = _findCachedLomId(signature);
-    if (cacheId != null) {
+      _rememberSignature(signature, lomId);
       _lastSignature = signature;
 
-      return LomRef(
-        id: cacheId,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        root: root,
-      );
+      return lom;
+    } catch (_) {
+      return null;
     }
-
-    final String lomId = Uuid().v7();
-
-    final Lom lom = Lom(
-      id: lomId,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-      width: root.box.width.toInt(),
-      height: root.box.height.toInt(),
-      root: root,
-    );
-
-    _rememberSignature(signature, lomId);
-    _lastSignature = signature;
-
-    return lom;
   }
 
   /// Keeps signature cache bounded during long sessions.
@@ -107,6 +135,7 @@ class LomTreeInspector {
 
   static List<Root> _visitElement(
     Element element, {
+    required Rect viewport,
     required LomTreeConfig config,
     required _RootCounter counter,
   }) {
@@ -119,34 +148,42 @@ class LomTreeInspector {
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
     if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, viewport, config, counter);
     }
 
     if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, viewport, config, counter);
     }
 
     if (!hasImportanteSemantic &&
         (widgetType.startsWith('_') ||
             config.ignoreAt.any((w) => widgetType.contains(w)))) {
-      return _visitChildrenFlat(element, config, counter);
+      return _visitChildrenFlat(element, viewport, config, counter);
     }
 
     final renderObject = element.renderObject;
     final Rect? rect = MathUtils.transformRect(renderObject);
 
-    if (rect == null || (rect.width == 0 && rect.height == 0)) {
-      return _visitChildrenFlat(element, config, counter);
+    if (rect == null || rect.width <= 0 || rect.height <= 0) {
+      return _visitChildrenFlat(element, viewport, config, counter);
     }
+
+    final visibleRect = rect.intersect(viewport);
+    if (visibleRect.width <= 0 || visibleRect.height <= 0) {
+      return _visitChildrenFlat(element, viewport, config, counter);
+    }
+
+    final id = counter.next();
+    final children = _visitChildrenFlat(element, viewport, config, counter);
 
     return [
       Root(
-        id: counter.next(),
+        id: id,
         objectId: renderObject.hashCode.toRadixString(16),
         widgetType: widgetType,
         renderType: renderObject.runtimeType.toString(),
-        box: rect,
-        children: _visitChildrenFlat(element, config, counter),
+        box: visibleRect,
+        children: children,
       ),
     ];
   }
@@ -154,6 +191,7 @@ class LomTreeInspector {
   /// Visite children in flat mode using heavy spread to avoid unnecessary lists
   static List<Root> _visitChildrenFlat(
     Element element,
+    Rect viewport,
     LomTreeConfig config,
     _RootCounter counter,
   ) {
@@ -161,6 +199,7 @@ class LomTreeInspector {
     element.visitChildren((child) {
       final rootChildren = _visitElement(
         child,
+        viewport: viewport,
         config: config,
         counter: counter,
       );

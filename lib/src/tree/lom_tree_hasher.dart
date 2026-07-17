@@ -15,17 +15,11 @@ class LomTreeHasher {
   static int _hashCombine(int seed, int value) =>
       seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
 
-  /// Generates a hash for a single `node` based on its type, position, and
-  /// size
-  ///
-  /// Example :
-  /// ```bash
-  ///   "Scaffold0,0,97,211|AppBar0,10,97,14|..."
-  /// ```
+  /// Generates a hash for a single `node` based on its visible geometry and
+  /// number of children.
   static int _hashRoot(Root root) {
     int s = 0;
 
-    s = _hashCombine(s, root.widgetType.hashCode);
     s = _hashCombine(s, _bucket(root.box.topLeft.dx));
     s = _hashCombine(s, _bucket(root.box.topLeft.dy));
     s = _hashCombine(s, _bucket(root.box.width));
