@@ -78,8 +78,6 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     _gestures = GestureCollector(viewportProvider: _resolvePointerViewport);
     _scrolls = ScrollCollector();
 
-    SessionRecorder.engine.context.start();
-    SessionRecorder.engine.controller.startReporting();
     SessionRecorder.engine.controller.onInterrupt(_dispatchPendingEvents);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

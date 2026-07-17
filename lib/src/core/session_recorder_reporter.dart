@@ -198,16 +198,26 @@ class SessionRecorderReporter {
 
   /// Sends the full LOM again when the server may not know its ref.
   void _replaceUnknownRefsWithFullLoms(Chunk chunk) {
-    if (_rescuedLoms.isEmpty || chunk.loms.isEmpty) return;
+    if (_rescuedLoms.isEmpty) return;
+
+    final referencedIds = <String>{
+      for (final action in chunk.actionsEvents)
+        if (action.lomRef.isNotEmpty) action.lomRef,
+      for (final exploration in chunk.explorationEvents)
+        if (exploration.lomRef.isNotEmpty) exploration.lomRef,
+    };
+    if (referencedIds.isEmpty) return;
 
     final fullIds = <String>{
       for (final lom in chunk.loms)
         if (lom is Lom) lom.id,
     };
+    final recordIds = <String>{for (final lom in chunk.loms) lom.id};
 
     for (var i = 0; i < chunk.loms.length; i++) {
       final lom = chunk.loms[i];
       if (lom is! LomRef) continue;
+      if (!referencedIds.contains(lom.id)) continue;
       if (fullIds.contains(lom.id)) continue;
 
       final rescued = _rescuedLoms[lom.id];
@@ -215,6 +225,17 @@ class SessionRecorderReporter {
 
       chunk.loms[i] = rescued;
       fullIds.add(lom.id);
+    }
+
+    for (final id in referencedIds) {
+      if (fullIds.contains(id) || recordIds.contains(id)) continue;
+
+      final rescued = _rescuedLoms[id];
+      if (rescued == null) continue;
+
+      chunk.loms.add(rescued);
+      fullIds.add(id);
+      recordIds.add(id);
     }
   }
 
