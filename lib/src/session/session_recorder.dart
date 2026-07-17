@@ -21,7 +21,7 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 /// void main() {
 ///   WidgetsFlutterBinding.ensureInitialized();
 ///
-///   final config = SessionRecorderConfig();
+///   final config = SessionRecorderConfig(endpoint: 'https://demo-client.ux-key.com endpoint');
 ///
 ///   SessionRecorder.init(config);
 ///
@@ -65,19 +65,19 @@ class SessionRecorder {
   static SessionRecorderEngineInternal get engine => _engine;
 
   /// Initializes session recording.
-///
+  ///
   /// Call this method once from `main`, after
   /// `WidgetsFlutterBinding.ensureInitialized()` and before `runApp`.
-///
+  ///
   /// This starts the engine, context, reporting, and inactivity tracking.
   /// The initial capture after the first frame is requested by
   /// `SessionRecorderWidget`; applications do not need to defer [init].
-///
+  ///
   /// Configuration and initialization errors are caught internally. When
   /// initialization fails, the SDK continues in no-op mode.
-///
-/// See also
-///  - `[SessionRecorderConfig]`: More information on what can be shared.
+  ///
+  /// See also
+  ///  - `[SessionRecorderConfig]`: More information on what can be shared.
   static void init(SessionRecorderConfig config) {
     if (_engine.isEnabled) {
       SessionLogger.warning("SessionRecorder already initialized");
