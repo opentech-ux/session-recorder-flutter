@@ -53,14 +53,14 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
     _setAttached();
-    _handleTransition(route);
+    _handleTransition(route, AnimationStatus.completed);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
     _setAttached();
-    _handleTransition(route);
+    _handleTransition(route, AnimationStatus.dismissed);
   }
 
   @override
@@ -68,7 +68,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     _setAttached();
     if (newRoute == null) return;
-    _handleTransition(newRoute);
+    _handleTransition(newRoute, AnimationStatus.completed);
   }
 
   @override
@@ -81,7 +81,10 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void _setAttached() => _isAttached = true;
 
   /// Reports navigation and waits for `route`'s animation to settle.
-  void _handleTransition(Route<dynamic> route) {
+  void _handleTransition(
+    Route<dynamic> route,
+    AnimationStatus terminalStatus,
+  ) {
     final controller = SessionRecorder.engine.controller;
     controller.beginNavigation();
 
@@ -98,17 +101,14 @@ class SessionNavigatorObserver extends NavigatorObserver {
       });
     }
 
-    if (animation == null ||
-        animation.status == AnimationStatus.completed ||
-        animation.status == AnimationStatus.dismissed) {
+    if (animation == null || animation.status == terminalStatus) {
       finish();
       return;
     }
 
     late final AnimationStatusListener listener;
     listener = (AnimationStatus status) {
-      if (status == AnimationStatus.completed ||
-          status == AnimationStatus.dismissed) {
+      if (status == terminalStatus) {
         animation.removeStatusListener(listener);
         finish();
       }
@@ -116,8 +116,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
     animation.addStatusListener(listener);
 
-    if (animation.status == AnimationStatus.completed ||
-        animation.status == AnimationStatus.dismissed) {
+    if (animation.status == terminalStatus) {
       animation.removeStatusListener(listener);
       finish();
     }

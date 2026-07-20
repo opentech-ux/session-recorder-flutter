@@ -1,6 +1,8 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -54,12 +56,7 @@ class LomTreeInspector {
         return null;
       }
 
-      final viewport = Rect.fromLTWH(
-        0,
-        0,
-        viewportWidth,
-        viewportHeight,
-      );
+      final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
       final counter = _RootCounter();
       final roots = _visitElement(
         element,
@@ -68,7 +65,19 @@ class LomTreeInspector {
         counter: counter,
       );
 
-      if (roots.length != 1) return null;
+      if (roots.length != 1) {
+        if (kDebugMode) {
+          final widgetTypes = roots
+              .map((root) => root.widgetType)
+              .toList(growable: false);
+          SessionLogger.warning(
+            'LOM inspection skipped: expected '
+            'exactly one top-level root, found ${roots.length}; '
+            'top-level widgetTypes: $widgetTypes',
+          );
+        }
+        return null;
+      }
       final root = roots.single;
 
       final signature = LomTreeHasher.signatureRoots([root]);

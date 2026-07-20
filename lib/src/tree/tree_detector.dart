@@ -40,6 +40,7 @@ class TreeDetector {
   bool _isNavigating = false;
   bool _isScrollActive = false;
   bool _isNotifierLocked = false;
+  bool _hasPendingOrdinaryCapture = false;
 
   /// Timer used to handle debouncing of widget tree captures.
   ///
@@ -58,7 +59,14 @@ class TreeDetector {
   final ValueNotifier<LomAbstract?> notifier = ValueNotifier(null);
 
   @pragma('vm:prefer-inline')
-  void setCurrentlyNavigating() => _isNavigating = true;
+  void setCurrentlyNavigating() {
+    if (_debounce != null) {
+      if (_debounce!.isActive) _queuePendingOrdinaryCapture();
+      _debounce?.cancel();
+      _debounce = null;
+    }
+    _isNavigating = true;
+  }
 
   void setScrollActive(bool isActive) {
     _isScrollActive = isActive;
@@ -93,13 +101,16 @@ class TreeDetector {
     void onBuildScheduled() {
       _lastOnBuildScheduled?.call();
 
-      if (!_isRunning || _isNavigating || _isScrollActive) return;
-
-      if (_isNotifierLocked) return;
+      if (!_isRunning || _isScrollActive || _isNotifierLocked) return;
+      if (_isNavigating) {
+        _queuePendingOrdinaryCapture();
+        return;
+      }
 
       _debounce?.cancel();
       _debounce = Timer(kDebounceTime, () {
-        if (!_isRunning || _isNavigating || _isScrollActive) return;
+        _debounce = null;
+        if (!_isRunning || _isScrollActive) return;
 
         captureTree(false);
       });
@@ -133,6 +144,7 @@ class TreeDetector {
     _isNavigating = false;
     _isScrollActive = false;
     _isNotifierLocked = false;
+    _hasPendingOrdinaryCapture = false;
     _captureElement = null;
     if (identical(_activeDetector, this)) _activeDetector = null;
 
@@ -146,7 +158,13 @@ class TreeDetector {
   }
 
   void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {
+    if (!comesFromNavigation && _isNavigating) {
+      _queuePendingOrdinaryCapture();
+      return;
+    }
+
     if (comesFromNavigation) _isNavigating = true;
+    var navigationCaptureProducedLom = false;
 
     final now = DateTime.now();
     if (!comesFromNavigation &&
@@ -177,6 +195,7 @@ class TreeDetector {
       _lastCaptureTime = DateTime.now();
 
       if (lom == null) return;
+      navigationCaptureProducedLom = comesFromNavigation;
 
       _isNotifierLocked = true;
       try {
@@ -189,8 +208,29 @@ class TreeDetector {
 
       _engine.context.recordLom(lom);
     } finally {
-      if (comesFromNavigation) _isNavigating = false;
+      if (comesFromNavigation) {
+        _completeNavigationCapture(navigationCaptureProducedLom);
+      }
     }
+  }
+
+  void _queuePendingOrdinaryCapture() {
+    _hasPendingOrdinaryCapture = true;
+  }
+
+  void _completeNavigationCapture(bool navigationCaptureProducedLom) {
+    final hadPendingCapture = _hasPendingOrdinaryCapture;
+    _hasPendingOrdinaryCapture = false;
+    _isNavigating = false;
+
+    if (navigationCaptureProducedLom || !hadPendingCapture || !_isRunning) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isRunning) return;
+      captureTree(false, bypassCooldown: true);
+    });
   }
 
   // static void _printTree(List<Root> nodes, int indent) {
