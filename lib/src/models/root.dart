@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 @immutable
@@ -32,6 +33,8 @@ class Root {
       'id': "z$id",
       'b': b,
       'c': children.map((x) => x.toMap()).toList(),
+      // TODO: Remove widgetType from the debug payload.
+      if (kDebugMode) 'widgetType': widgetType,
     };
   }
 

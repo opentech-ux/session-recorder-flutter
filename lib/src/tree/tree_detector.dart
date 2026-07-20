@@ -15,7 +15,6 @@ class TreeDetector {
 
   final SessionRecorderEngine _engine;
   final LomTreeInspector _inspector;
-
   TreeDetector({required SessionRecorderEngine engine})
     : _engine = engine,
       _inspector = LomTreeInspector();
@@ -120,7 +119,8 @@ class TreeDetector {
     final buildOwner = WidgetsBinding.instance.buildOwner;
     final installedCallback = _installedOnBuildScheduled;
 
-    final didRestoreHook = _isBuilded &&
+    final didRestoreHook =
+        _isBuilded &&
         buildOwner != null &&
         installedCallback != null &&
         identical(buildOwner.onBuildScheduled, installedCallback);
@@ -145,17 +145,14 @@ class TreeDetector {
     notifier.dispose();
   }
 
-  void captureTree(
-    bool comesFromNavigation, {
-    bool bypassCooldown = false,
-  }) {
+  void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {
     if (comesFromNavigation) _isNavigating = true;
 
     final now = DateTime.now();
     if (!comesFromNavigation &&
         !bypassCooldown &&
         now.difference(_lastCaptureTime).inMilliseconds <
-        kCooldownTime.inMilliseconds) {
+            kCooldownTime.inMilliseconds) {
       return;
     }
 
