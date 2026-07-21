@@ -61,7 +61,14 @@ class MathUtils {
     Map<int, PointerTrace> pointers,
     PinchMetricsBaseline pinchMetrics,
   ) {
-    if (pinchMetrics.initialPositions == null) return false;
+    final initialPositions = pinchMetrics.initialPositions;
+    if (initialPositions == null) return false;
+    if (pointers.length != initialPositions.length ||
+        initialPositions.keys.any(
+          (pointer) => !pointers.containsKey(pointer),
+        )) {
+      return false;
+    }
 
     /// This block filters out most insignificant movements: if there is
     /// no relevant change in the average distance, it is not a zoom.
@@ -70,7 +77,6 @@ class MathUtils {
     /// Avoid divided by 0
     if (d0 <= 1e-6) return false;
 
-    // final cNow = MathUtils.getCentroid(pinchMetrics.scalePointers!);
     final dNow = MathUtils.getAverageDistance(pointers);
 
     final scale = MathUtils.getScale(d0, dNow);
@@ -86,7 +92,7 @@ class MathUtils {
 
     final stats = MathUtils.analyzeFingerDirections(
       pointers,
-      pinchMetrics.initialPositions!,
+      initialPositions,
       pinchMetrics.centroid!,
     );
 
@@ -126,10 +132,9 @@ class MathUtils {
     double sumRadial = 0.0, sumTangentialSq = 0.0;
 
     int positives = 0, negatives = 0, counted = 0;
+    final currentCentroid = MathUtils.getCentroid(pointers);
 
     for (int pointer in initialPointers.keys) {
-      if (!pointers.containsKey(pointer)) continue;
-
       /// Initial position
       final p0 = initialPointers[pointer]!;
 
@@ -144,8 +149,10 @@ class MathUtils {
       /// If the finger was exactly at the initial center, continues.
       if (rDis <= 1e-6) continue;
 
-      /// The [Finger's Movement Vector]: how much the finger moved.
-      final v = pNow - p0;
+      /// Movement relative to the centroid removes translation shared by all
+      /// participating fingers before radial/tangential decomposition.
+      final v =
+          (pNow - currentCentroid) - (p0 - initialCentroid);
 
       if (v.distance < 3.0) continue;
 
