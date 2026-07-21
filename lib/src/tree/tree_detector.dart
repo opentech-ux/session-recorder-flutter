@@ -41,6 +41,7 @@ class TreeDetector {
   bool _isScrollActive = false;
   bool _isNotifierLocked = false;
   bool _hasPendingOrdinaryCapture = false;
+  int _navigationEpoch = 0;
 
   /// Timer used to handle debouncing of widget tree captures.
   ///
@@ -60,6 +61,7 @@ class TreeDetector {
 
   @pragma('vm:prefer-inline')
   void setCurrentlyNavigating() {
+    _navigationEpoch += 1;
     if (_debounce != null) {
       if (_debounce!.isActive) _queuePendingOrdinaryCapture();
       _debounce?.cancel();
@@ -145,6 +147,7 @@ class TreeDetector {
     _isScrollActive = false;
     _isNotifierLocked = false;
     _hasPendingOrdinaryCapture = false;
+    _navigationEpoch += 1;
     _captureElement = null;
     if (identical(_activeDetector, this)) _activeDetector = null;
 
@@ -158,6 +161,30 @@ class TreeDetector {
   }
 
   void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {
+    if (comesFromNavigation) {
+      final scheduledNavigationEpoch = _navigationEpoch;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_isRunning || scheduledNavigationEpoch != _navigationEpoch) {
+          return;
+        }
+        _captureTreeNow(
+          true,
+          navigationEpoch: scheduledNavigationEpoch,
+        );
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+      return;
+    }
+
+    _captureTreeNow(false, bypassCooldown: bypassCooldown);
+  }
+
+  void _captureTreeNow(
+    bool comesFromNavigation, {
+    bool bypassCooldown = false,
+    int? navigationEpoch,
+  }) {
     if (!comesFromNavigation && _isNavigating) {
       _queuePendingOrdinaryCapture();
       return;
@@ -209,7 +236,10 @@ class TreeDetector {
       _engine.context.recordLom(lom);
     } finally {
       if (comesFromNavigation) {
-        _completeNavigationCapture(navigationCaptureProducedLom);
+        _completeNavigationCapture(
+          navigationCaptureProducedLom,
+          navigationEpoch!,
+        );
       }
     }
   }
@@ -218,7 +248,12 @@ class TreeDetector {
     _hasPendingOrdinaryCapture = true;
   }
 
-  void _completeNavigationCapture(bool navigationCaptureProducedLom) {
+  void _completeNavigationCapture(
+    bool navigationCaptureProducedLom,
+    int completedNavigationEpoch,
+  ) {
+    if (completedNavigationEpoch != _navigationEpoch) return;
+
     final hadPendingCapture = _hasPendingOrdinaryCapture;
     _hasPendingOrdinaryCapture = false;
     _isNavigating = false;
@@ -228,9 +263,10 @@ class TreeDetector {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isRunning) return;
+      if (!_isRunning || completedNavigationEpoch != _navigationEpoch) return;
       captureTree(false, bypassCooldown: true);
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   // static void _printTree(List<Root> nodes, int indent) {
