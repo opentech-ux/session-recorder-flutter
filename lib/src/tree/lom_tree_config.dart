@@ -40,7 +40,6 @@ class LomTreeConfig {
       'FittedBox',
       'ConstrainedBox',
       'LimitedBox',
-      'DecoratedBox',
       'ColoredBox',
       'RepaintBoundary',
       'SafeArea',
@@ -73,6 +72,9 @@ class LomTreeConfig {
       'InkWell',
       'Image',
       'Icon',
+      'NavigationBar',
+      'BottomNavigationBar',
+      'NavigationRail',
     },
   });
 }
