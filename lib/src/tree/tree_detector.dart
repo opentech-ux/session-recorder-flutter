@@ -41,6 +41,8 @@ class TreeDetector {
   bool _isScrollActive = false;
   bool _isNotifierLocked = false;
   bool _hasPendingOrdinaryCapture = false;
+  bool _treeDirty = true;
+  bool _priorityCaptureAttemptedForDirtyState = false;
   int _navigationEpoch = 0;
 
   /// Timer used to handle debouncing of widget tree captures.
@@ -104,18 +106,13 @@ class TreeDetector {
       _lastOnBuildScheduled?.call();
 
       if (!_isRunning || _isScrollActive || _isNotifierLocked) return;
+      _markTreeDirty();
       if (_isNavigating) {
         _queuePendingOrdinaryCapture();
         return;
       }
 
-      _debounce?.cancel();
-      _debounce = Timer(kDebounceTime, () {
-        _debounce = null;
-        if (!_isRunning || _isScrollActive) return;
-
-        captureTree(false);
-      });
+      _scheduleDebouncedCapture();
     }
 
     _installedOnBuildScheduled = onBuildScheduled;
@@ -147,6 +144,8 @@ class TreeDetector {
     _isScrollActive = false;
     _isNotifierLocked = false;
     _hasPendingOrdinaryCapture = false;
+    _treeDirty = false;
+    _priorityCaptureAttemptedForDirtyState = false;
     _navigationEpoch += 1;
     _captureElement = null;
     if (identical(_activeDetector, this)) _activeDetector = null;
@@ -180,14 +179,44 @@ class TreeDetector {
     _captureTreeNow(false, bypassCooldown: bypassCooldown);
   }
 
-  void _captureTreeNow(
+  /// Resolves the LOM reference to freeze into a new pointer trace.
+  String resolveLomRefForPointerDown({String? inheritedLomRef}) {
+    if (!_isRunning || _isNavigating) return '';
+    if (inheritedLomRef != null) return inheritedLomRef;
+
+    final currentLomRef = _engine.context.currentLomRef ?? '';
+    if (_isScrollActive || !_treeDirty) return currentLomRef;
+    if (_priorityCaptureAttemptedForDirtyState) return '';
+
+    _priorityCaptureAttemptedForDirtyState = true;
+
+    try {
+      final lom = _captureTreeNow(false, bypassCooldown: true);
+      if (lom != null) return lom.id;
+    } catch (error, stackTrace) {
+      try {
+        SessionLogger.error(
+          'Priority tree capture failed',
+          error,
+          stackTrace,
+        );
+      } catch (_) {
+        // A client logger cannot break pointer delivery.
+      }
+    }
+
+    _scheduleDebouncedCapture(restart: false);
+    return '';
+  }
+
+  LomAbstract? _captureTreeNow(
     bool comesFromNavigation, {
     bool bypassCooldown = false,
     int? navigationEpoch,
   }) {
     if (!comesFromNavigation && _isNavigating) {
       _queuePendingOrdinaryCapture();
-      return;
+      return null;
     }
 
     if (comesFromNavigation) _isNavigating = true;
@@ -198,7 +227,7 @@ class TreeDetector {
         !bypassCooldown &&
         now.difference(_lastCaptureTime).inMilliseconds <
             kCooldownTime.inMilliseconds) {
-      return;
+      return null;
     }
 
     try {
@@ -211,7 +240,7 @@ class TreeDetector {
         SessionLogger.warning(
           "The capture subtree is not available or is no longer mounted",
         );
-        return;
+        return null;
       }
 
       final lom = _inspector.captureLom(
@@ -219,10 +248,7 @@ class TreeDetector {
         comesFromNavigation: comesFromNavigation,
       );
 
-      _lastCaptureTime = DateTime.now();
-
-      if (lom == null) return;
-      navigationCaptureProducedLom = comesFromNavigation;
+      if (lom == null) return null;
 
       _isNotifierLocked = true;
       try {
@@ -234,6 +260,10 @@ class TreeDetector {
       // _printTree([lom.root!], 0);
 
       _engine.context.recordLom(lom);
+      _lastCaptureTime = DateTime.now();
+      _markTreeCaptured();
+      navigationCaptureProducedLom = comesFromNavigation;
+      return lom;
     } finally {
       if (comesFromNavigation) {
         _completeNavigationCapture(
@@ -246,6 +276,31 @@ class TreeDetector {
 
   void _queuePendingOrdinaryCapture() {
     _hasPendingOrdinaryCapture = true;
+  }
+
+  void _markTreeDirty() {
+    _treeDirty = true;
+    _priorityCaptureAttemptedForDirtyState = false;
+  }
+
+  void _markTreeCaptured() {
+    _treeDirty = false;
+    _priorityCaptureAttemptedForDirtyState = false;
+    _debounce?.cancel();
+    _debounce = null;
+  }
+
+  void _scheduleDebouncedCapture({bool restart = true}) {
+    if (!_isRunning || _isNavigating || _isScrollActive) return;
+    if (!restart && (_debounce?.isActive ?? false)) return;
+
+    _debounce?.cancel();
+    _debounce = Timer(kDebounceTime, () {
+      _debounce = null;
+      if (!_isRunning || _isScrollActive) return;
+
+      captureTree(false);
+    });
   }
 
   void _completeNavigationCapture(

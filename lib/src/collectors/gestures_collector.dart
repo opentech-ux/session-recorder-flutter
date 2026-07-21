@@ -27,9 +27,24 @@ class GestureCollector {
   /// Called when a pointer first touches the screen.
   void onPointerDown(PointerDownEvent details) {
     final int pointer = details.pointer;
+    final viewport = _viewportProvider();
+    if (viewport == null) {
+      _ignoredPointers.add(pointer);
+      return;
+    }
+
+    final inheritedLomRef = _oldestActivePointer()?.lomRef;
+    final lomRef = _engine.context.resolveLomRefForPointerDown(
+      inheritedLomRef: inheritedLomRef,
+    );
 
     /// Add the first [PointerTrace]
-    addPointer(pointer, details.position);
+    addPointer(
+      pointer,
+      details.position,
+      viewport: viewport,
+      lomRef: lomRef,
+    );
 
     if (_ignoredPointers.contains(pointer)) return;
 
@@ -73,7 +88,6 @@ class GestureCollector {
     pointerTrace.add(
       position,
       viewport: viewport,
-      lomRef: _engine.context.currentLomRef ?? '',
     );
 
     if (pointerTrace.type != GesturesType.pinch &&
@@ -190,23 +204,49 @@ class GestureCollector {
   /// Set `[GesturesType.tap]` type by __default__.
   void addPointer(
     int pointer,
-    Offset position, [
+    Offset position, {
     GesturesType type = GesturesType.tap,
-  ]) {
-    final viewport = _viewportProvider();
-    if (viewport == null) {
+    Rect? viewport,
+    String? lomRef,
+  }) {
+    final resolvedViewport = viewport ?? _viewportProvider();
+    if (resolvedViewport == null) {
       _ignoredPointers.add(pointer);
       return;
     }
 
     _ignoredPointers.remove(pointer);
+    final resolvedLomRef =
+        lomRef ??
+        _oldestActivePointer()?.lomRef ??
+        _engine.context.currentLomRef ??
+        '';
 
-    _pointers[pointer] = PointerTrace(pointer: pointer, type: type)
+    _pointers[pointer] = PointerTrace(
+      pointer: pointer,
+      lomRef: resolvedLomRef,
+      type: type,
+    )
       ..add(
         position,
-        viewport: viewport,
-        lomRef: _engine.context.currentLomRef ?? '',
+        viewport: resolvedViewport,
       );
+  }
+
+  PointerTrace? _oldestActivePointer() {
+    PointerTrace? oldest;
+
+    for (final trace in _pointers.values) {
+      if (trace.isEmpty) continue;
+      if (oldest == null ||
+          trace.firstTimestamp < oldest.firstTimestamp ||
+          (trace.firstTimestamp == oldest.firstTimestamp &&
+              trace.pointer < oldest.pointer)) {
+        oldest = trace;
+      }
+    }
+
+    return oldest;
   }
 
   /// Update the Pinch Metrics Baseline
@@ -261,7 +301,6 @@ class GestureCollector {
     pointerTrace.add(
       details.position,
       viewport: viewport,
-      lomRef: _engine.context.currentLomRef ?? '',
     );
 
     // * PINCH

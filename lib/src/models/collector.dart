@@ -4,12 +4,14 @@ import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 
 class PointerTrace {
   final int pointer;
+  final String lomRef;
   final List<TimedPosition> positions;
   GesturesType type;
   final bool isOrphanedPointer;
 
   PointerTrace({
     required this.pointer,
+    this.lomRef = '',
     List<TimedPosition>? positions,
     required this.type,
     this.isOrphanedPointer = false,
@@ -48,7 +50,7 @@ class PointerTrace {
     this.type = type;
   }
 
-  void add(Offset position, {required Rect viewport, String lomRef = ''}) {
+  void add(Offset position, {required Rect viewport}) {
     positions.add(
       TimedPosition(position, viewport: viewport, lomRef: lomRef),
     );
@@ -64,12 +66,12 @@ class PointerTrace {
   }) {
     return PointerTrace(
       pointer: pointer,
+      lomRef: lomRef,
       type: newType,
       isOrphanedPointer: isOrphanedPointer,
     )..add(
         lastPosition,
         viewport: positions.last.viewport,
-        lomRef: positions.last.lomRef,
       );
   }
 

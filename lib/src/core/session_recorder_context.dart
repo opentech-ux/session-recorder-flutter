@@ -22,6 +22,9 @@ abstract interface class SessionRecorderContext {
   /// Current LOM id used to bind events to their screen snapshot.
   String? get currentLomRef;
 
+  /// Resolves the LOM reference to freeze when a pointer starts.
+  String resolveLomRefForPointerDown({String? inheritedLomRef});
+
   void recordLom(LomAbstract? lom);
   void recordAction(ActionEvent action);
   void recordExploration(ExplorationEvent exploration);
@@ -41,6 +44,8 @@ class NoOpContext implements SessionRecorderContext {
   void dispose() {}
   @override
   String? get currentLomRef => null;
+  @override
+  String resolveLomRefForPointerDown({String? inheritedLomRef}) => '';
   @override
   void recordAction(ActionEvent action) {}
   @override
@@ -99,6 +104,13 @@ class ContextImpl implements SessionRecorderContext {
 
   @override
   String? get currentLomRef => _currentLom?.id;
+
+  @override
+  String resolveLomRefForPointerDown({String? inheritedLomRef}) =>
+      _detector?.resolveLomRefForPointerDown(
+        inheritedLomRef: inheritedLomRef,
+      ) ??
+      '';
 
   @override
   void recordAction(ActionEvent action) {
