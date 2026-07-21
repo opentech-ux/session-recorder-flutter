@@ -5,6 +5,7 @@ import 'package:session_recorder_flutter/src/collectors/scroll_collector.dart';
 import 'package:session_recorder_flutter/src/observers/session_lifecycle_observer.dart';
 import 'package:session_recorder_flutter/src/observers/session_navigator_observer.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
@@ -77,6 +78,11 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      try {
+        SessionLogger.verbose('LOM capture attempt reason=initial');
+      } catch (_) {
+        // Diagnostics cannot affect the client application.
+      }
       SessionRecorder.engine.context.captureTree(false);
     });
   }

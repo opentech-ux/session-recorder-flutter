@@ -75,8 +75,14 @@ class TreeDetector {
   void setScrollActive(bool isActive) {
     _isScrollActive = isActive;
     if (isActive) {
+      final interruptedNavigation = _isNavigating;
       _debounce?.cancel();
       _debounce = null;
+      if (interruptedNavigation) {
+        _navigationEpoch += 1;
+        _isNavigating = false;
+        _hasPendingOrdinaryCapture = false;
+      }
     }
   }
 
@@ -161,18 +167,24 @@ class TreeDetector {
 
   void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {
     if (comesFromNavigation) {
-      final scheduledNavigationEpoch = _navigationEpoch;
+      if (!_isRunning || !_isNavigating || _isScrollActive) return;
+      if (_debounce?.isActive ?? false) return;
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_isRunning || scheduledNavigationEpoch != _navigationEpoch) {
+      final scheduledNavigationEpoch = _navigationEpoch;
+      _debounce = Timer(kDebounceTime, () {
+        _debounce = null;
+        if (!_isRunning ||
+            scheduledNavigationEpoch != _navigationEpoch ||
+            !_isNavigating ||
+            _isScrollActive) {
           return;
         }
+        _logCaptureReason('navigation');
         _captureTreeNow(
           true,
           navigationEpoch: scheduledNavigationEpoch,
         );
       });
-      WidgetsBinding.instance.ensureVisualUpdate();
       return;
     }
 
@@ -191,6 +203,7 @@ class TreeDetector {
     _priorityCaptureAttemptedForDirtyState = true;
 
     try {
+      _logCaptureReason('priority');
       final lom = _captureTreeNow(false, bypassCooldown: true);
       if (lom != null) return lom.id;
     } catch (error, stackTrace) {
@@ -223,10 +236,19 @@ class TreeDetector {
     var navigationCaptureProducedLom = false;
 
     final now = DateTime.now();
+    final elapsedSinceLastCapture = now.difference(_lastCaptureTime);
     if (!comesFromNavigation &&
         !bypassCooldown &&
-        now.difference(_lastCaptureTime).inMilliseconds <
+        elapsedSinceLastCapture.inMilliseconds <
             kCooldownTime.inMilliseconds) {
+      if (_isRunning &&
+          _treeDirty &&
+          !_isNavigating &&
+          !_isScrollActive) {
+        _scheduleDebouncedCapture(
+          delay: kCooldownTime - elapsedSinceLastCapture,
+        );
+      }
       return null;
     }
 
@@ -290,17 +312,31 @@ class TreeDetector {
     _debounce = null;
   }
 
-  void _scheduleDebouncedCapture({bool restart = true}) {
-    if (!_isRunning || _isNavigating || _isScrollActive) return;
+  void _scheduleDebouncedCapture({
+    bool restart = true,
+    Duration delay = kDebounceTime,
+  }) {
+    if (!_isRunning || !_treeDirty || _isNavigating || _isScrollActive) {
+      return;
+    }
     if (!restart && (_debounce?.isActive ?? false)) return;
 
     _debounce?.cancel();
-    _debounce = Timer(kDebounceTime, () {
+    _debounce = Timer(delay, () {
       _debounce = null;
-      if (!_isRunning || _isScrollActive) return;
+      if (!_isRunning || !_treeDirty || _isScrollActive) return;
 
+      _logCaptureReason('ordinary');
       captureTree(false);
     });
+  }
+
+  void _logCaptureReason(String reason) {
+    try {
+      SessionLogger.verbose('LOM capture attempt reason=$reason');
+    } catch (_) {
+      // Diagnostics cannot affect capture or the client application.
+    }
   }
 
   void _completeNavigationCapture(
@@ -319,6 +355,7 @@ class TreeDetector {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isRunning || completedNavigationEpoch != _navigationEpoch) return;
+      _logCaptureReason('navigation');
       captureTree(false, bypassCooldown: true);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
