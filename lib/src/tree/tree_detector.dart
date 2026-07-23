@@ -139,9 +139,11 @@ class TreeDetector {
 
   /// Resolves the LOM reference to freeze into a new pointer trace.
   String resolveLomRefForPointerDown({String? inheritedLomRef}) {
+    final currentLomRef = _engine.context.currentLomRef ?? '';
+
     return _scheduler.resolveLomRefForPointerDown(
       inheritedLomRef: inheritedLomRef,
-      currentLomRef: _engine.context.currentLomRef ?? '',
+      currentLomRef: currentLomRef,
     );
   }
 

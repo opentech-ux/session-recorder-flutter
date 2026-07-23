@@ -164,12 +164,14 @@ class LomCaptureScheduler {
     );
   }
 
+  /// A priority capture can improve a first pointer's current LOM reference,
+  /// but a blocked or failed capture never replaces a non-empty ref with ''.
   String resolveLomRefForPointerDown({
     String? inheritedLomRef,
     required String currentLomRef,
   }) {
-    if (!_isRunning || _isNavigationBarrierActive) return '';
     if (inheritedLomRef != null) return inheritedLomRef;
+    if (!_isRunning || _isNavigationBarrierActive) return currentLomRef;
 
     if (_needsPostScrollCapture) {
       if (_hasAttemptedPriorityCaptureForCurrentState) return currentLomRef;
@@ -182,7 +184,9 @@ class LomCaptureScheduler {
           comesFromNavigation: false,
           bypassCooldown: true,
         );
-        if (lom != null) return lom.id;
+        if (lom != null) {
+          return _preserveCurrentLomRef(lom.id, currentLomRef);
+        }
       } catch (error, stackTrace) {
         _logPriorityCaptureError(
           LomCaptureReason.postScrollPointerDown,
@@ -197,7 +201,7 @@ class LomCaptureScheduler {
     if (_isScrollCaptureSuppressed || !_hasUncapturedTreeChange) {
       return currentLomRef;
     }
-    if (_hasAttemptedPriorityCaptureForCurrentState) return '';
+    if (_hasAttemptedPriorityCaptureForCurrentState) return currentLomRef;
 
     _hasAttemptedPriorityCaptureForCurrentState = true;
 
@@ -207,7 +211,9 @@ class LomCaptureScheduler {
         comesFromNavigation: false,
         bypassCooldown: true,
       );
-      if (lom != null) return lom.id;
+      if (lom != null) {
+        return _preserveCurrentLomRef(lom.id, currentLomRef);
+      }
     } catch (error, stackTrace) {
       _logPriorityCaptureError(
         LomCaptureReason.dirtyPointerDown,
@@ -217,7 +223,17 @@ class LomCaptureScheduler {
     }
 
     _scheduleDebouncedCapture(restart: false);
-    return '';
+    return currentLomRef;
+  }
+
+  String _preserveCurrentLomRef(
+    String resolvedLomRef,
+    String currentLomRef,
+  ) {
+    if (resolvedLomRef.isEmpty && currentLomRef.isNotEmpty) {
+      return currentLomRef;
+    }
+    return resolvedLomRef;
   }
 
   LomAbstract? _captureNow(
