@@ -18,6 +18,9 @@ abstract interface class SessionRecorderContext {
   ValueListenable<LomAbstract?>? get notifier;
   void setCurrentlyNavigating();
   void setScrollActive(bool isActive);
+  void markPostScrollCapturePending();
+  void capturePendingPostScrollLom();
+  bool get hasPendingPostScrollCapture;
 
   /// Current LOM id used to bind events to their screen snapshot.
   String? get currentLomRef;
@@ -45,6 +48,8 @@ class NoOpContext implements SessionRecorderContext {
   @override
   String? get currentLomRef => null;
   @override
+  bool get hasPendingPostScrollCapture => false;
+  @override
   String resolveLomRefForPointerDown({String? inheritedLomRef}) => '';
   @override
   void recordAction(ActionEvent action) {}
@@ -65,6 +70,10 @@ class NoOpContext implements SessionRecorderContext {
   void setCurrentlyNavigating() {}
   @override
   void setScrollActive(bool isActive) {}
+  @override
+  void markPostScrollCapturePending() {}
+  @override
+  void capturePendingPostScrollLom() {}
 }
 
 @internal
@@ -104,6 +113,10 @@ class ContextImpl implements SessionRecorderContext {
 
   @override
   String? get currentLomRef => _currentLom?.id;
+
+  @override
+  bool get hasPendingPostScrollCapture =>
+      _detector?.hasPendingPostScrollCapture ?? false;
 
   @override
   String resolveLomRefForPointerDown({String? inheritedLomRef}) =>
@@ -152,6 +165,14 @@ class ContextImpl implements SessionRecorderContext {
 
   @override
   void setScrollActive(bool isActive) => _detector?.setScrollActive(isActive);
+
+  @override
+  void markPostScrollCapturePending() =>
+      _detector?.markPostScrollCapturePending();
+
+  @override
+  void capturePendingPostScrollLom() =>
+      _detector?.capturePendingPostScrollLom();
 
   @override
   ValueNotifier<LomAbstract?>? get notifier => _detector?.notifier;

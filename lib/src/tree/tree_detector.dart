@@ -25,6 +25,9 @@ class TreeDetector {
   @pragma('vm:prefer-inline')
   bool get isRunning => _isRunning;
 
+  @pragma('vm:prefer-inline')
+  bool get hasPendingPostScrollCapture => _hasPendingPostScrollCapture;
+
   static void registerCaptureElement(Element element) {
     _activeDetector?._captureElement = element;
   }
@@ -41,6 +44,7 @@ class TreeDetector {
   bool _isScrollActive = false;
   bool _isNotifierLocked = false;
   bool _hasPendingOrdinaryCapture = false;
+  bool _hasPendingPostScrollCapture = false;
   bool _treeDirty = true;
   bool _priorityCaptureAttemptedForDirtyState = false;
   int _navigationEpoch = 0;
@@ -84,6 +88,26 @@ class TreeDetector {
         _hasPendingOrdinaryCapture = false;
       }
     }
+  }
+
+  void markPostScrollCapturePending() {
+    if (!_isRunning) return;
+
+    _hasPendingPostScrollCapture = true;
+    _treeDirty = true;
+    _priorityCaptureAttemptedForDirtyState = false;
+  }
+
+  void capturePendingPostScrollLom() {
+    if (!_isRunning ||
+        !_hasPendingPostScrollCapture ||
+        _isNavigating ||
+        _isScrollActive) {
+      return;
+    }
+
+    _logCaptureReason('scrollEnd');
+    _captureTreeNow(false, bypassCooldown: true);
   }
 
   /// Starts watching for tree changes.
@@ -150,6 +174,7 @@ class TreeDetector {
     _isScrollActive = false;
     _isNotifierLocked = false;
     _hasPendingOrdinaryCapture = false;
+    _hasPendingPostScrollCapture = false;
     _treeDirty = false;
     _priorityCaptureAttemptedForDirtyState = false;
     _navigationEpoch += 1;
@@ -197,6 +222,30 @@ class TreeDetector {
     if (inheritedLomRef != null) return inheritedLomRef;
 
     final currentLomRef = _engine.context.currentLomRef ?? '';
+    if (_hasPendingPostScrollCapture) {
+      if (_priorityCaptureAttemptedForDirtyState) return currentLomRef;
+
+      _priorityCaptureAttemptedForDirtyState = true;
+
+      try {
+        _logCaptureReason('priority');
+        final lom = _captureTreeNow(false, bypassCooldown: true);
+        if (lom != null) return lom.id;
+      } catch (error, stackTrace) {
+        try {
+          SessionLogger.error(
+            'Priority post-scroll tree capture failed',
+            error,
+            stackTrace,
+          );
+        } catch (_) {
+          // A client logger cannot break pointer delivery.
+        }
+      }
+
+      return currentLomRef;
+    }
+
     if (_isScrollActive || !_treeDirty) return currentLomRef;
     if (_priorityCaptureAttemptedForDirtyState) return '';
 
@@ -302,10 +351,13 @@ class TreeDetector {
 
   void _markTreeDirty() {
     _treeDirty = true;
-    _priorityCaptureAttemptedForDirtyState = false;
+    if (!_hasPendingPostScrollCapture) {
+      _priorityCaptureAttemptedForDirtyState = false;
+    }
   }
 
   void _markTreeCaptured() {
+    _hasPendingPostScrollCapture = false;
     _treeDirty = false;
     _priorityCaptureAttemptedForDirtyState = false;
     _debounce?.cancel();

@@ -33,10 +33,12 @@ class GestureCollector {
       return;
     }
 
+    final hasActivePointers =
+        _pointers.isNotEmpty || _ignoredPointers.isNotEmpty;
     final inheritedLomRef = _oldestActivePointer()?.lomRef;
-    final lomRef = _engine.context.resolveLomRefForPointerDown(
-      inheritedLomRef: inheritedLomRef,
-    );
+    final lomRef = hasActivePointers
+        ? inheritedLomRef ?? _engine.context.currentLomRef ?? ''
+        : _engine.context.resolveLomRefForPointerDown();
 
     /// Add the first [PointerTrace]
     addPointer(

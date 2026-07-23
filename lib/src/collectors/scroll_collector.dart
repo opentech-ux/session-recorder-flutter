@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
-import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
@@ -196,6 +195,7 @@ class ScrollCollector {
 
     _engine.context.recordExploration(provisionalStart);
     _isValidated = true;
+    _engine.context.markPostScrollCapturePending();
   }
 
   /// Forced shutdown when the collection is interrupted
@@ -227,8 +227,6 @@ class ScrollCollector {
   }
 
   void _finishSession({bool scheduleCapture = true}) {
-    var shouldCapture = false;
-
     try {
       final viewport = _activeViewportBounds;
       final offset = _activeOffset;
@@ -243,13 +241,15 @@ class ScrollCollector {
             lomRef: _engine.context.currentLomRef ?? '',
           ),
         );
-        shouldCapture = true;
       }
     } finally {
       _releaseSuppressionAndReset();
     }
 
-    if (shouldCapture && scheduleCapture) _scheduleStabilizedCapture();
+    if (scheduleCapture &&
+        _engine.context.hasPendingPostScrollCapture) {
+      _scheduleStabilizedCapture();
+    }
   }
 
   void _releaseSuppressionAndReset() {
@@ -279,12 +279,7 @@ class ScrollCollector {
       _captureTimer = null;
 
       try {
-        try {
-          SessionLogger.verbose('LOM capture attempt reason=scrollEnd');
-        } catch (_) {
-          // Diagnostics cannot affect the client application.
-        }
-        _engine.context.captureTree(false, bypassCooldown: true);
+        _engine.context.capturePendingPostScrollLom();
       } catch (_) {
         // Tree capture stays fail-open.
       }
