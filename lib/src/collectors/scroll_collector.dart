@@ -23,6 +23,7 @@ class ScrollCollector {
   bool _isValidated = false;
   bool _isDisposed = false;
   ScrollExplorationEvent? _provisionalStart;
+  String? _activeLomRef;
   Rect? _activeViewportBounds;
   Offset? _initialOffset;
   Offset? _activeOffset;
@@ -70,12 +71,14 @@ class ScrollCollector {
     _activeViewportBounds = rect;
     _initialOffset = offset;
     _activeOffset = offset;
+    final lomRef = _engine.context.currentLomRef ?? '';
+    _activeLomRef = lomRef;
     _provisionalStart = ScrollExplorationEvent(
       timestamp: DateTime.now().millisecondsSinceEpoch,
       viewport: rect,
       phase: ScrollPhase.start,
       offset: offset,
-      lomRef: _engine.context.currentLomRef ?? '',
+      lomRef: lomRef,
     );
     _engine.context.setScrollActive(true);
   }
@@ -230,15 +233,19 @@ class ScrollCollector {
     try {
       final viewport = _activeViewportBounds;
       final offset = _activeOffset;
+      final lomRef = _activeLomRef;
 
-      if (_isValidated && viewport != null && offset != null) {
+      if (_isValidated &&
+          viewport != null &&
+          offset != null &&
+          lomRef != null) {
         _engine.context.recordExploration(
           ScrollExplorationEvent(
             timestamp: DateTime.now().millisecondsSinceEpoch,
             viewport: viewport,
             phase: ScrollPhase.end,
             offset: offset,
-            lomRef: _engine.context.currentLomRef ?? '',
+            lomRef: lomRef,
           ),
         );
       }
@@ -264,6 +271,7 @@ class ScrollCollector {
     _isScrolling = false;
     _isValidated = false;
     _provisionalStart = null;
+    _activeLomRef = null;
     _activeViewportBounds = null;
     _initialOffset = null;
     _activeOffset = null;

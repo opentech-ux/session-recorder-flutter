@@ -103,11 +103,13 @@ class GestureCollector {
 
         _pointers[pointerTrace.pointer] = pointerTrace.splitForTransition(
           newType: GesturesType.drag,
+          isDragOnly: true,
         );
       } else {
         pointerTrace.setType(GesturesType.drag);
       }
     } else if (pointerTrace.type != GesturesType.pinch &&
+        !pointerTrace.isDragOnly &&
         pointerTrace.distance <= touchSlop &&
         pointerTrace.duration >= longPressTimeout) {
       pointerTrace.setType(GesturesType.longPress);
@@ -192,6 +194,11 @@ class GestureCollector {
   void _evaluatePointer(PointerTrace p) {
     if (p.type == GesturesType.pinch || p.type == GesturesType.drag) {
       _emitExplorations(p);
+    } else if (p.isDragOnly) {
+      if (p.distance >= touchSlop) {
+        p.setType(GesturesType.drag);
+        _emitExplorations(p);
+      }
     } else if (p.type == GesturesType.longPress ||
         (p.duration >= longPressTimeout && p.distance < touchSlop)) {
       _evaluateLongPress(p);
@@ -314,6 +321,18 @@ class GestureCollector {
 
     _updatePinchMetrics();
 
+    // A transition trace cannot become a tap or long press. A long-press drag
+    // is already typed as drag, while a post-pinch trace must first move far
+    // enough from its transition anchor.
+    if (pointerTrace.isDragOnly) {
+      if (pointerTrace.type == GesturesType.drag ||
+          pointerTrace.distance >= touchSlop) {
+        _evaluateDrag(pointerTrace);
+      }
+
+      return;
+    }
+
     // * LONG PRESS
     if (pointerTrace.duration >= longPressTimeout &&
         pointerTrace.distance < touchSlop) {
@@ -326,13 +345,6 @@ class GestureCollector {
     if (pointerTrace.distance >= touchSlop) {
       _evaluateDrag(pointerTrace);
 
-      return;
-    }
-
-    // * ORPHANED POINTER
-    if (pointerTrace.isOrphanedPointer &&
-        DateTime.now().millisecondsSinceEpoch - pointerTrace.firstTimestamp <
-            250) {
       return;
     }
 
@@ -417,7 +429,7 @@ class GestureCollector {
 
         _pointers[lastPointer.pointer] = lastPointer.splitForTransition(
           newType: GesturesType.tap,
-          isOrphanedPointer: true,
+          isDragOnly: true,
         );
       }
     }
@@ -438,7 +450,7 @@ class GestureCollector {
     _emitExplorations(remainingPointer);
     _pointers[remainingPointer.pointer] = remainingPointer.splitForTransition(
       newType: GesturesType.tap,
-      isOrphanedPointer: true,
+      isDragOnly: true,
     );
   }
 
