@@ -58,9 +58,15 @@ class LomTreeInspector {
 
       final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
       final counter = _RootCounter();
+      // A child RenderObject has one real parent edge, so its cached value also
+      // prevents that edge from being inspected more than once per capture.
+      final effectiveClips = HashMap<RenderObject, Rect>.identity();
       final roots = _visitElement(
         element,
         viewport: viewport,
+        effectiveClip: viewport,
+        nearestRenderAncestor: null,
+        effectiveClips: effectiveClips,
         config: _config,
         counter: counter,
       );
@@ -145,45 +151,112 @@ class LomTreeInspector {
   static List<Root> _visitElement(
     Element element, {
     required Rect viewport,
+    required Rect effectiveClip,
+    required RenderObject? nearestRenderAncestor,
+    required HashMap<RenderObject, Rect> effectiveClips,
     required LomTreeConfig config,
     required _RootCounter counter,
   }) {
     final Widget widget = element.widget;
-
     final String widgetType = widget.runtimeType.toString();
+    var inheritedClip = effectiveClip;
+    var inheritedRenderAncestor = nearestRenderAncestor;
+
+    // Component elements may expose their first descendant RenderObject. Only
+    // RenderObjectElement introduces a new edge in the render tree.
+    if (element is RenderObjectElement) {
+      final renderObject = element.renderObject;
+      inheritedClip = _resolveEffectiveClip(
+        renderObject: renderObject,
+        nearestRenderAncestor: nearestRenderAncestor,
+        inheritedClip: effectiveClip,
+        effectiveClips: effectiveClips,
+      );
+      inheritedRenderAncestor = renderObject;
+    }
+
+    if (inheritedClip.isEmpty) return [];
 
     if (config.pruneAt.contains(widgetType)) return [];
 
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
     if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
-      return _visitChildrenFlat(element, viewport, config, counter);
+      return _visitChildrenFlat(
+        element,
+        viewport: viewport,
+        effectiveClip: inheritedClip,
+        nearestRenderAncestor: inheritedRenderAncestor,
+        effectiveClips: effectiveClips,
+        config: config,
+        counter: counter,
+      );
     }
 
     if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
-      return _visitChildrenFlat(element, viewport, config, counter);
+      return _visitChildrenFlat(
+        element,
+        viewport: viewport,
+        effectiveClip: inheritedClip,
+        nearestRenderAncestor: inheritedRenderAncestor,
+        effectiveClips: effectiveClips,
+        config: config,
+        counter: counter,
+      );
     }
 
     if (!hasImportanteSemantic &&
         (widgetType.startsWith('_') ||
             config.ignoreAt.any((w) => widgetType.contains(w)))) {
-      return _visitChildrenFlat(element, viewport, config, counter);
+      return _visitChildrenFlat(
+        element,
+        viewport: viewport,
+        effectiveClip: inheritedClip,
+        nearestRenderAncestor: inheritedRenderAncestor,
+        effectiveClips: effectiveClips,
+        config: config,
+        counter: counter,
+      );
     }
 
     final renderObject = element.renderObject;
     final Rect? rect = MathUtils.transformRect(renderObject);
 
     if (rect == null || rect.width <= 0 || rect.height <= 0) {
-      return _visitChildrenFlat(element, viewport, config, counter);
+      return _visitChildrenFlat(
+        element,
+        viewport: viewport,
+        effectiveClip: inheritedClip,
+        nearestRenderAncestor: inheritedRenderAncestor,
+        effectiveClips: effectiveClips,
+        config: config,
+        counter: counter,
+      );
     }
 
-    final visibleRect = rect.intersect(viewport);
+    final visibleRect = rect.intersect(inheritedClip).intersect(viewport);
     if (visibleRect.width <= 0 || visibleRect.height <= 0) {
-      return _visitChildrenFlat(element, viewport, config, counter);
+      return _visitChildrenFlat(
+        element,
+        viewport: viewport,
+        effectiveClip: inheritedClip,
+        nearestRenderAncestor: inheritedRenderAncestor,
+        effectiveClips: effectiveClips,
+        config: config,
+        counter: counter,
+      );
     }
 
     final id = counter.next();
-    final children = _visitChildrenFlat(element, viewport, config, counter);
+    final children = _visitChildrenFlat(
+      element,
+      viewport: viewport,
+      effectiveClip: inheritedClip,
+      nearestRenderAncestor: inheritedRenderAncestor,
+      effectiveClips: effectiveClips,
+      config: config,
+      counter: counter,
+    );
 
     return [
       Root(
@@ -199,16 +272,22 @@ class LomTreeInspector {
 
   /// Visite children in flat mode using heavy spread to avoid unnecessary lists
   static List<Root> _visitChildrenFlat(
-    Element element,
-    Rect viewport,
-    LomTreeConfig config,
-    _RootCounter counter,
-  ) {
+    Element element, {
+    required Rect viewport,
+    required Rect effectiveClip,
+    required RenderObject? nearestRenderAncestor,
+    required HashMap<RenderObject, Rect> effectiveClips,
+    required LomTreeConfig config,
+    required _RootCounter counter,
+  }) {
     final children = <Root>[];
     element.visitChildren((child) {
       final rootChildren = _visitElement(
         child,
         viewport: viewport,
+        effectiveClip: effectiveClip,
+        nearestRenderAncestor: nearestRenderAncestor,
+        effectiveClips: effectiveClips,
         config: config,
         counter: counter,
       );
@@ -218,6 +297,83 @@ class LomTreeInspector {
     });
 
     return children;
+  }
+
+  static Rect _resolveEffectiveClip({
+    required RenderObject renderObject,
+    required RenderObject? nearestRenderAncestor,
+    required Rect inheritedClip,
+    required HashMap<RenderObject, Rect> effectiveClips,
+  }) {
+    if (effectiveClips.containsKey(renderObject)) {
+      return effectiveClips[renderObject]!;
+    }
+
+    if (nearestRenderAncestor == null) {
+      effectiveClips[renderObject] = inheritedClip;
+      return inheritedClip;
+    }
+
+    effectiveClips.putIfAbsent(nearestRenderAncestor, () => inheritedClip);
+
+    // Stop at the first render ancestor already resolved. Any intermediate
+    // RenderObjects are cached while unwinding, keeping the traversal linear.
+    final chain = <RenderObject>[];
+    var current = renderObject;
+
+    while (!effectiveClips.containsKey(current)) {
+      chain.add(current);
+      final parent = current.parent;
+      if (parent is! RenderObject) {
+        effectiveClips[renderObject] = inheritedClip;
+        return inheritedClip;
+      }
+      current = parent;
+    }
+
+    var resolvedClip = effectiveClips[current]!;
+
+    for (final child in chain.reversed) {
+      final parent = child.parent;
+      if (parent is! RenderObject || !identical(parent, current)) {
+        effectiveClips[renderObject] = inheritedClip;
+        return inheritedClip;
+      }
+
+      final globalPaintClip = _globalPaintClip(parent, child);
+      if (globalPaintClip != null) {
+        final intersection = resolvedClip.intersect(globalPaintClip);
+        resolvedClip = intersection.isEmpty ? Rect.zero : intersection;
+      }
+
+      effectiveClips[child] = resolvedClip;
+      current = child;
+    }
+
+    return resolvedClip;
+  }
+
+  static Rect? _globalPaintClip(
+    RenderObject parent,
+    RenderObject child,
+  ) {
+    try {
+      final localClip = parent.describeApproximatePaintClip(child);
+      if (localClip == null || !_isFiniteRect(localClip)) return null;
+
+      final transform = parent.getTransformTo(null);
+      final globalClip = MatrixUtils.transformRect(transform, localClip);
+      return _isFiniteRect(globalClip) ? globalClip : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isFiniteRect(Rect rect) {
+    return rect.left.isFinite &&
+        rect.top.isFinite &&
+        rect.right.isFinite &&
+        rect.bottom.isFinite;
   }
 }
 
