@@ -164,17 +164,19 @@ class LomCaptureScheduler {
     );
   }
 
-  /// A priority capture can improve a first pointer's current LOM reference,
-  /// but a blocked or failed capture never replaces a non-empty ref with ''.
-  String resolveLomRefForPointerDown({
-    String? inheritedLomRef,
+  /// A priority capture can improve a first pointer's current LOM state, but a
+  /// blocked or failed capture never replaces a non-empty ref with ''.
+  ({String lomRef, bool isResolved}) resolveLomStateForPointerDown({
     required String currentLomRef,
   }) {
-    if (inheritedLomRef != null) return inheritedLomRef;
-    if (!_isRunning || _isNavigationBarrierActive) return currentLomRef;
+    if (!_isRunning || _isNavigationBarrierActive) {
+      return (lomRef: currentLomRef, isResolved: false);
+    }
 
     if (_needsPostScrollCapture) {
-      if (_hasAttemptedPriorityCaptureForCurrentState) return currentLomRef;
+      if (_hasAttemptedPriorityCaptureForCurrentState) {
+        return (lomRef: currentLomRef, isResolved: false);
+      }
 
       _hasAttemptedPriorityCaptureForCurrentState = true;
 
@@ -185,7 +187,8 @@ class LomCaptureScheduler {
           bypassCooldown: true,
         );
         if (lom != null) {
-          return _preserveCurrentLomRef(lom.id, currentLomRef);
+          final lomRef = _preserveCurrentLomRef(lom.id, currentLomRef);
+          return (lomRef: lomRef, isResolved: lom.id.isNotEmpty);
         }
       } catch (error, stackTrace) {
         _logPriorityCaptureError(
@@ -195,13 +198,18 @@ class LomCaptureScheduler {
         );
       }
 
-      return currentLomRef;
+      return (lomRef: currentLomRef, isResolved: false);
     }
 
     if (_isScrollCaptureSuppressed || !_hasUncapturedTreeChange) {
-      return currentLomRef;
+      return (
+        lomRef: currentLomRef,
+        isResolved: currentLomRef.isNotEmpty && !_hasUncapturedTreeChange,
+      );
     }
-    if (_hasAttemptedPriorityCaptureForCurrentState) return currentLomRef;
+    if (_hasAttemptedPriorityCaptureForCurrentState) {
+      return (lomRef: currentLomRef, isResolved: false);
+    }
 
     _hasAttemptedPriorityCaptureForCurrentState = true;
 
@@ -212,7 +220,8 @@ class LomCaptureScheduler {
         bypassCooldown: true,
       );
       if (lom != null) {
-        return _preserveCurrentLomRef(lom.id, currentLomRef);
+        final lomRef = _preserveCurrentLomRef(lom.id, currentLomRef);
+        return (lomRef: lomRef, isResolved: lom.id.isNotEmpty);
       }
     } catch (error, stackTrace) {
       _logPriorityCaptureError(
@@ -223,7 +232,7 @@ class LomCaptureScheduler {
     }
 
     _scheduleDebouncedCapture(restart: false);
-    return currentLomRef;
+    return (lomRef: currentLomRef, isResolved: false);
   }
 
   String _preserveCurrentLomRef(

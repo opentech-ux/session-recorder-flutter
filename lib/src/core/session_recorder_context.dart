@@ -25,8 +25,8 @@ abstract interface class SessionRecorderContext {
   /// Current LOM id used to bind events to their screen snapshot.
   String? get currentLomRef;
 
-  /// Resolves the LOM reference to freeze when a pointer starts.
-  String resolveLomRefForPointerDown({String? inheritedLomRef});
+  /// Resolves the LOM state to freeze when a pointer starts.
+  ({String lomRef, bool isResolved}) resolveLomStateForPointerDown();
 
   void recordLom(LomAbstract? lom);
   void recordAction(ActionEvent action);
@@ -50,7 +50,8 @@ class NoOpContext implements SessionRecorderContext {
   @override
   bool get hasPendingPostScrollCapture => false;
   @override
-  String resolveLomRefForPointerDown({String? inheritedLomRef}) => '';
+  ({String lomRef, bool isResolved}) resolveLomStateForPointerDown() =>
+      (lomRef: '', isResolved: false);
   @override
   void recordAction(ActionEvent action) {}
   @override
@@ -119,11 +120,9 @@ class ContextImpl implements SessionRecorderContext {
       _detector?.hasPendingPostScrollCapture ?? false;
 
   @override
-  String resolveLomRefForPointerDown({String? inheritedLomRef}) =>
-      _detector?.resolveLomRefForPointerDown(
-        inheritedLomRef: inheritedLomRef,
-      ) ??
-      '';
+  ({String lomRef, bool isResolved}) resolveLomStateForPointerDown() =>
+      _detector?.resolveLomStateForPointerDown() ??
+      (lomRef: currentLomRef ?? '', isResolved: false);
 
   @override
   void recordAction(ActionEvent action) {

@@ -5,6 +5,8 @@ import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 class PointerTrace {
   final int pointer;
   final String lomRef;
+  final bool isLomStateResolved;
+  final int downOrder;
   final List<TimedPosition> positions;
   GesturesType type;
 
@@ -14,6 +16,8 @@ class PointerTrace {
   PointerTrace({
     required this.pointer,
     this.lomRef = '',
+    this.isLomStateResolved = false,
+    this.downOrder = 0,
     List<TimedPosition>? positions,
     required this.type,
     this.isDragOnly = false,
@@ -69,6 +73,8 @@ class PointerTrace {
     return PointerTrace(
       pointer: pointer,
       lomRef: lomRef,
+      isLomStateResolved: isLomStateResolved,
+      downOrder: downOrder,
       type: newType,
       isDragOnly: isDragOnly,
     )..add(

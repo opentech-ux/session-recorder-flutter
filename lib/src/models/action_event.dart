@@ -7,16 +7,16 @@ abstract class ActionEvent {
   final int timestampRelative;
   final GesturesType actionType;
   final Rect viewport;
-  final Offset position;
   final String lomRef;
 
   const ActionEvent({
     required this.timestampRelative,
     required this.actionType,
     required this.viewport,
-    required this.position,
     required this.lomRef,
   });
+
+  Offset get position;
 
   @protected
   List<String> get baseParts => [
@@ -32,36 +32,60 @@ abstract class ActionEvent {
 }
 
 class TapActionEvent extends ActionEvent {
+  @override
+  final Offset position;
+
   const TapActionEvent({
     required super.timestampRelative,
     required super.viewport,
-    required super.position,
+    required this.position,
     required super.lomRef,
   }) : super(actionType: GesturesType.tap);
 }
 
 class DoubleTapActionEvent extends ActionEvent {
-  /// Internal origin used only to keep tap/doubleTap ordering coherent.
-  final int? originTimestampRelative;
-  final Offset? originPosition;
+  final int secondTimestamp;
+  final List<Offset> positions;
 
-  const DoubleTapActionEvent({
+  DoubleTapActionEvent({
     required super.timestampRelative,
     required super.viewport,
-    required super.position,
+    required this.secondTimestamp,
+    required List<Offset> positions,
     required super.lomRef,
-    this.originTimestampRelative,
-    this.originPosition,
-  }) : super(actionType: GesturesType.doubleTap);
+  }) : assert(positions.length == 2),
+       positions = List<Offset>.unmodifiable(positions),
+       super(actionType: GesturesType.doubleTap);
+
+  @override
+  Offset get position => positions.first;
+
+  @override
+  String concatenateString() {
+    final positionsString = positions
+        .map((position) => '${position.dx.toInt()},${position.dy.toInt()}')
+        .join('|');
+
+    return [
+      timestampRelative.toString(),
+      actionType.name,
+      '${viewport.left.toInt()},${viewport.top.toInt()}',
+      positionsString,
+      secondTimestamp.toString(),
+      lomRef,
+    ].join(':');
+  }
 }
 
 class LongPressActionEvent extends ActionEvent {
+  @override
+  final Offset position;
   final Duration duration;
 
   const LongPressActionEvent({
     required super.timestampRelative,
     required super.viewport,
-    required super.position,
+    required this.position,
     required super.lomRef,
     required this.duration,
   }) : super(actionType: GesturesType.longPress);
