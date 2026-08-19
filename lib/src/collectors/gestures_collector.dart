@@ -22,12 +22,14 @@ class GestureCollector {
   final Map<int, PointerTrace> _pointers = {};
   final Set<int> _ignoredPointers = {};
   final List<PointerTrace> _lastTaps = [];
-  PinchMetricsBaseline? _pinchMetrics;
+  PinchMetricsBaseline? _candidatePinchBaseline;
+  _ActivePinchSession? _activePinch;
 
   /// Called when a pointer first touches the screen.
   void onPointerDown(PointerDownEvent details) {
     final int pointer = details.pointer;
-    final viewport = _viewportProvider();
+    final activePinch = _activePinch;
+    final viewport = _viewportProvider() ?? activePinch?.viewport;
     if (viewport == null) {
       _ignoredPointers.add(pointer);
       return;
@@ -36,9 +38,11 @@ class GestureCollector {
     final hasActivePointers =
         _pointers.isNotEmpty || _ignoredPointers.isNotEmpty;
     final inheritedLomRef = _oldestActivePointer()?.lomRef;
-    final lomRef = hasActivePointers
-        ? inheritedLomRef ?? _engine.context.currentLomRef ?? ''
-        : _engine.context.resolveLomRefForPointerDown();
+    final lomRef =
+        activePinch?.lomRef ??
+        (hasActivePointers
+            ? inheritedLomRef ?? _engine.context.currentLomRef ?? ''
+            : _engine.context.resolveLomRefForPointerDown());
 
     /// Add the first [PointerTrace]
     addPointer(
@@ -50,7 +54,13 @@ class GestureCollector {
 
     if (_ignoredPointers.contains(pointer)) return;
 
-    _updatePinchMetrics();
+    final pointerTrace = _pointers[pointer];
+    if (activePinch != null && pointerTrace != null) {
+      _joinActivePinch(pointerTrace);
+      return;
+    }
+
+    _updateCandidatePinchBaseline();
   }
 
   /// Called whenever the pointer moves across the screen.
@@ -76,13 +86,26 @@ class GestureCollector {
     /// add it
     if (pointerTrace == null) {
       /// Add the [PointerTrace]
-      addPointer(pointer, position);
+      final activePinch = _activePinch;
+      addPointer(
+        pointer,
+        position,
+        viewport: activePinch?.viewport,
+        lomRef: activePinch?.lomRef,
+      );
+
+      final recoveredTrace = _pointers[pointer];
+      if (activePinch != null && recoveredTrace != null) {
+        _joinActivePinch(recoveredTrace);
+      } else {
+        _updateCandidatePinchBaseline();
+      }
 
       return;
     }
 
     if (pointerTrace.isEmpty) {
-      _updatePinchMetrics();
+      _updateCandidatePinchBaseline();
       return;
     }
 
@@ -91,6 +114,22 @@ class GestureCollector {
       position,
       viewport: viewport,
     );
+
+    final activePinch = _activePinch;
+    if (activePinch != null) {
+      final track = activePinch.tracks[pointer];
+      if (track == null) {
+        _joinActivePinch(pointerTrace);
+      } else {
+        pointerTrace.setType(GesturesType.pinch);
+        track.positions.add(pointerTrace.last);
+      }
+
+      if (_pointers.length >= 2) {
+        MathUtils.evaluatePinchGesture(_pointers, activePinch.baseline);
+      }
+      return;
+    }
 
     if (pointerTrace.type != GesturesType.pinch &&
         pointerTrace.distance >= touchSlop) {
@@ -117,62 +156,60 @@ class GestureCollector {
 
     bool isScaling = false;
 
-    if (_pointers.length >= 2 && _pinchMetrics != null) {
-      isScaling = MathUtils.evaluatePinchGesture(_pointers, _pinchMetrics!);
+    if (_pointers.length >= 2 && _candidatePinchBaseline != null) {
+      isScaling = MathUtils.evaluatePinchGesture(
+        _pointers,
+        _candidatePinchBaseline!,
+      );
     }
 
-    final bool isAlreadyScaling = pointerTrace.type == GesturesType.pinch;
-
-    // * SPLIT SCALING
-    if (isScaling || isAlreadyScaling) {
-      /// Split and emit the exploration
-      for (var p in _pointers.values) {
-        final isSomePointerPinching =
-            _pinchMetrics!.initialPositions!.containsKey(p.pointer);
-
-        if (!isSomePointerPinching) continue;
-
-        if (p.type == GesturesType.pinch) continue;
-
-        if (p.type == GesturesType.drag) {
-          _emitExplorations(p);
-
-          _pointers[p.pointer] = p.splitForTransition(
-            newType: GesturesType.pinch,
-          );
-        } else {
-          p.setType(GesturesType.pinch);
-        }
-      }
-    }
+    if (isScaling) _startActivePinch(pointerTrace);
   }
 
   /// Called whenever the pointer cancels in the screen (e.g. a phone call).
   void onPointerCancel(PointerCancelEvent details) {
     final pointer = details.pointer;
     _ignoredPointers.remove(pointer);
-    final pointerTrace = _pointers.remove(pointer);
+    final pointerTrace = _pointers[pointer];
     _lastTaps.removeWhere((tap) => tap.pointer == pointer);
+
+    final activePinch = _activePinch;
+    if (activePinch != null && pointerTrace != null) {
+      final cancelTimestamp = DateTime.now().millisecondsSinceEpoch;
+      activePinch.tracks[pointer]?.exitTimestamp = cancelTimestamp;
+      _pointers.remove(pointer);
+      _continueOrFinishActivePinch(cancelTimestamp);
+      return;
+    }
+
+    _pointers.remove(pointer);
 
     if (pointerTrace != null) {
       if (!pointerTrace.isEmpty &&
-          (pointerTrace.type == GesturesType.drag ||
-              pointerTrace.type == GesturesType.pinch)) {
+          pointerTrace.type == GesturesType.drag) {
         _emitExplorations(pointerTrace);
-      }
-
-      if (pointerTrace.type == GesturesType.pinch) {
-        _preserveRemainingPinchPointer();
       }
     }
 
-    _updatePinchMetrics();
+    _updateCandidatePinchBaseline();
   }
 
   /// Forced shutdown when the collection is interrupted
   void forceRecordCollector() {
+    if (_activePinch != null) {
+      _finishActivePinch(
+        DateTime.now().millisecondsSinceEpoch,
+        preserveSurvivor: false,
+      );
+      _pointers.clear();
+      _candidatePinchBaseline = null;
+      _lastTaps.clear();
+      _ignoredPointers.clear();
+      return;
+    }
+
     if (_pointers.isEmpty) {
-      _pinchMetrics = null;
+      _candidatePinchBaseline = null;
       _lastTaps.clear();
       _ignoredPointers.clear();
       return;
@@ -184,7 +221,7 @@ class GestureCollector {
     }
 
     _pointers.clear();
-    _pinchMetrics = null;
+    _candidatePinchBaseline = null;
     _lastTaps.clear();
     _ignoredPointers.clear();
   }
@@ -192,7 +229,7 @@ class GestureCollector {
   /// Emit any valid gesture that is in progress to the record before
   /// the pointer is destroyed by a system interrupt.
   void _evaluatePointer(PointerTrace p) {
-    if (p.type == GesturesType.pinch || p.type == GesturesType.drag) {
+    if (p.type == GesturesType.drag) {
       _emitExplorations(p);
     } else if (p.isDragOnly) {
       if (p.distance >= touchSlop) {
@@ -258,33 +295,172 @@ class GestureCollector {
     return oldest;
   }
 
-  /// Update the Pinch Metrics Baseline
-  void _updatePinchMetrics() {
-    var removedPinchPointer = false;
+  PinchMetricsBaseline _buildPinchBaseline() {
+    return PinchMetricsBaseline(
+      initialPositions: _pointers.map(
+        (key, pointer) => MapEntry(key, pointer.lastPosition),
+      ),
+      centroid: MathUtils.getCentroid(_pointers),
+      avgDistance: MathUtils.getAverageDistance(_pointers),
+    );
+  }
+
+  void _updateCandidatePinchBaseline() {
     final emptyPointers = _pointers.entries
         .where((entry) => entry.value.isEmpty)
         .toList();
 
+    final removedAt = DateTime.now().millisecondsSinceEpoch;
     for (final entry in emptyPointers) {
       _pointers.remove(entry.key);
       _ignoredPointers.add(entry.key);
-      if (entry.value.type == GesturesType.pinch) {
-        removedPinchPointer = true;
-      }
+      _activePinch?.tracks[entry.key]?.exitTimestamp = removedAt;
     }
 
-    if (removedPinchPointer) _preserveRemainingPinchPointer();
+    if (_activePinch != null) {
+      _continueOrFinishActivePinch(removedAt);
+      return;
+    }
 
     if (_pointers.length >= 2) {
-      _pinchMetrics = PinchMetricsBaseline(
-        initialPositions: _pointers.map(
-          (key, pointer) => MapEntry(key, pointer.lastPosition),
-        ),
-        centroid: MathUtils.getCentroid(_pointers),
-        avgDistance: MathUtils.getAverageDistance(_pointers),
-      );
+      _candidatePinchBaseline = _buildPinchBaseline();
     } else {
-      _pinchMetrics = null;
+      _candidatePinchBaseline = null;
+    }
+  }
+
+  void _joinActivePinch(PointerTrace pointerTrace) {
+    final activePinch = _activePinch;
+    if (activePinch == null || pointerTrace.isEmpty) return;
+
+    pointerTrace.setType(GesturesType.pinch);
+    activePinch.tracks[pointerTrace.pointer] = _ActivePinchTrack(
+      pointerId: pointerTrace.pointer,
+      entryTimestamp: pointerTrace.lastTimestamp,
+      positions: [pointerTrace.last],
+    );
+    _candidatePinchBaseline = null;
+
+    if (_pointers.length >= 2) {
+      activePinch.baseline = _buildPinchBaseline();
+    }
+  }
+
+  void _startActivePinch(PointerTrace qualifyingPointer) {
+    if (_activePinch != null || qualifyingPointer.isEmpty) return;
+
+    final startPosition = qualifyingPointer.last;
+    final oldestPointer = _oldestActivePointer();
+    final tracks = <int, _ActivePinchTrack>{};
+
+    for (final pointerTrace in _pointers.values) {
+      if (pointerTrace.isEmpty) continue;
+      final entryPosition = pointerTrace.pointer == qualifyingPointer.pointer
+          ? startPosition
+          : TimedPosition(
+              pointerTrace.lastPosition,
+              viewport: pointerTrace.last.viewport,
+              lomRef: pointerTrace.lomRef,
+            );
+      tracks[pointerTrace.pointer] = _ActivePinchTrack(
+        pointerId: pointerTrace.pointer,
+        entryTimestamp: startPosition.timestamp,
+        positions: [entryPosition],
+      );
+    }
+
+    _activePinch = _ActivePinchSession(
+      startTimestamp: startPosition.timestamp,
+      viewport: startPosition.viewport,
+      lomRef: oldestPointer?.lomRef ?? qualifyingPointer.lomRef,
+      tracks: tracks,
+      baseline: _buildPinchBaseline(),
+    );
+    _candidatePinchBaseline = null;
+
+    for (final pointerTrace in _pointers.values.toList()) {
+      if (pointerTrace.type == GesturesType.drag) {
+        if (pointerTrace.pointer == qualifyingPointer.pointer) {
+          final qualifyingPosition = pointerTrace.positions.removeLast();
+          if (!pointerTrace.isEmpty && pointerTrace.distance >= touchSlop) {
+            _emitExplorations(pointerTrace);
+          }
+          pointerTrace.positions.add(qualifyingPosition);
+        } else {
+          _emitExplorations(pointerTrace);
+        }
+
+        _pointers[pointerTrace.pointer] = pointerTrace.splitForTransition(
+          newType: GesturesType.pinch,
+        );
+      } else {
+        pointerTrace.setType(GesturesType.pinch);
+      }
+    }
+  }
+
+  void _continueOrFinishActivePinch(int timestamp) {
+    final activePinch = _activePinch;
+    if (activePinch == null) return;
+
+    if (_pointers.length >= 2) {
+      activePinch.baseline = _buildPinchBaseline();
+      return;
+    }
+
+    _finishActivePinch(timestamp, preserveSurvivor: true);
+  }
+
+  void _finishActivePinch(
+    int endTimestamp, {
+    required bool preserveSurvivor,
+  }) {
+    final activePinch = _activePinch;
+    if (activePinch == null) return;
+
+    for (final track in activePinch.tracks.values) {
+      track.exitTimestamp ??= endTimestamp;
+    }
+
+    final tracks = activePinch.tracks.values
+        .where((track) => track.positions.isNotEmpty)
+        .map((track) {
+          final sampledPositions = _samplePositions(track.positions);
+          return PinchTrack(
+            pointerId: track.pointerId,
+            entryDelta: track.entryTimestamp - activePinch.startTimestamp,
+            exitDelta: track.exitTimestamp! - activePinch.startTimestamp,
+            positions: sampledPositions
+                .map((position) => position.position)
+                .toList(),
+          );
+        })
+        .toList();
+
+    _activePinch = null;
+    _candidatePinchBaseline = null;
+
+    if (tracks.isNotEmpty) {
+      _engine.context.recordExploration(
+        PinchExplorationEvent(
+          timestamp: activePinch.startTimestamp,
+          viewport: activePinch.viewport,
+          endTimestamp: endTimestamp,
+          tracks: tracks,
+          lomRef: activePinch.lomRef,
+        ),
+      );
+    }
+
+    if (preserveSurvivor && _pointers.length == 1) {
+      final remainingPointer = _pointers.values.single;
+      if (!remainingPointer.isEmpty) {
+        _pointers[remainingPointer.pointer] =
+            remainingPointer.splitForTransition(
+              newType: GesturesType.tap,
+              isDragOnly: true,
+            );
+      }
     }
   }
 
@@ -294,15 +470,41 @@ class GestureCollector {
   void onPointerUp(PointerUpEvent details) {
     final int pointer = details.pointer;
     _ignoredPointers.remove(pointer);
-    final PointerTrace? pointerTrace = _pointers.remove(pointer);
+    final PointerTrace? pointerTrace = _pointers[pointer];
 
     if (pointerTrace == null) return;
 
-    if (pointerTrace.isEmpty) {
-      if (pointerTrace.type == GesturesType.pinch) {
-        _preserveRemainingPinchPointer();
+    final activePinch = _activePinch;
+    if (activePinch != null) {
+      int endTimestamp;
+      if (pointerTrace.isEmpty) {
+        endTimestamp = DateTime.now().millisecondsSinceEpoch;
+      } else {
+        final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
+        pointerTrace.add(
+          details.position,
+          viewport: viewport,
+        );
+
+        final track = activePinch.tracks[pointer];
+        if (track == null) {
+          _joinActivePinch(pointerTrace);
+        } else {
+          track.positions.add(pointerTrace.last);
+        }
+        endTimestamp = pointerTrace.lastTimestamp;
       }
-      _updatePinchMetrics();
+
+      activePinch.tracks[pointer]?.exitTimestamp = endTimestamp;
+      _pointers.remove(pointer);
+      _continueOrFinishActivePinch(endTimestamp);
+      return;
+    }
+
+    _pointers.remove(pointer);
+
+    if (pointerTrace.isEmpty) {
+      _updateCandidatePinchBaseline();
       return;
     }
 
@@ -312,14 +514,13 @@ class GestureCollector {
       viewport: viewport,
     );
 
-    // * PINCH
+    // A stale pinch trace cannot produce an independent pinch event.
     if (pointerTrace.type == GesturesType.pinch) {
-      _evaluatePinch(pointerTrace);
-
+      _updateCandidatePinchBaseline();
       return;
     }
 
-    _updatePinchMetrics();
+    _updateCandidatePinchBaseline();
 
     // A transition trace cannot become a tap or long press. A long-press drag
     // is already typed as drag, while a post-pinch trace must first move far
@@ -418,42 +619,6 @@ class GestureCollector {
     _engine.context.recordAction(action);
   }
 
-  void _evaluatePinch(PointerTrace pointerTrace) {
-    _emitExplorations(pointerTrace);
-
-    if (_pointers.length == 1) {
-      final lastPointer = _pointers.values.first;
-
-      if (lastPointer.type == GesturesType.pinch) {
-        _emitExplorations(lastPointer);
-
-        _pointers[lastPointer.pointer] = lastPointer.splitForTransition(
-          newType: GesturesType.tap,
-          isDragOnly: true,
-        );
-      }
-    }
-
-    _updatePinchMetrics();
-  }
-
-  void _preserveRemainingPinchPointer() {
-    final remainingPinchPointers = _pointers.values
-        .where(
-          (trace) => trace.type == GesturesType.pinch && !trace.isEmpty,
-        )
-        .toList();
-
-    if (remainingPinchPointers.length != 1) return;
-
-    final remainingPointer = remainingPinchPointers.single;
-    _emitExplorations(remainingPointer);
-    _pointers[remainingPointer.pointer] = remainingPointer.splitForTransition(
-      newType: GesturesType.tap,
-      isDragOnly: true,
-    );
-  }
-
   void _emitExplorations(PointerTrace pointerTrace) {
     final explorations = _createExplorationEvent(pointerTrace);
     if (explorations.isNotEmpty) {
@@ -516,26 +681,10 @@ class GestureCollector {
     }
   }
 
-  /// Creates a `[ExplorationEvent]` gonna create it by the `pointers` type
-  ///
-  /// Could return a `[DragExplorationEvent]`, `[PinchExplorationEvent]` list
+  /// Creates drag explorations from a pointer trace.
   List<ExplorationEvent> _createExplorationEvent(PointerTrace pointer) {
-    List<ExplorationEvent> explorationEvents = [];
-
-    switch (pointer.type) {
-      case GesturesType.drag:
-        explorationEvents = _getDragExploration(pointer);
-        break;
-      case GesturesType.pinch:
-        explorationEvents = [_getPinchExploration(pointer)];
-
-        break;
-
-      default:
-        return [];
-    }
-
-    return explorationEvents;
+    if (pointer.type != GesturesType.drag) return [];
+    return _getDragExploration(pointer);
   }
 
   /// Converts the recorded `[PointerTrace]` data into a list of `[DragExplorationEvent]`
@@ -560,23 +709,6 @@ class GestureCollector {
     );
 
     return panList;
-  }
-
-  /// Converts the recorded `[PointerTrace]` data into a list of `[PinchExplorationEvent]`
-  /// instances.
-  PinchExplorationEvent _getPinchExploration(PointerTrace pointer) {
-    final sampledPositions = _samplePositions(pointer.positions);
-
-    final pinch = PinchExplorationEvent(
-      timestamp: pointer.firstTimestamp,
-      pointer: pointer.pointer,
-      endTimestamp: pointer.lastTimestamp,
-      viewport: pointer.first.viewport,
-      positions: sampledPositions.map((p) => p.position).toList(),
-      lomRef: pointer.first.lomRef,
-    );
-
-    return pinch;
   }
 
   /// Returns a sampled version of `positions` keeping every `timestampThresholdMs` point.
@@ -624,4 +756,33 @@ class GestureCollector {
       timestampThresholdMs: timestampThresholdMs,
     );
   }
+}
+
+final class _ActivePinchSession {
+  final int startTimestamp;
+  final Rect viewport;
+  final String lomRef;
+  final Map<int, _ActivePinchTrack> tracks;
+  PinchMetricsBaseline baseline;
+
+  _ActivePinchSession({
+    required this.startTimestamp,
+    required this.viewport,
+    required this.lomRef,
+    required this.tracks,
+    required this.baseline,
+  });
+}
+
+final class _ActivePinchTrack {
+  final int pointerId;
+  final int entryTimestamp;
+  int? exitTimestamp;
+  final List<TimedPosition> positions;
+
+  _ActivePinchTrack({
+    required this.pointerId,
+    required this.entryTimestamp,
+    required this.positions,
+  });
 }

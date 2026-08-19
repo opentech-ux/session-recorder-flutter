@@ -56,31 +56,47 @@ class DragExplorationEvent extends ExplorationEvent {
       'DragExplorationEvent(timestamp: $timestamp, viewport: $viewport, position: $position)';
 }
 
+@immutable
+class PinchTrack {
+  final int pointerId;
+  final int entryDelta;
+  final int exitDelta;
+  final List<Offset> positions;
+
+  const PinchTrack({
+    required this.pointerId,
+    required this.entryDelta,
+    required this.exitDelta,
+    required this.positions,
+  });
+}
+
 class PinchExplorationEvent extends ExplorationEvent {
   final int endTimestamp;
-  final int pointer;
-  final List<Offset> positions;
+  final List<PinchTrack> tracks;
 
   const PinchExplorationEvent({
     required super.timestamp,
-    required this.pointer,
     required super.viewport,
     required this.endTimestamp,
-    required this.positions,
+    required this.tracks,
     required super.lomRef,
   }) : super(explorationType: GesturesType.pinch);
 
   @override
   String concatenateString() {
-    final String positionsString = positions
-        .map((p) => '${p.dx.toInt()},${p.dy.toInt()}')
-        .join('|');
+    final tracksString = tracks.map((track) {
+      final positionsString = track.positions
+          .map((position) => '${position.dx.toInt()},${position.dy.toInt()}')
+          .join('|');
+      return '${track.pointerId},${track.entryDelta},${track.exitDelta}@$positionsString';
+    }).join(';');
+
     return [
       timestamp.toString(),
       explorationType.name,
-      pointer,
       viewportStringLT,
-      positionsString,
+      tracksString,
       endTimestamp.toString(),
       lomRef,
     ].join(':');
@@ -88,7 +104,7 @@ class PinchExplorationEvent extends ExplorationEvent {
 
   @override
   String toString() =>
-      'PinchExplorationEvent(timestamp: $timestamp, endTimestamp: $endTimestamp, viewport: $viewport, positions: $positions)';
+      'PinchExplorationEvent(timestamp: $timestamp, endTimestamp: $endTimestamp, viewport: $viewport, tracks: $tracks)';
 }
 
 class ScrollExplorationEvent extends ExplorationEvent {
