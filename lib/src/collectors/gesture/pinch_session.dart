@@ -8,6 +8,8 @@ final class PinchSession {
   final String lomRef;
   final bool isLomStateResolved;
 
+  // _tracks preserves the full session history; _activeTracks only indexes
+  // current participants, so a reused pointer id cannot overwrite old tracks.
   final List<_PinchTrackState> _tracks = [];
   final Map<int, _PinchTrackState> _activeTracks = {};
 

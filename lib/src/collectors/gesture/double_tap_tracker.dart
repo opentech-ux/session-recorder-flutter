@@ -6,6 +6,9 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 
 final class DoubleTapTracker {
   final void Function(ActionEvent event) _recordAction;
+
+  // Completed taps keep frozen gesture and LOM data until they are matched or
+  // their double-tap window expires.
   final List<_PendingTap> _pendingTaps = [];
 
   Timer? _doubleTapTimer;

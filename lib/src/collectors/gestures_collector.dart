@@ -125,9 +125,9 @@ class GestureCollector {
     }
 
     if (pointerTrace == null) {
-      // A move cannot create a new gesture without a real pointer down.
-      // Ignored contacts remain blocked until Up or Cancel so orphan moves
-      // cannot re-enter gesture recognition.
+      // Orphan moves are ignored instead of being promoted into gesture
+      // candidates. A later real PointerDown may establish a fresh trace for
+      // that pointer id.
       _ignoredPointers.add(pointer);
       return;
     }
@@ -142,25 +142,24 @@ class GestureCollector {
     final qualifyingPosition = pointerTrace.last;
     var currentTrace = pointerTrace;
 
-    if (currentTrace.type != GesturesType.pinch &&
+    if (currentTrace.type == GesturesType.longPress &&
         currentTrace.distance >= touchSlop) {
-      final isAlreadyLongPress =
-          currentTrace.type == GesturesType.longPress;
-
-      if (isAlreadyLongPress) {
-        _emitAction(currentTrace);
-        _pointers[currentTrace.pointer] = currentTrace.splitForTransition(
-          newType: GesturesType.drag,
-          isPostTransitionDragOnly: true,
-        );
-        // Re-read after the split so later phase logic never uses a stale
-        // trace from the completed long-press phase.
-        currentTrace = _pointers[currentTrace.pointer]!;
-      } else {
+      _emitLongPressAction(currentTrace);
+      _pointers[currentTrace.pointer] = currentTrace.splitForTransition(
+        newType: GesturesType.drag,
+        isPostTransitionDragOnly: true,
+      );
+      // Re-read after the split so later phase logic never uses a stale
+      // trace from the completed long-press phase.
+      currentTrace = _pointers[currentTrace.pointer]!;
+    } else if (currentTrace.type == GesturesType.tap &&
+        currentTrace.distance >= touchSlop) {
+      if (!currentTrace.isPostTransitionDragOnly) {
         _doubleTapTracker.resolveRelatedPendingBeforeNonTap(currentTrace);
-        currentTrace.setType(GesturesType.drag);
       }
-    } else if (currentTrace.type != GesturesType.pinch &&
+
+      currentTrace.setType(GesturesType.drag);
+    } else if (currentTrace.type == GesturesType.tap &&
         !currentTrace.isPostTransitionDragOnly &&
         currentTrace.distance <= touchSlop &&
         currentTrace.duration >= longPressTimeout) {
@@ -276,31 +275,19 @@ class GestureCollector {
   void _startPointerTrace(
     int pointer,
     Offset position, {
-    GesturesType type = GesturesType.tap,
-    Rect? viewport,
-    String? lomRef,
-    bool? isLomStateResolved,
-    int? downOrder,
+    required Rect viewport,
+    required String lomRef,
+    required bool isLomStateResolved,
+    required int downOrder,
   }) {
-    final resolvedViewport = viewport ?? _viewportProvider();
-    if (resolvedViewport == null) {
-      _ignoredPointers.add(pointer);
-      return;
-    }
-
     _ignoredPointers.remove(pointer);
-    final oldestPointer = _oldestActivePointer();
-    final resolvedLomRef =
-        lomRef ?? oldestPointer?.lomRef ?? _engine.context.currentLomRef ?? '';
-
     _pointers[pointer] = PointerTrace(
       pointer: pointer,
-      lomRef: resolvedLomRef,
-      isLomStateResolved:
-          isLomStateResolved ?? oldestPointer?.isLomStateResolved ?? false,
-      downOrder: downOrder ?? 0,
-      type: type,
-    )..add(position, viewport: resolvedViewport);
+      lomRef: lomRef,
+      isLomStateResolved: isLomStateResolved,
+      downOrder: downOrder,
+      type: GesturesType.tap,
+    )..add(position, viewport: viewport);
   }
 
   PointerTrace? _oldestActivePointer() {
@@ -556,7 +543,7 @@ class GestureCollector {
   }
 
   void _evaluateDrag(PointerTrace pointerTrace) {
-    if (pointerTrace.type != GesturesType.drag &&
+    if (pointerTrace.type == GesturesType.tap &&
         !pointerTrace.isPostTransitionDragOnly) {
       _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
@@ -567,11 +554,12 @@ class GestureCollector {
   }
 
   void _evaluateLongPress(PointerTrace pointerTrace) {
-    if (pointerTrace.type != GesturesType.longPress) {
+    if (pointerTrace.type == GesturesType.tap &&
+        !pointerTrace.isPostTransitionDragOnly) {
       _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
     pointerTrace.setType(GesturesType.longPress);
-    _engine.context.recordAction(_buildActionEvent(pointerTrace));
+    _engine.context.recordAction(_buildLongPressAction(pointerTrace));
   }
 
   void _emitDragEvents(PointerTrace pointerTrace) {
@@ -580,30 +568,19 @@ class GestureCollector {
     }
   }
 
-  void _emitAction(PointerTrace pointerTrace) {
-    _engine.context.recordAction(_buildActionEvent(pointerTrace));
+  void _emitLongPressAction(PointerTrace pointerTrace) {
+    _engine.context.recordAction(_buildLongPressAction(pointerTrace));
   }
 
-  ActionEvent _buildActionEvent(PointerTrace pointer) {
+  LongPressActionEvent _buildLongPressAction(PointerTrace pointer) {
     final firstPosition = pointer.first;
-
-    switch (pointer.type) {
-      case GesturesType.longPress:
-        return LongPressActionEvent(
-          timestampRelative: firstPosition.timestamp,
-          duration: pointer.duration,
-          viewport: firstPosition.viewport,
-          position: firstPosition.position,
-          lomRef: firstPosition.lomRef,
-        );
-      default:
-        return TapActionEvent(
-          timestampRelative: firstPosition.timestamp,
-          viewport: firstPosition.viewport,
-          position: firstPosition.position,
-          lomRef: firstPosition.lomRef,
-        );
-    }
+    return LongPressActionEvent(
+      timestampRelative: firstPosition.timestamp,
+      duration: pointer.duration,
+      viewport: firstPosition.viewport,
+      position: firstPosition.position,
+      lomRef: firstPosition.lomRef,
+    );
   }
 
   List<DragExplorationEvent> _buildDragEvents(PointerTrace pointer) {
