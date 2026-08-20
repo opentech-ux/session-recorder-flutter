@@ -60,6 +60,8 @@ class SessionRecorderConfig {
     /// Enable this ONLY to send TESTING data. Normally you do not
     /// have to enable this.
     bool debugSendSession = false,
+
+    ///{@macro session_logger}
     SessionLoggerCallback? logger,
   }) : shouldSend = kReleaseMode || debugSendSession,
        logger = logger ?? defaultSessionLogger;

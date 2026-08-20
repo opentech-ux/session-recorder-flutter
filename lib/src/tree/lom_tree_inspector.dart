@@ -58,15 +58,16 @@ class LomTreeInspector {
 
       final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
       final counter = _RootCounter();
-      // A child RenderObject has one real parent edge, so its cached value also
-      // prevents that edge from being inspected more than once per capture.
+      // Resolve each real parent edge only once per capture.
       final effectiveClips = HashMap<RenderObject, Rect>.identity();
+      final paintEligibility = HashMap<RenderObject, bool>.identity();
       final roots = _visitElement(
         element,
         viewport: viewport,
         effectiveClip: viewport,
         nearestRenderAncestor: null,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: _config,
         counter: counter,
       );
@@ -154,6 +155,7 @@ class LomTreeInspector {
     required Rect effectiveClip,
     required RenderObject? nearestRenderAncestor,
     required HashMap<RenderObject, Rect> effectiveClips,
+    required HashMap<RenderObject, bool> paintEligibility,
     required LomTreeConfig config,
     required _RootCounter counter,
   }) {
@@ -166,12 +168,16 @@ class LomTreeInspector {
     // RenderObjectElement introduces a new edge in the render tree.
     if (element is RenderObjectElement) {
       final renderObject = element.renderObject;
-      inheritedClip = _resolveEffectiveClip(
+      final resolvedClip = _resolveEffectiveClip(
         renderObject: renderObject,
         nearestRenderAncestor: nearestRenderAncestor,
         inheritedClip: effectiveClip,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
       );
+      // A definitive false means no descendant can paint through this edge.
+      if (resolvedClip == null) return [];
+      inheritedClip = resolvedClip;
       inheritedRenderAncestor = renderObject;
     }
 
@@ -188,6 +194,7 @@ class LomTreeInspector {
         effectiveClip: inheritedClip,
         nearestRenderAncestor: inheritedRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -200,6 +207,7 @@ class LomTreeInspector {
         effectiveClip: inheritedClip,
         nearestRenderAncestor: inheritedRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -214,6 +222,7 @@ class LomTreeInspector {
         effectiveClip: inheritedClip,
         nearestRenderAncestor: inheritedRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -229,6 +238,7 @@ class LomTreeInspector {
         effectiveClip: inheritedClip,
         nearestRenderAncestor: inheritedRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -242,6 +252,7 @@ class LomTreeInspector {
         effectiveClip: inheritedClip,
         nearestRenderAncestor: inheritedRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -254,6 +265,7 @@ class LomTreeInspector {
       effectiveClip: inheritedClip,
       nearestRenderAncestor: inheritedRenderAncestor,
       effectiveClips: effectiveClips,
+      paintEligibility: paintEligibility,
       config: config,
       counter: counter,
     );
@@ -277,17 +289,21 @@ class LomTreeInspector {
     required Rect effectiveClip,
     required RenderObject? nearestRenderAncestor,
     required HashMap<RenderObject, Rect> effectiveClips,
+    required HashMap<RenderObject, bool> paintEligibility,
     required LomTreeConfig config,
     required _RootCounter counter,
   }) {
     final children = <Root>[];
-    element.visitChildren((child) {
+    // Traverse only children Flutter considers onstage so retained routes and
+    // inactive branches do not become visible LOM nodes.
+    element.debugVisitOnstageChildren((child) {
       final rootChildren = _visitElement(
         child,
         viewport: viewport,
         effectiveClip: effectiveClip,
         nearestRenderAncestor: nearestRenderAncestor,
         effectiveClips: effectiveClips,
+        paintEligibility: paintEligibility,
         config: config,
         counter: counter,
       );
@@ -299,36 +315,49 @@ class LomTreeInspector {
     return children;
   }
 
-  static Rect _resolveEffectiveClip({
+  static Rect? _resolveEffectiveClip({
     required RenderObject renderObject,
     required RenderObject? nearestRenderAncestor,
     required Rect inheritedClip,
     required HashMap<RenderObject, Rect> effectiveClips,
+    required HashMap<RenderObject, bool> paintEligibility,
   }) {
+    if (paintEligibility[renderObject] == false) return null;
+
     if (effectiveClips.containsKey(renderObject)) {
       return effectiveClips[renderObject]!;
     }
 
     if (nearestRenderAncestor == null) {
       effectiveClips[renderObject] = inheritedClip;
+      paintEligibility[renderObject] = true;
       return inheritedClip;
     }
 
     effectiveClips.putIfAbsent(nearestRenderAncestor, () => inheritedClip);
+    paintEligibility.putIfAbsent(nearestRenderAncestor, () => true);
 
     // Stop at the first render ancestor already resolved. Any intermediate
     // RenderObjects are cached while unwinding, keeping the traversal linear.
     final chain = <RenderObject>[];
     var current = renderObject;
 
-    while (!effectiveClips.containsKey(current)) {
+    while (!effectiveClips.containsKey(current) &&
+        paintEligibility[current] != false) {
       chain.add(current);
       final parent = current.parent;
       if (parent is! RenderObject) {
+        // Unknown render relationships remain visible to keep capture fail-open.
         effectiveClips[renderObject] = inheritedClip;
+        paintEligibility[renderObject] = true;
         return inheritedClip;
       }
       current = parent;
+    }
+
+    if (paintEligibility[current] == false) {
+      paintEligibility[renderObject] = false;
+      return null;
     }
 
     var resolvedClip = effectiveClips[current]!;
@@ -336,8 +365,16 @@ class LomTreeInspector {
     for (final child in chain.reversed) {
       final parent = child.parent;
       if (parent is! RenderObject || !identical(parent, current)) {
+        // Unknown render relationships remain visible to keep capture fail-open.
         effectiveClips[renderObject] = inheritedClip;
+        paintEligibility[renderObject] = true;
         return inheritedClip;
+      }
+
+      if (_paintsChild(parent, child) == false) {
+        paintEligibility[child] = false;
+        paintEligibility[renderObject] = false;
+        return null;
       }
 
       final globalPaintClip = _globalPaintClip(parent, child);
@@ -347,10 +384,20 @@ class LomTreeInspector {
       }
 
       effectiveClips[child] = resolvedClip;
+      paintEligibility[child] = true;
       current = child;
     }
 
     return resolvedClip;
+  }
+
+  static bool? _paintsChild(RenderObject parent, RenderObject child) {
+    try {
+      return parent.paintsChild(child);
+    } catch (_) {
+      // Unknown paint participation remains visible to keep capture fail-open.
+      return null;
+    }
   }
 
   static Rect? _globalPaintClip(
