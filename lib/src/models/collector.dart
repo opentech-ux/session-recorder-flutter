@@ -11,7 +11,7 @@ class PointerTrace {
   GesturesType type;
 
   /// This transition trace may be a drag, but never a tap or long press.
-  final bool isDragOnly;
+  final bool isPostTransitionDragOnly;
 
   PointerTrace({
     required this.pointer,
@@ -20,7 +20,7 @@ class PointerTrace {
     this.downOrder = 0,
     List<TimedPosition>? positions,
     required this.type,
-    this.isDragOnly = false,
+    this.isPostTransitionDragOnly = false,
   }) : positions = positions ?? [];
 
   /// Requires this trace to contain at least one real position.
@@ -68,7 +68,7 @@ class PointerTrace {
 
   PointerTrace splitForTransition({
     required GesturesType newType,
-    bool isDragOnly = false,
+    bool isPostTransitionDragOnly = false,
   }) {
     return PointerTrace(
       pointer: pointer,
@@ -76,7 +76,7 @@ class PointerTrace {
       isLomStateResolved: isLomStateResolved,
       downOrder: downOrder,
       type: newType,
-      isDragOnly: isDragOnly,
+      isPostTransitionDragOnly: isPostTransitionDragOnly,
     )..add(
         lastPosition,
         viewport: positions.last.viewport,

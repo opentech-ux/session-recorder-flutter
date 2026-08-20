@@ -1,41 +1,48 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
+import 'package:session_recorder_flutter/src/collectors/gesture/double_tap_tracker.dart';
+import 'package:session_recorder_flutter/src/collectors/gesture/gesture_sampling.dart';
+import 'package:session_recorder_flutter/src/collectors/gesture/pinch_session.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
+import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
-import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
 class GestureCollector {
   final SessionRecorderEngineInternal _engine;
   final Rect? Function() _viewportProvider;
+  late final DoubleTapTracker _doubleTapTracker;
 
   GestureCollector({
     SessionRecorderEngineInternal? engine,
     required Rect? Function() viewportProvider,
   }) : _engine = engine ?? SessionRecorder.engine,
-       _viewportProvider = viewportProvider;
+       _viewportProvider = viewportProvider {
+    _doubleTapTracker = DoubleTapTracker(
+      recordAction: _engine.context.recordAction,
+    );
+  }
 
-  /// Tracks main active pointers for gesture detection and movement history
+  /// Tracks main active pointers for gesture detection and movement history.
   final Map<int, PointerTrace> _pointers = {};
   final Set<int> _ignoredPointers = {};
-  final List<_PendingTap> _pendingTaps = [];
-  Timer? _doubleTapTimer;
-  int? _doubleTapDeadline;
-  int _contactOrder = 0;
   PinchMetricsBaseline? _candidatePinchBaseline;
-  _ActivePinchSession? _activePinch;
+  PinchSession? _pinchSession;
 
   /// Called when a pointer first touches the screen.
   void onPointerDown(PointerDownEvent details) {
-    final int pointer = details.pointer;
-    final downOrder = ++_contactOrder;
-    final activePinch = _activePinch;
-    final viewport = _viewportProvider() ?? activePinch?.viewport;
+    final pointer = details.pointer;
+
+    // Physical contact ordering includes contacts that gesture recognition
+    // later ignores; double-tap matching depends on that complete ordering.
+    final downOrder = _doubleTapTracker.registerPointerDown();
+    final pinchSession = _pinchSession;
+    if (pinchSession?.hasActiveTrack(pointer) ?? false) return;
+
+    final viewport = _viewportProvider() ?? pinchSession?.viewport;
     if (viewport == null) {
       _ignoredPointers.add(pointer);
       return;
@@ -46,10 +53,10 @@ class GestureCollector {
     final oldestPointer = _oldestActivePointer();
     final ({String lomRef, bool isResolved}) lomState;
 
-    if (activePinch != null) {
+    if (pinchSession != null) {
       lomState = (
-        lomRef: activePinch.lomRef,
-        isResolved: oldestPointer?.isLomStateResolved ?? false,
+        lomRef: pinchSession.lomRef,
+        isResolved: pinchSession.isLomStateResolved,
       );
     } else if (hasActivePointers) {
       lomState = (
@@ -61,8 +68,7 @@ class GestureCollector {
       lomState = _engine.context.resolveLomStateForPointerDown();
     }
 
-    /// Add the first [PointerTrace]
-    addPointer(
+    _startPointerTrace(
       pointer,
       details.position,
       viewport: viewport,
@@ -74,8 +80,8 @@ class GestureCollector {
     if (_ignoredPointers.contains(pointer)) return;
 
     final pointerTrace = _pointers[pointer];
-    if (activePinch != null && pointerTrace != null) {
-      _joinActivePinch(pointerTrace);
+    if (pinchSession != null && pointerTrace != null) {
+      _joinPinchSession(pointerTrace);
       return;
     }
 
@@ -83,43 +89,46 @@ class GestureCollector {
   }
 
   /// Called whenever the pointer moves across the screen.
-  ///
-  /// Compares the current position and movement delta with the initial data
-  /// from [onPointerDown] to determine whether the gesture still qualifies
-  /// as a tap or if it should be treated for another gesture.
-  ///
-  /// This is where movement thresholds or gesture cancellation logic
-  /// (e.g. “no longer a tap”) are typically evaluated.
-  ///
-  /// Doing nothing if `_didScroll` is [true].
-  ///
   void onPointerMove(PointerMoveEvent details) {
-    final int pointer = details.pointer;
-    final Offset position = details.position;
+    final pointer = details.pointer;
+    final position = details.position;
 
     if (_ignoredPointers.contains(pointer)) return;
 
-    final PointerTrace? pointerTrace = _pointers[pointer];
+    final pointerTrace = _pointers[pointer];
+    final pinchSession = _pinchSession;
 
-    /// If for some reason the current `pointer` not exist in `_pointers`, we
-    /// add it
-    if (pointerTrace == null) {
-      /// Add the [PointerTrace]
-      final activePinch = _activePinch;
-      addPointer(
-        pointer,
-        position,
-        viewport: activePinch?.viewport,
-        lomRef: activePinch?.lomRef,
-      );
+    if (pinchSession != null) {
+      // During pinch, only an already-active track may recover a missing
+      // PointerTrace. An unrelated Move cannot join the gesture.
+      if (!pinchSession.hasActiveTrack(pointer)) return;
 
-      final recoveredTrace = _pointers[pointer];
-      if (activePinch != null && recoveredTrace != null) {
-        _joinActivePinch(recoveredTrace);
+      final viewport = _viewportProvider() ??
+          (pointerTrace != null && !pointerTrace.isEmpty
+              ? pointerTrace.last.viewport
+              : pinchSession.viewport);
+      if (pointerTrace != null) {
+        pointerTrace.add(position, viewport: viewport);
+        pointerTrace.setType(GesturesType.pinch);
+        pinchSession.move(pointer, pointerTrace.last);
       } else {
-        _updateCandidatePinchBaseline();
+        pinchSession.move(
+          pointer,
+          TimedPosition(
+            position,
+            viewport: viewport,
+            lomRef: pinchSession.lomRef,
+          ),
+        );
       }
+      return;
+    }
 
+    if (pointerTrace == null) {
+      // A move cannot create a new gesture without a real pointer down.
+      // Ignored contacts remain blocked until Up or Cancel so orphan moves
+      // cannot re-enter gesture recognition.
+      _ignoredPointers.add(pointer);
       return;
     }
 
@@ -129,104 +138,97 @@ class GestureCollector {
     }
 
     final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
-    pointerTrace.add(
-      position,
-      viewport: viewport,
-    );
+    pointerTrace.add(position, viewport: viewport);
+    final qualifyingPosition = pointerTrace.last;
+    var currentTrace = pointerTrace;
 
-    final activePinch = _activePinch;
-    if (activePinch != null) {
-      final track = activePinch.tracks[pointer];
-      if (track == null) {
-        _joinActivePinch(pointerTrace);
-      } else {
-        pointerTrace.setType(GesturesType.pinch);
-        track.positions.add(pointerTrace.last);
-      }
-
-      if (_pointers.length >= 2) {
-        MathUtils.evaluatePinchGesture(_pointers, activePinch.baseline);
-      }
-      return;
-    }
-
-    if (pointerTrace.type != GesturesType.pinch &&
-        pointerTrace.distance >= touchSlop) {
-      // * SPLIT LONG PRESS
-      final bool isAlreadyLongPress =
-          pointerTrace.type == GesturesType.longPress;
+    if (currentTrace.type != GesturesType.pinch &&
+        currentTrace.distance >= touchSlop) {
+      final isAlreadyLongPress =
+          currentTrace.type == GesturesType.longPress;
 
       if (isAlreadyLongPress) {
-        _emitAction(pointerTrace);
-
-        _pointers[pointerTrace.pointer] = pointerTrace.splitForTransition(
+        _emitAction(currentTrace);
+        _pointers[currentTrace.pointer] = currentTrace.splitForTransition(
           newType: GesturesType.drag,
-          isDragOnly: true,
+          isPostTransitionDragOnly: true,
         );
+        // Re-read after the split so later phase logic never uses a stale
+        // trace from the completed long-press phase.
+        currentTrace = _pointers[currentTrace.pointer]!;
       } else {
-        _resolvePendingTapForTrace(pointerTrace);
-        pointerTrace.setType(GesturesType.drag);
+        _doubleTapTracker.resolveRelatedPendingBeforeNonTap(currentTrace);
+        currentTrace.setType(GesturesType.drag);
       }
-    } else if (pointerTrace.type != GesturesType.pinch &&
-        !pointerTrace.isDragOnly &&
-        pointerTrace.distance <= touchSlop &&
-        pointerTrace.duration >= longPressTimeout) {
-      _resolvePendingTapForTrace(pointerTrace);
-      pointerTrace.setType(GesturesType.longPress);
+    } else if (currentTrace.type != GesturesType.pinch &&
+        !currentTrace.isPostTransitionDragOnly &&
+        currentTrace.distance <= touchSlop &&
+        currentTrace.duration >= longPressTimeout) {
+      _doubleTapTracker.resolveRelatedPendingBeforeNonTap(currentTrace);
+      currentTrace.setType(GesturesType.longPress);
     }
 
-    bool isScaling = false;
-
+    var qualifiesForPinch = false;
+    // Candidate geometry is evaluated only until the pinch session starts.
     if (_pointers.length >= 2 && _candidatePinchBaseline != null) {
-      isScaling = MathUtils.evaluatePinchGesture(
+      qualifiesForPinch = MathUtils.evaluatePinchGesture(
         _pointers,
         _candidatePinchBaseline!,
       );
     }
 
-    if (isScaling) _startActivePinch(pointerTrace);
+    if (qualifiesForPinch) {
+      _startPinchSession(
+        currentTrace,
+        qualifyingPosition: qualifyingPosition,
+      );
+    }
   }
 
-  /// Called whenever the pointer cancels in the screen (e.g. a phone call).
+  /// Called whenever the pointer cancels on the screen (e.g. a phone call).
   void onPointerCancel(PointerCancelEvent details) {
     final pointer = details.pointer;
     _ignoredPointers.remove(pointer);
     final pointerTrace = _pointers[pointer];
+    final pinchSession = _pinchSession;
 
-    final activePinch = _activePinch;
-    if (activePinch != null && pointerTrace != null) {
+    if (pinchSession != null) {
       final cancelTimestamp = DateTime.now().millisecondsSinceEpoch;
-      activePinch.tracks[pointer]?.exitTimestamp = cancelTimestamp;
+      final didCloseTrack = pinchSession.pointerCancel(
+        pointer,
+        cancelTimestamp,
+      );
       _pointers.remove(pointer);
-      _continueOrFinishActivePinch(cancelTimestamp);
+      if (didCloseTrack) _finishPinchIfNeeded(cancelTimestamp);
       return;
     }
 
     if (pointerTrace != null &&
         !pointerTrace.isEmpty &&
-        !pointerTrace.isDragOnly &&
+        !pointerTrace.isPostTransitionDragOnly &&
         pointerTrace.type == GesturesType.tap) {
-      _resolvePendingTapForTrace(pointerTrace);
+      _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
 
     _pointers.remove(pointer);
 
-    if (pointerTrace != null) {
-      if (!pointerTrace.isEmpty &&
-          pointerTrace.type == GesturesType.drag) {
-        _emitExplorations(pointerTrace);
-      }
+    if (pointerTrace != null &&
+        !pointerTrace.isEmpty &&
+        pointerTrace.type == GesturesType.drag) {
+      _emitDragEvents(pointerTrace);
     }
 
     _updateCandidatePinchBaseline();
   }
 
-  /// Forced shutdown when the collection is interrupted
+  /// Forced shutdown when the collection is interrupted.
   void forceRecordCollector() {
-    _drainPendingTaps();
+    // Drain pending taps before active traces so each physical tap has one
+    // owner.
+    _doubleTapTracker.drain();
 
-    if (_activePinch != null) {
-      _finishActivePinch(
+    if (_pinchSession != null) {
+      _finishPinchSession(
         DateTime.now().millisecondsSinceEpoch,
         preserveSurvivor: false,
       );
@@ -242,9 +244,9 @@ class GestureCollector {
       return;
     }
 
-    for (var p in _pointers.values) {
-      if (p.isEmpty) continue;
-      _evaluatePointer(p);
+    for (final pointer in _pointers.values) {
+      if (pointer.isEmpty) continue;
+      _drainPointerTrace(pointer);
     }
 
     _pointers.clear();
@@ -252,28 +254,26 @@ class GestureCollector {
     _ignoredPointers.clear();
   }
 
-  /// Emit any valid gesture that is in progress to the record before
-  /// the pointer is destroyed by a system interrupt.
-  void _evaluatePointer(PointerTrace p) {
-    if (p.type == GesturesType.drag) {
-      _emitExplorations(p);
-    } else if (p.isDragOnly) {
-      if (p.distance >= touchSlop) {
-        p.setType(GesturesType.drag);
-        _emitExplorations(p);
+  /// Emit any valid gesture in progress before a system interrupt.
+  void _drainPointerTrace(PointerTrace pointer) {
+    if (pointer.type == GesturesType.drag) {
+      _emitDragEvents(pointer);
+    } else if (pointer.isPostTransitionDragOnly) {
+      if (pointer.distance >= touchSlop) {
+        pointer.setType(GesturesType.drag);
+        _emitDragEvents(pointer);
       }
-    } else if (p.type == GesturesType.longPress ||
-        (p.duration >= longPressTimeout && p.distance < touchSlop)) {
-      _evaluateLongPress(p);
-    } else if (p.distance >= touchSlop) {
-      _evaluateDrag(p);
+    } else if (pointer.type == GesturesType.longPress ||
+        (pointer.duration >= longPressTimeout &&
+            pointer.distance < touchSlop)) {
+      _evaluateLongPress(pointer);
+    } else if (pointer.distance >= touchSlop) {
+      _evaluateDrag(pointer);
     }
   }
 
-  /// Add the first `[PointerTrace]` with their first `[TimedPosition]`.
-  ///
-  /// Set `[GesturesType.tap]` type by __default__.
-  void addPointer(
+  /// Starts a trace with its first real position.
+  void _startPointerTrace(
     int pointer,
     Offset position, {
     GesturesType type = GesturesType.tap,
@@ -298,13 +298,9 @@ class GestureCollector {
       lomRef: resolvedLomRef,
       isLomStateResolved:
           isLomStateResolved ?? oldestPointer?.isLomStateResolved ?? false,
-      downOrder: downOrder ?? _contactOrder,
+      downOrder: downOrder ?? 0,
       type: type,
-    )
-      ..add(
-        position,
-        viewport: resolvedViewport,
-      );
+    )..add(position, viewport: resolvedViewport);
   }
 
   PointerTrace? _oldestActivePointer() {
@@ -323,7 +319,7 @@ class GestureCollector {
     return oldest;
   }
 
-  PinchMetricsBaseline _buildPinchBaseline() {
+  PinchMetricsBaseline _buildCandidatePinchBaseline() {
     return PinchMetricsBaseline(
       initialPositions: _pointers.map(
         (key, pointer) => MapEntry(key, pointer.lastPosition),
@@ -334,210 +330,190 @@ class GestureCollector {
   }
 
   void _updateCandidatePinchBaseline() {
+    if (_pinchSession != null) return;
+
     final emptyPointers = _pointers.entries
         .where((entry) => entry.value.isEmpty)
         .toList();
-
-    final removedAt = DateTime.now().millisecondsSinceEpoch;
     for (final entry in emptyPointers) {
       _pointers.remove(entry.key);
       _ignoredPointers.add(entry.key);
-      _activePinch?.tracks[entry.key]?.exitTimestamp = removedAt;
-    }
-
-    if (_activePinch != null) {
-      _continueOrFinishActivePinch(removedAt);
-      return;
     }
 
     if (_pointers.length >= 2) {
-      _candidatePinchBaseline = _buildPinchBaseline();
+      _candidatePinchBaseline = _buildCandidatePinchBaseline();
     } else {
       _candidatePinchBaseline = null;
     }
   }
 
-  void _joinActivePinch(PointerTrace pointerTrace) {
-    final activePinch = _activePinch;
-    if (activePinch == null || pointerTrace.isEmpty) return;
+  void _joinPinchSession(PointerTrace pointerTrace) {
+    final pinchSession = _pinchSession;
+    if (pinchSession == null || pointerTrace.isEmpty) return;
 
-    pointerTrace.setType(GesturesType.pinch);
-    activePinch.tracks[pointerTrace.pointer] = _ActivePinchTrack(
+    final didJoin = pinchSession.join(
       pointerId: pointerTrace.pointer,
       entryTimestamp: pointerTrace.lastTimestamp,
-      positions: [pointerTrace.last],
+      initialPosition: pointerTrace.last,
     );
-    _candidatePinchBaseline = null;
+    if (!didJoin) return;
 
-    if (_pointers.length >= 2) {
-      activePinch.baseline = _buildPinchBaseline();
-    }
+    pointerTrace.setType(GesturesType.pinch);
+    _candidatePinchBaseline = null;
   }
 
-  void _startActivePinch(PointerTrace qualifyingPointer) {
-    if (_activePinch != null || qualifyingPointer.isEmpty) return;
+  void _startPinchSession(
+    PointerTrace qualifyingTrace, {
+    required TimedPosition qualifyingPosition,
+  }) {
+    if (_pinchSession != null || qualifyingTrace.isEmpty) return;
 
     for (final pointerTrace in _pointers.values) {
       if (!pointerTrace.isEmpty &&
-          !pointerTrace.isDragOnly &&
+          !pointerTrace.isPostTransitionDragOnly &&
           pointerTrace.type == GesturesType.tap) {
-        _resolvePendingTapForTrace(pointerTrace);
+        _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
       }
     }
 
-    final startPosition = qualifyingPointer.last;
     final oldestPointer = _oldestActivePointer();
-    final tracks = <int, _ActivePinchTrack>{};
+    final pinchSession = PinchSession(
+      startTimestamp: qualifyingPosition.timestamp,
+      viewport: qualifyingPosition.viewport,
+      lomRef: oldestPointer?.lomRef ?? qualifyingTrace.lomRef,
+      isLomStateResolved:
+          oldestPointer?.isLomStateResolved ??
+          qualifyingTrace.isLomStateResolved,
+    );
+    _pinchSession = pinchSession;
 
     for (final pointerTrace in _pointers.values) {
       if (pointerTrace.isEmpty) continue;
-      final entryPosition = pointerTrace.pointer == qualifyingPointer.pointer
-          ? startPosition
+      final entryPosition = pointerTrace.pointer == qualifyingTrace.pointer
+          ? qualifyingPosition
           : TimedPosition(
               pointerTrace.lastPosition,
               viewport: pointerTrace.last.viewport,
               lomRef: pointerTrace.lomRef,
             );
-      tracks[pointerTrace.pointer] = _ActivePinchTrack(
+      pinchSession.join(
         pointerId: pointerTrace.pointer,
-        entryTimestamp: startPosition.timestamp,
-        positions: [entryPosition],
+        entryTimestamp: qualifyingPosition.timestamp,
+        initialPosition: entryPosition,
       );
     }
-
-    _activePinch = _ActivePinchSession(
-      startTimestamp: startPosition.timestamp,
-      viewport: startPosition.viewport,
-      lomRef: oldestPointer?.lomRef ?? qualifyingPointer.lomRef,
-      tracks: tracks,
-      baseline: _buildPinchBaseline(),
-    );
     _candidatePinchBaseline = null;
 
     for (final pointerTrace in _pointers.values.toList()) {
       if (pointerTrace.type == GesturesType.drag) {
-        if (pointerTrace.pointer == qualifyingPointer.pointer) {
-          final qualifyingPosition = pointerTrace.positions.removeLast();
+        if (pointerTrace.pointer == qualifyingTrace.pointer) {
+          final qualifyingSample = pointerTrace.positions.removeLast();
           if (!pointerTrace.isEmpty && pointerTrace.distance >= touchSlop) {
-            _emitExplorations(pointerTrace);
+            _emitDragEvents(pointerTrace);
           }
-          pointerTrace.positions.add(qualifyingPosition);
+          pointerTrace.positions.add(qualifyingSample);
         } else {
-          _emitExplorations(pointerTrace);
+          _emitDragEvents(pointerTrace);
         }
 
         _pointers[pointerTrace.pointer] = pointerTrace.splitForTransition(
           newType: GesturesType.pinch,
         );
-      } else {
-        pointerTrace.setType(GesturesType.pinch);
+        continue;
       }
+
+      pointerTrace.setType(GesturesType.pinch);
     }
   }
 
-  void _continueOrFinishActivePinch(int timestamp) {
-    final activePinch = _activePinch;
-    if (activePinch == null) return;
+  void _finishPinchIfNeeded(int timestamp) {
+    final pinchSession = _pinchSession;
+    if (pinchSession == null || pinchSession.activePointerCount >= 2) return;
 
-    if (_pointers.length >= 2) {
-      activePinch.baseline = _buildPinchBaseline();
-      return;
-    }
-
-    _finishActivePinch(timestamp, preserveSurvivor: true);
+    _finishPinchSession(timestamp, preserveSurvivor: true);
   }
 
-  void _finishActivePinch(
+  void _finishPinchSession(
     int endTimestamp, {
     required bool preserveSurvivor,
   }) {
-    final activePinch = _activePinch;
-    if (activePinch == null) return;
+    final pinchSession = _pinchSession;
+    if (pinchSession == null) return;
 
-    for (final track in activePinch.tracks.values) {
-      track.exitTimestamp ??= endTimestamp;
-    }
+    final survivorId = pinchSession.soleActivePointerId;
+    final survivorPosition = survivorId == null
+        ? null
+        : pinchSession.lastPositionFor(survivorId);
+    final survivorTrace = survivorId == null ? null : _pointers[survivorId];
+    final event = pinchSession.finish(endTimestamp);
 
-    final tracks = activePinch.tracks.values
-        .where((track) => track.positions.isNotEmpty)
-        .map((track) {
-          final sampledPositions = _samplePositions(track.positions);
-          return PinchTrack(
-            pointerId: track.pointerId,
-            entryDelta: track.entryTimestamp - activePinch.startTimestamp,
-            exitDelta: track.exitTimestamp! - activePinch.startTimestamp,
-            positions: sampledPositions
-                .map((position) => position.position)
-                .toList(),
-          );
-        })
-        .toList();
-
-    _activePinch = null;
+    _pinchSession = null;
     _candidatePinchBaseline = null;
+    if (event != null) _engine.context.recordExploration(event);
 
-    if (tracks.isNotEmpty) {
-      _engine.context.recordExploration(
-        PinchExplorationEvent(
-          timestamp: activePinch.startTimestamp,
-          viewport: activePinch.viewport,
-          endTimestamp: endTimestamp,
-          tracks: tracks,
-          lomRef: activePinch.lomRef,
-        ),
-      );
-    }
-
-    if (preserveSurvivor && _pointers.length == 1) {
-      final remainingPointer = _pointers.values.single;
-      if (!remainingPointer.isEmpty) {
-        _pointers[remainingPointer.pointer] =
-            remainingPointer.splitForTransition(
-              newType: GesturesType.tap,
-              isDragOnly: true,
-            );
-      }
-    }
-  }
-
-  /// Called when the pointer is lifted from the screen.
-  ///
-  /// Finalizes the gesture logic based on previous movement analysis.
-  void onPointerUp(PointerUpEvent details) {
-    final int pointer = details.pointer;
-    final upOrder = ++_contactOrder;
-    _ignoredPointers.remove(pointer);
-    final PointerTrace? pointerTrace = _pointers[pointer];
-
-    if (pointerTrace == null) return;
-
-    final activePinch = _activePinch;
-    if (activePinch != null) {
-      int endTimestamp;
-      if (pointerTrace.isEmpty) {
-        endTimestamp = DateTime.now().millisecondsSinceEpoch;
-      } else {
-        final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
-        pointerTrace.add(
-          details.position,
-          viewport: viewport,
-        );
-
-        final track = activePinch.tracks[pointer];
-        if (track == null) {
-          _joinActivePinch(pointerTrace);
-        } else {
-          track.positions.add(pointerTrace.last);
-        }
-        endTimestamp = pointerTrace.lastTimestamp;
-      }
-
-      activePinch.tracks[pointer]?.exitTimestamp = endTimestamp;
-      _pointers.remove(pointer);
-      _continueOrFinishActivePinch(endTimestamp);
+    if (!preserveSurvivor ||
+        survivorId == null ||
+        survivorPosition == null) {
       return;
     }
 
+    // The survivor starts a new transition phase at the pinch exit anchor. It
+    // can only qualify as a later drag, never as tap or long-press.
+    _pointers[survivorId] = PointerTrace(
+      pointer: survivorId,
+      lomRef: survivorTrace?.lomRef ?? pinchSession.lomRef,
+      isLomStateResolved:
+          survivorTrace?.isLomStateResolved ??
+          pinchSession.isLomStateResolved,
+      downOrder: survivorTrace?.downOrder ?? 0,
+      type: GesturesType.tap,
+      isPostTransitionDragOnly: true,
+    )..add(
+        survivorPosition.position,
+        viewport: survivorPosition.viewport,
+      );
+  }
+
+  /// Called when the pointer is lifted from the screen.
+  void onPointerUp(PointerUpEvent details) {
+    final pointer = details.pointer;
+
+    // Up advances the same physical contact ordering even when the pointer was
+    // ignored or its trace is unavailable.
+    final upOrder = _doubleTapTracker.registerPointerUp();
+    _ignoredPointers.remove(pointer);
+    final pointerTrace = _pointers[pointer];
+    final pinchSession = _pinchSession;
+
+    if (pinchSession != null) {
+      if (!pinchSession.hasActiveTrack(pointer)) {
+        _pointers.remove(pointer);
+        return;
+      }
+
+      final viewport = _viewportProvider() ??
+          (pointerTrace != null && !pointerTrace.isEmpty
+              ? pointerTrace.last.viewport
+              : pinchSession.viewport);
+      final TimedPosition terminalPosition;
+      if (pointerTrace != null) {
+        pointerTrace.add(details.position, viewport: viewport);
+        terminalPosition = pointerTrace.last;
+      } else {
+        terminalPosition = TimedPosition(
+          details.position,
+          viewport: viewport,
+          lomRef: pinchSession.lomRef,
+        );
+      }
+
+      pinchSession.pointerUp(pointer, terminalPosition);
+      _pointers.remove(pointer);
+      _finishPinchIfNeeded(terminalPosition.timestamp);
+      return;
+    }
+
+    if (pointerTrace == null) return;
     _pointers.remove(pointer);
 
     if (pointerTrace.isEmpty) {
@@ -546,10 +522,7 @@ class GestureCollector {
     }
 
     final viewport = _viewportProvider() ?? pointerTrace.last.viewport;
-    pointerTrace.add(
-      details.position,
-      viewport: viewport,
-    );
+    pointerTrace.add(details.position, viewport: viewport);
 
     // A stale pinch trace cannot produce an independent pinch event.
     if (pointerTrace.type == GesturesType.pinch) {
@@ -559,269 +532,60 @@ class GestureCollector {
 
     _updateCandidatePinchBaseline();
 
-    // A transition trace cannot become a tap or long press. A long-press drag
-    // is already typed as drag, while a post-pinch trace must first move far
-    // enough from its transition anchor.
-    if (pointerTrace.isDragOnly) {
+    if (pointerTrace.isPostTransitionDragOnly) {
       if (pointerTrace.type == GesturesType.drag ||
           pointerTrace.distance >= touchSlop) {
         _evaluateDrag(pointerTrace);
       }
-
       return;
     }
 
-    // * LONG PRESS
     if (pointerTrace.duration >= longPressTimeout &&
         pointerTrace.distance < touchSlop) {
       _evaluateLongPress(pointerTrace);
-
       return;
     }
 
-    // * DRAG
     if (pointerTrace.distance >= touchSlop) {
       _evaluateDrag(pointerTrace);
-
       return;
     }
 
-    // * TAP
     pointerTrace.setType(GesturesType.tap);
-
-    _evaluateTap(pointerTrace, upOrder: upOrder);
-  }
-
-  void _evaluateTap(PointerTrace pointerTrace, {required int upOrder}) {
-    final current = _PendingTap(
-      downTimestamp: pointerTrace.firstTimestamp,
-      upTimestamp: pointerTrace.lastTimestamp,
-      downOrder: pointerTrace.downOrder,
-      upOrder: upOrder,
-      actionPosition: pointerTrace.firstPosition,
-      terminalPosition: pointerTrace.lastPosition,
-      viewport: pointerTrace.first.viewport,
-      lomRef: pointerTrace.lomRef,
-      isLomStateResolved: pointerTrace.isLomStateResolved,
-    );
-
-    _expirePendingTaps(current.upTimestamp);
-
-    final matchIndex = _findBestPendingTapIndex(
-      downTimestamp: current.downTimestamp,
-      downOrder: current.downOrder,
-      matchTimestamp: current.upTimestamp,
-      terminalPosition: current.terminalPosition,
-      viewport: current.viewport,
-      lomRef: current.lomRef,
-      isLomStateResolved: current.isLomStateResolved,
-    );
-
-    if (matchIndex != null) {
-      final first = _pendingTaps.removeAt(matchIndex);
-      _scheduleDoubleTapTimer();
-      _emitDoubleTap(first, current);
-      return;
-    }
-
-    _pendingTaps.add(current);
-    _scheduleDoubleTapTimer();
-  }
-
-  int? _findBestPendingTapIndex({
-    required int downTimestamp,
-    required int downOrder,
-    required int matchTimestamp,
-    required Offset terminalPosition,
-    required Rect viewport,
-    required String lomRef,
-    required bool isLomStateResolved,
-  }) {
-    int? bestIndex;
-    double? bestDistance;
-    int? bestUpOrder;
-
-    for (var i = 0; i < _pendingTaps.length; i++) {
-      final pending = _pendingTaps[i];
-      if (downOrder <= pending.upOrder ||
-          downTimestamp < pending.upTimestamp) {
-        continue;
-      }
-
-      final elapsed = matchTimestamp - pending.upTimestamp;
-      if (elapsed < 0 || elapsed > doubleTapTimeout.inMilliseconds) continue;
-      if (viewport != pending.viewport ||
-          !isLomStateResolved ||
-          !pending.isLomStateResolved ||
-          lomRef != pending.lomRef) {
-        continue;
-      }
-
-      final distance = (terminalPosition - pending.terminalPosition).distance;
-      if (distance >= doubleTapSlop) continue;
-
-      if (bestDistance == null ||
-          distance < bestDistance ||
-          (distance == bestDistance && pending.upOrder > bestUpOrder!)) {
-        bestIndex = i;
-        bestDistance = distance;
-        bestUpOrder = pending.upOrder;
-      }
-    }
-
-    return bestIndex;
-  }
-
-  void _resolvePendingTapForTrace(PointerTrace pointerTrace) {
-    if (pointerTrace.isEmpty || _pendingTaps.isEmpty) return;
-
-    _expirePendingTaps(pointerTrace.lastTimestamp);
-    final matchIndex = _findBestPendingTapIndex(
-      downTimestamp: pointerTrace.firstTimestamp,
-      downOrder: pointerTrace.downOrder,
-      matchTimestamp: pointerTrace.lastTimestamp,
-      terminalPosition: pointerTrace.firstPosition,
-      viewport: pointerTrace.first.viewport,
-      lomRef: pointerTrace.lomRef,
-      isLomStateResolved: pointerTrace.isLomStateResolved,
-    );
-    if (matchIndex == null) return;
-
-    final pending = _pendingTaps.removeAt(matchIndex);
-    _scheduleDoubleTapTimer();
-    _emitPendingTap(pending);
-  }
-
-  void _expirePendingTaps(int now) {
-    if (_pendingTaps.isEmpty) return;
-
-    final expired = <_PendingTap>[];
-    _pendingTaps.removeWhere((pending) {
-      final isExpired = now > pending.lastEligibleTimestamp;
-      if (isExpired) expired.add(pending);
-      return isExpired;
-    });
-    if (expired.isEmpty) return;
-
-    _scheduleDoubleTapTimer();
-    for (final pending in expired) {
-      _emitPendingTap(pending);
-    }
-  }
-
-  void _scheduleDoubleTapTimer() {
-    if (_pendingTaps.isEmpty) {
-      _cancelDoubleTapTimer();
-      return;
-    }
-
-    var nextDeadline = _pendingTaps.first.expiryDeadline;
-    for (var i = 1; i < _pendingTaps.length; i++) {
-      final deadline = _pendingTaps[i].expiryDeadline;
-      if (deadline < nextDeadline) nextDeadline = deadline;
-    }
-
-    if ((_doubleTapTimer?.isActive ?? false) &&
-        _doubleTapDeadline == nextDeadline) {
-      return;
-    }
-
-    _cancelDoubleTapTimer();
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final delay = nextDeadline > now ? nextDeadline - now : 0;
-    _doubleTapDeadline = nextDeadline;
-
-    late final Timer timer;
-    timer = Timer(Duration(milliseconds: delay), () {
-      if (!identical(_doubleTapTimer, timer)) return;
-      _doubleTapTimer = null;
-      _doubleTapDeadline = null;
-      _expirePendingTaps(DateTime.now().millisecondsSinceEpoch);
-      _scheduleDoubleTapTimer();
-    });
-    _doubleTapTimer = timer;
-  }
-
-  void _cancelDoubleTapTimer() {
-    _doubleTapTimer?.cancel();
-    _doubleTapTimer = null;
-    _doubleTapDeadline = null;
-  }
-
-  void _drainPendingTaps() {
-    _cancelDoubleTapTimer();
-    if (_pendingTaps.isEmpty) return;
-
-    final pendingTaps = List<_PendingTap>.of(_pendingTaps);
-    _pendingTaps.clear();
-    for (final pending in pendingTaps) {
-      _emitPendingTap(pending);
-    }
-  }
-
-  void _emitPendingTap(_PendingTap pending) {
-    _engine.context.recordAction(
-      TapActionEvent(
-        timestampRelative: pending.downTimestamp,
-        viewport: pending.viewport,
-        position: pending.actionPosition,
-        lomRef: pending.lomRef,
-      ),
-    );
-  }
-
-  void _emitDoubleTap(_PendingTap first, _PendingTap second) {
-    _engine.context.recordAction(
-      DoubleTapActionEvent(
-        timestampRelative: first.downTimestamp,
-        secondTimestamp: second.downTimestamp,
-        viewport: first.viewport,
-        positions: [first.actionPosition, second.actionPosition],
-        lomRef: first.lomRef,
-      ),
-    );
+    _doubleTapTracker.completeTap(pointerTrace, upOrder: upOrder);
   }
 
   void _evaluateDrag(PointerTrace pointerTrace) {
-    if (pointerTrace.type != GesturesType.drag && !pointerTrace.isDragOnly) {
-      _resolvePendingTapForTrace(pointerTrace);
+    if (pointerTrace.type != GesturesType.drag &&
+        !pointerTrace.isPostTransitionDragOnly) {
+      _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
     pointerTrace.setType(GesturesType.drag);
-    final explorations = _createExplorationEvent(pointerTrace);
-    for (ExplorationEvent exploration in explorations) {
+    for (final exploration in _buildDragEvents(pointerTrace)) {
       _engine.context.recordExploration(exploration);
     }
   }
 
   void _evaluateLongPress(PointerTrace pointerTrace) {
     if (pointerTrace.type != GesturesType.longPress) {
-      _resolvePendingTapForTrace(pointerTrace);
+      _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
     pointerTrace.setType(GesturesType.longPress);
-    final action = _createActionEvent(pointerTrace);
-    _engine.context.recordAction(action);
+    _engine.context.recordAction(_buildActionEvent(pointerTrace));
   }
 
-  void _emitExplorations(PointerTrace pointerTrace) {
-    final explorations = _createExplorationEvent(pointerTrace);
-    if (explorations.isNotEmpty) {
-      for (final exploration in explorations) {
-        _engine.context.recordExploration(exploration);
-      }
+  void _emitDragEvents(PointerTrace pointerTrace) {
+    for (final exploration in _buildDragEvents(pointerTrace)) {
+      _engine.context.recordExploration(exploration);
     }
   }
 
   void _emitAction(PointerTrace pointerTrace) {
-    final action = _createActionEvent(pointerTrace);
-    _engine.context.recordAction(action);
+    _engine.context.recordAction(_buildActionEvent(pointerTrace));
   }
 
-  /// Creates and returns the `[ActionEvent]` object with its LOM ref.
-  ///
-  /// - `[TapActionEvent]`
-  /// - `[LongPressActionEvent]`
-  ActionEvent _createActionEvent(PointerTrace pointer) {
-    final TimedPosition firstPosition = pointer.first;
+  ActionEvent _buildActionEvent(PointerTrace pointer) {
+    final firstPosition = pointer.first;
 
     switch (pointer.type) {
       case GesturesType.longPress:
@@ -842,69 +606,22 @@ class GestureCollector {
     }
   }
 
-  /// Creates drag explorations from a pointer trace.
-  List<ExplorationEvent> _createExplorationEvent(PointerTrace pointer) {
-    if (pointer.type != GesturesType.drag) return [];
-    return _getDragExploration(pointer);
-  }
-
-  /// Converts the recorded `[PointerTrace]` data into a list of `[DragExplorationEvent]`
-  /// instances.
-  List<DragExplorationEvent> _getDragExploration(PointerTrace pointer) {
-    final List<TimedPosition> positions = pointer.positions;
-
-    if (positions.isEmpty) return [];
-
-    final sampledPositions = _samplePositions(positions);
-
-    List<DragExplorationEvent> panList = List.from(
-      sampledPositions.map(
-        (touchDrag) => DragExplorationEvent(
-          timestamp: touchDrag.timestamp,
-          pointer: pointer.pointer,
-          viewport: touchDrag.viewport,
-          position: touchDrag.position,
-          lomRef: touchDrag.lomRef,
-        ),
-      ),
-    );
-
-    return panList;
-  }
-
-  /// Returns a sampled version of `positions` keeping every `timestampThresholdMs` point.
-  /// Always includes the first and last position to preserve start and end.
-  List<TimedPosition> _samplePositions(
-    List<TimedPosition> positions, {
-    int timestampThresholdMs = 50,
-  }) {
-    if (positions.length <= 2) return positions;
-
-    final sampled = <TimedPosition>[positions.first];
-    TimedPosition lastSaved = positions.first;
-
-    for (var i = 1; i < positions.length; i++) {
-      final current = positions[i];
-
-      final timePassed = current.timestamp - lastSaved.timestamp;
-
-      if (timePassed >= timestampThresholdMs) {
-        sampled.add(current);
-        lastSaved = current;
-      }
+  List<DragExplorationEvent> _buildDragEvents(PointerTrace pointer) {
+    if (pointer.type != GesturesType.drag || pointer.positions.isEmpty) {
+      return [];
     }
 
-    if (!_isSameTimedPosition(lastSaved, positions.last)) {
-      sampled.add(positions.last);
-    }
-
-    return sampled;
-  }
-
-  bool _isSameTimedPosition(TimedPosition a, TimedPosition b) {
-    return a.timestamp == b.timestamp &&
-        a.position == b.position &&
-        a.viewport == b.viewport;
+    return sampleTimedPositions(pointer.positions)
+        .map(
+          (position) => DragExplorationEvent(
+            timestamp: position.timestamp,
+            pointer: pointer.pointer,
+            viewport: position.viewport,
+            position: position.position,
+            lomRef: position.lomRef,
+          ),
+        )
+        .toList();
   }
 
   /// Exposes sampling for focused regression tests.
@@ -912,67 +629,9 @@ class GestureCollector {
     List<TimedPosition> positions, {
     int timestampThresholdMs = 50,
   }) {
-    return _samplePositions(
+    return sampleTimedPositions(
       positions,
       timestampThresholdMs: timestampThresholdMs,
     );
   }
-}
-
-final class _PendingTap {
-  final int downTimestamp;
-  final int upTimestamp;
-  final int downOrder;
-  final int upOrder;
-  final Offset actionPosition;
-  final Offset terminalPosition;
-  final Rect viewport;
-  final String lomRef;
-  final bool isLomStateResolved;
-
-  const _PendingTap({
-    required this.downTimestamp,
-    required this.upTimestamp,
-    required this.downOrder,
-    required this.upOrder,
-    required this.actionPosition,
-    required this.terminalPosition,
-    required this.viewport,
-    required this.lomRef,
-    required this.isLomStateResolved,
-  });
-
-  int get lastEligibleTimestamp =>
-      upTimestamp + doubleTapTimeout.inMilliseconds;
-
-  int get expiryDeadline => lastEligibleTimestamp + 1;
-}
-
-final class _ActivePinchSession {
-  final int startTimestamp;
-  final Rect viewport;
-  final String lomRef;
-  final Map<int, _ActivePinchTrack> tracks;
-  PinchMetricsBaseline baseline;
-
-  _ActivePinchSession({
-    required this.startTimestamp,
-    required this.viewport,
-    required this.lomRef,
-    required this.tracks,
-    required this.baseline,
-  });
-}
-
-final class _ActivePinchTrack {
-  final int pointerId;
-  final int entryTimestamp;
-  int? exitTimestamp;
-  final List<TimedPosition> positions;
-
-  _ActivePinchTrack({
-    required this.pointerId,
-    required this.entryTimestamp,
-    required this.positions,
-  });
 }
