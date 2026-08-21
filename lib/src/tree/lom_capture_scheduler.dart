@@ -9,8 +9,8 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 /// Capture causes ordered by conceptual precedence.
 ///
 /// Navigation owns the strongest barrier. Pointer-down priorities can advance
-/// pending post-scroll or dirty-state work. Stabilized scroll work precedes
-/// ordinary mutation debounce work.
+/// pending post-scroll or dirty-state work. Stabilized scroll work precedes a
+/// fixed interaction consequence, which precedes ordinary mutation debounce.
 ///
 /// The declaration order documents conceptual precedence only. Scheduling
 /// rules enforce precedence; enum indexes are never compared.
@@ -19,6 +19,7 @@ enum LomCaptureReason {
   postScrollPointerDown,
   dirtyPointerDown,
   scrollEnd,
+  interactionConsequence,
   ordinaryMutation,
 }
 
@@ -39,6 +40,8 @@ class LomCaptureScheduler {
   bool _hasDeferredMutationCapture = false;
   bool _needsPostScrollCapture = false;
   bool _hasAttemptedPriorityCaptureForCurrentState = false;
+  DateTime? _interactionConsequenceArmedAt;
+  bool _isInteractionConsequenceScheduled = false;
   int _navigationEpoch = 0;
   Timer? _captureTimer;
   DateTime _lastCaptureTime = DateTime.fromMillisecondsSinceEpoch(0);
@@ -64,6 +67,8 @@ class LomCaptureScheduler {
     _needsPostScrollCapture = false;
     _hasUncapturedTreeChange = false;
     _hasAttemptedPriorityCaptureForCurrentState = false;
+    _interactionConsequenceArmedAt = null;
+    _isInteractionConsequenceScheduled = false;
     _navigationEpoch += 1;
   }
 
@@ -76,6 +81,8 @@ class LomCaptureScheduler {
       _captureTimer = null;
     }
     _isNavigationBarrierActive = true;
+    _interactionConsequenceArmedAt = null;
+    _isInteractionConsequenceScheduled = false;
   }
 
   void setScrollActive(bool isActive) {
@@ -89,7 +96,25 @@ class LomCaptureScheduler {
         _isNavigationBarrierActive = false;
         _hasDeferredMutationCapture = false;
       }
+    } else if (_isInteractionConsequenceScheduled) {
+      _scheduleDebouncedCapture(
+        reason: LomCaptureReason.interactionConsequence,
+      );
     }
+  }
+
+  void armInteractionConsequence() {
+    if (!_isRunning || _isNavigationBarrierActive) return;
+
+    final armedAt = _interactionConsequenceArmedAt;
+    if (armedAt != null &&
+        (_isInteractionConsequenceScheduled ||
+            DateTime.now().difference(armedAt) <= kDebounceTime)) {
+      return;
+    }
+
+    _interactionConsequenceArmedAt = DateTime.now();
+    _isInteractionConsequenceScheduled = false;
   }
 
   void markPostScrollCapturePending() {
@@ -98,6 +123,12 @@ class LomCaptureScheduler {
     _needsPostScrollCapture = true;
     _hasUncapturedTreeChange = true;
     _hasAttemptedPriorityCaptureForCurrentState = false;
+    if (_isInteractionConsequenceScheduled) {
+      _captureTimer?.cancel();
+      _captureTimer = null;
+    }
+    _interactionConsequenceArmedAt = null;
+    _isInteractionConsequenceScheduled = false;
   }
 
   void capturePendingPostScrollLom() {
@@ -122,6 +153,20 @@ class LomCaptureScheduler {
     if (_isNavigationBarrierActive) {
       _deferMutationCapture();
       return;
+    }
+
+    if (_isInteractionConsequenceScheduled) return;
+
+    final armedAt = _interactionConsequenceArmedAt;
+    if (armedAt != null) {
+      if (DateTime.now().difference(armedAt) <= kDebounceTime) {
+        _isInteractionConsequenceScheduled = true;
+        _scheduleDebouncedCapture(
+          reason: LomCaptureReason.interactionConsequence,
+        );
+        return;
+      }
+      _interactionConsequenceArmedAt = null;
     }
 
     _scheduleDebouncedCapture();
@@ -273,9 +318,17 @@ class LomCaptureScheduler {
           !_isScrollCaptureSuppressed) {
         _scheduleDebouncedCapture(
           delay: kCooldownTime - elapsedSinceLastCapture,
+          reason: reason == LomCaptureReason.interactionConsequence
+              ? LomCaptureReason.interactionConsequence
+              : LomCaptureReason.ordinaryMutation,
         );
       }
       return null;
+    }
+
+    if (reason == LomCaptureReason.interactionConsequence) {
+      _interactionConsequenceArmedAt = null;
+      _isInteractionConsequenceScheduled = false;
     }
 
     try {
@@ -311,6 +364,8 @@ class LomCaptureScheduler {
     _needsPostScrollCapture = false;
     _hasUncapturedTreeChange = false;
     _hasAttemptedPriorityCaptureForCurrentState = false;
+    _interactionConsequenceArmedAt = null;
+    _isInteractionConsequenceScheduled = false;
     _captureTimer?.cancel();
     _captureTimer = null;
   }
@@ -318,6 +373,7 @@ class LomCaptureScheduler {
   void _scheduleDebouncedCapture({
     bool restart = true,
     Duration delay = kDebounceTime,
+    LomCaptureReason reason = LomCaptureReason.ordinaryMutation,
   }) {
     if (!_isRunning ||
         !_hasUncapturedTreeChange ||
@@ -337,7 +393,7 @@ class LomCaptureScheduler {
       }
 
       _captureNow(
-        LomCaptureReason.ordinaryMutation,
+        reason,
         comesFromNavigation: false,
       );
     });

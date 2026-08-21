@@ -127,6 +127,7 @@ class ContextImpl implements SessionRecorderContext {
   @override
   void recordAction(ActionEvent action) {
     _currentChunk.addActionEvent(action);
+    _detector?.armInteractionConsequence();
     _engine.controller.pingInactivity();
   }
 

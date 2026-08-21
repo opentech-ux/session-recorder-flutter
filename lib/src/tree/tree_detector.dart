@@ -61,6 +61,10 @@ class TreeDetector {
     _scheduler.markPostScrollCapturePending();
   }
 
+  void armInteractionConsequence() {
+    _scheduler.armInteractionConsequence();
+  }
+
   void capturePendingPostScrollLom() {
     _scheduler.capturePendingPostScrollLom();
   }
