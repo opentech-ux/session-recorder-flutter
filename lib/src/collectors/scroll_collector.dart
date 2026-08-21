@@ -20,6 +20,9 @@ class ScrollCollector {
     : _engine = engine ?? SessionRecorder.engine;
 
   bool _isScrolling = false;
+
+  /// A start remains provisional until clamped offset movement exceeds the
+  /// tolerance; an unvalidated bounce emits no logical scroll session.
   bool _isValidated = false;
   bool _isDisposed = false;
   ScrollExplorationEvent? _provisionalStart;
@@ -52,6 +55,8 @@ class ScrollCollector {
   }
 
   void _handleScrollStart(ScrollStartNotification notification) {
+    /// New scrolling cancels stabilization, but post-scroll debt belongs to the
+    /// scheduler and survives until a successful capture satisfies it.
     _cancelPendingCapture();
 
     if (_isScrolling) {
@@ -71,6 +76,9 @@ class ScrollCollector {
     _activeViewportBounds = rect;
     _initialOffset = offset;
     _activeOffset = offset;
+
+    /// Start and end share this frozen ref; later LOM changes cannot split one
+    /// logical scroll session across snapshots.
     final lomRef = _engine.context.currentLomRef ?? '';
     _activeLomRef = lomRef;
     _provisionalStart = ScrollExplorationEvent(
@@ -83,10 +91,7 @@ class ScrollCollector {
     _engine.context.setScrollActive(true);
   }
 
-  void _handleScrollUpdate(
-    BuildContext? context,
-    ScrollMetrics scrollMetrics,
-  ) {
+  void _handleScrollUpdate(BuildContext? context, ScrollMetrics scrollMetrics) {
     if (!_isScrolling) return;
 
     final rect = _captureViewportGeometry(context);
@@ -99,10 +104,7 @@ class ScrollCollector {
     _validateMovement(offset);
   }
 
-  void _handleScrollEnd(
-    BuildContext? context,
-    ScrollMetrics scrollMetrics,
-  ) {
+  void _handleScrollEnd(BuildContext? context, ScrollMetrics scrollMetrics) {
     if (!_isScrolling) return;
 
     try {
@@ -179,6 +181,8 @@ class ScrollCollector {
       final effectivePixels = pixels.clamp(min, max).toDouble();
       if (!effectivePixels.isFinite) return null;
 
+      /// Offset is event metadata only; it never translates gesture or LOM
+      /// coordinates into a document space.
       return scrollMetrics.axis == Axis.horizontal
           ? Offset(effectivePixels, 0)
           : Offset(0, effectivePixels);
@@ -196,6 +200,8 @@ class ScrollCollector {
 
     if ((offset - initialOffset).distance <= _movementTolerance) return;
 
+    /// Validation commits the provisional start exactly once and creates the
+    /// post-scroll capture debt independently of the final offset.
     _engine.context.recordExploration(provisionalStart);
     _isValidated = true;
     _engine.context.markPostScrollCapturePending();
@@ -253,8 +259,7 @@ class ScrollCollector {
       _releaseSuppressionAndReset();
     }
 
-    if (scheduleCapture &&
-        _engine.context.hasPendingPostScrollCapture) {
+    if (scheduleCapture && _engine.context.hasPendingPostScrollCapture) {
       _scheduleStabilizedCapture();
     }
   }

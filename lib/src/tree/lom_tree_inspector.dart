@@ -58,7 +58,8 @@ class LomTreeInspector {
 
       final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
       final counter = _RootCounter();
-      // Resolve each real parent edge only once per capture.
+
+      /// Resolve each real parent edge only once per capture.
       final effectiveClips = HashMap<RenderObject, Rect>.identity();
       final paintEligibility = HashMap<RenderObject, bool>.identity();
       final roots = _visitElement(
@@ -94,7 +95,7 @@ class LomTreeInspector {
         final cacheId = _findCachedLomId(signature);
         if (cacheId == null) return null;
 
-        // Refresh local hit-test data without adding network noise.
+        /// Refresh local hit-test data without adding network noise.
         return LocalLomRef(
           id: cacheId,
           timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -164,8 +165,8 @@ class LomTreeInspector {
     var inheritedClip = effectiveClip;
     var inheritedRenderAncestor = nearestRenderAncestor;
 
-    // Component elements may expose their first descendant RenderObject. Only
-    // RenderObjectElement introduces a new edge in the render tree.
+    /// Component elements may expose their first descendant RenderObject. Only
+    /// RenderObjectElement introduces a new edge in the render tree.
     if (element is RenderObjectElement) {
       final renderObject = element.renderObject;
       final resolvedClip = _resolveEffectiveClip(
@@ -175,14 +176,19 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
       );
-      // A definitive false means no descendant can paint through this edge.
+
+      /// A definitive false means no descendant can paint through this edge.
       if (resolvedClip == null) return [];
       inheritedClip = resolvedClip;
       inheritedRenderAncestor = renderObject;
     }
 
+    /// An empty ancestral clip forbids all descendant paint, so it safely
+    /// prunes the entire geometric branch.
     if (inheritedClip.isEmpty) return [];
 
+    /// Prune removes a subtree by policy; flattening below keeps descendants
+    /// and propagates the same render ancestor and effective clip.
     if (config.pruneAt.contains(widgetType)) return [];
 
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
@@ -231,6 +237,8 @@ class LomTreeInspector {
     final renderObject = element.renderObject;
     final Rect? rect = MathUtils.transformRect(renderObject);
 
+    /// Missing node geometry does not prune descendants because unclipped
+    /// overflow may still paint outside the parent's own bounds.
     if (rect == null || rect.width <= 0 || rect.height <= 0) {
       return _visitChildrenFlat(
         element,
@@ -245,6 +253,9 @@ class LomTreeInspector {
     }
 
     final visibleRect = rect.intersect(inheritedClip).intersect(viewport);
+
+    /// A Root needs visible geometry, but its children may still overflow when
+    /// the inherited clip itself remains non-empty.
     if (visibleRect.width <= 0 || visibleRect.height <= 0) {
       return _visitChildrenFlat(
         element,
@@ -379,6 +390,8 @@ class LomTreeInspector {
 
       final globalPaintClip = _globalPaintClip(parent, child);
       if (globalPaintClip != null) {
+        /// Real paint clips accumulate as global rectangular bounds; no clip
+        /// preserves Flutter's permitted overflow across the edge.
         final intersection = resolvedClip.intersect(globalPaintClip);
         resolvedClip = intersection.isEmpty ? Rect.zero : intersection;
       }
@@ -400,10 +413,7 @@ class LomTreeInspector {
     }
   }
 
-  static Rect? _globalPaintClip(
-    RenderObject parent,
-    RenderObject child,
-  ) {
+  static Rect? _globalPaintClip(RenderObject parent, RenderObject child) {
     try {
       final localClip = parent.describeApproximatePaintClip(child);
       if (localClip == null || !_isFiniteRect(localClip)) return null;
@@ -412,6 +422,8 @@ class LomTreeInspector {
       final globalClip = MatrixUtils.transformRect(transform, localClip);
       return _isFiniteRect(globalClip) ? globalClip : null;
     } catch (_) {
+      /// Unsafe clip or transform data must not hide content the inspector
+      /// cannot prove Flutter excludes from paint.
       return null;
     }
   }

@@ -8,9 +8,10 @@ final class PinchSession {
   final String lomRef;
   final bool isLomStateResolved;
 
-  // _tracks preserves the full session history; _activeTracks only indexes
-  // current participants, so a reused pointer id cannot overwrite old tracks.
+  /// `_tracks` preserves participants across dynamic exits and entries;
   final List<_PinchTrackState> _tracks = [];
+
+  /// `_activeTracks` owns only pointers still active in the logical session.
   final Map<int, _PinchTrackState> _activeTracks = {};
 
   PinchSession({
@@ -25,8 +26,7 @@ final class PinchSession {
   int? get soleActivePointerId =>
       _activeTracks.length == 1 ? _activeTracks.keys.first : null;
 
-  bool hasActiveTrack(int pointerId) =>
-      _activeTracks.containsKey(pointerId);
+  bool hasActiveTrack(int pointerId) => _activeTracks.containsKey(pointerId);
 
   TimedPosition? lastPositionFor(int pointerId) {
     final track = _activeTracks[pointerId];
@@ -42,6 +42,8 @@ final class PinchSession {
   }) {
     if (_activeTracks.containsKey(pointerId)) return false;
 
+    /// A new participant extends the same pinch even after another track has
+    /// exited; history is append-only for the lifetime of the session.
     final track = _PinchTrackState(
       pointerId: pointerId,
       entryTimestamp: entryTimestamp,
@@ -74,6 +76,8 @@ final class PinchSession {
     return true;
   }
 
+  /// The collector finishes once fewer than two pointers remain; any survivor
+  /// is closed at the shared logical end before event construction.
   PinchExplorationEvent? finish(int endTimestamp) {
     for (final track in _activeTracks.values) {
       track.exitTimestamp ??= endTimestamp;
@@ -87,9 +91,9 @@ final class PinchSession {
             pointerId: track.pointerId,
             entryDelta: track.entryTimestamp - startTimestamp,
             exitDelta: (track.exitTimestamp ?? endTimestamp) - startTimestamp,
-            positions: sampleTimedPositions(track.positions)
-                .map((position) => position.position)
-                .toList(),
+            positions: sampleTimedPositions(
+              track.positions,
+            ).map((position) => position.position).toList(),
           ),
         )
         .toList();

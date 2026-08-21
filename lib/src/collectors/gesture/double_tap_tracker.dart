@@ -15,9 +15,8 @@ final class DoubleTapTracker {
   int? _scheduledDoubleTapExpiry;
   int _contactOrder = 0;
 
-  DoubleTapTracker({
-    required void Function(ActionEvent event) recordAction,
-  }) : _recordAction = recordAction;
+  DoubleTapTracker({required void Function(ActionEvent event) recordAction})
+    : _recordAction = recordAction;
 
   int registerPointerDown() => ++_contactOrder;
 
@@ -116,10 +115,14 @@ final class DoubleTapTracker {
     double? bestDistance;
     int? bestUpOrder;
 
+    /// All pending taps remain independent candidates so separate double-tap
+    /// streams can coexist; distance and recency choose only one match.
     for (var i = 0; i < _pendingTaps.length; i++) {
       final pending = _pendingTaps[i];
-      if (downOrder <= pending.upOrder ||
-          downTimestamp < pending.upTimestamp) {
+
+      /// Contact order forbids physically overlapping fingers from masquerading
+      /// as sequential taps even when their timestamps are close.
+      if (downOrder <= pending.upOrder || downTimestamp < pending.upTimestamp) {
         continue;
       }
 
@@ -132,8 +135,7 @@ final class DoubleTapTracker {
         continue;
       }
 
-      final distance =
-          (comparisonPosition - pending.terminalPosition).distance;
+      final distance = (comparisonPosition - pending.terminalPosition).distance;
       if (distance >= doubleTapSlop) continue;
 
       if (bestDistance == null ||
@@ -151,6 +153,8 @@ final class DoubleTapTracker {
   List<_PendingTap> _takeExpiredPendingTaps(int now) {
     final expired = <_PendingTap>[];
     _pendingTaps.removeWhere((pending) {
+      /// Equality remains eligible for matching; expiry begins just beyond the
+      /// inclusive double-tap timeout boundary.
       final isExpired = now > pending.lastEligibleTimestamp;
       if (isExpired) expired.add(pending);
       return isExpired;

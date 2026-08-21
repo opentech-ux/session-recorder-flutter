@@ -36,8 +36,8 @@ class GestureCollector {
   void onPointerDown(PointerDownEvent details) {
     final pointer = details.pointer;
 
-    // Physical contact ordering includes contacts that gesture recognition
-    // later ignores; double-tap matching depends on that complete ordering.
+    /// Physical contact ordering includes contacts that gesture recognition
+    /// later ignores; double-tap matching depends on that complete ordering.
     final downOrder = _doubleTapTracker.registerPointerDown();
     final pinchSession = _pinchSession;
     if (pinchSession?.hasActiveTrack(pointer) ?? false) return;
@@ -48,6 +48,8 @@ class GestureCollector {
       return;
     }
 
+    /// Only a real Down creates a trace; additional contacts inherit the oldest
+    /// interaction's frozen LOM state instead of resolving a newer snapshot.
     final hasActivePointers =
         _pointers.isNotEmpty || _ignoredPointers.isNotEmpty;
     final oldestPointer = _oldestActivePointer();
@@ -60,8 +62,7 @@ class GestureCollector {
       );
     } else if (hasActivePointers) {
       lomState = (
-        lomRef:
-            oldestPointer?.lomRef ?? _engine.context.currentLomRef ?? '',
+        lomRef: oldestPointer?.lomRef ?? _engine.context.currentLomRef ?? '',
         isResolved: oldestPointer?.isLomStateResolved ?? false,
       );
     } else {
@@ -103,7 +104,8 @@ class GestureCollector {
       // PointerTrace. An unrelated Move cannot join the gesture.
       if (!pinchSession.hasActiveTrack(pointer)) return;
 
-      final viewport = _viewportProvider() ??
+      final viewport =
+          _viewportProvider() ??
           (pointerTrace != null && !pointerTrace.isEmpty
               ? pointerTrace.last.viewport
               : pinchSession.viewport);
@@ -142,8 +144,12 @@ class GestureCollector {
     final qualifyingPosition = pointerTrace.last;
     var currentTrace = pointerTrace;
 
+    /// These transitions transfer sample ownership once; resolving a related
+    /// pending tap prevents the same contact history from remaining tap-owned.
     if (currentTrace.type == GesturesType.longPress &&
         currentTrace.distance >= touchSlop) {
+      /// Long-press is emitted once before the phase split; the new drag-only
+      /// trace cannot later emit a tap or another long-press.
       _emitLongPressAction(currentTrace);
       _pointers[currentTrace.pointer] = currentTrace.splitForTransition(
         newType: GesturesType.drag,
@@ -177,10 +183,7 @@ class GestureCollector {
     }
 
     if (qualifiesForPinch) {
-      _startPinchSession(
-        currentTrace,
-        qualifyingPosition: qualifyingPosition,
-      );
+      _startPinchSession(currentTrace, qualifyingPosition: qualifyingPosition);
     }
   }
 
@@ -355,6 +358,8 @@ class GestureCollector {
   }) {
     if (_pinchSession != null || qualifyingTrace.isEmpty) return;
 
+    /// Recognizing a non-tap gesture finalizes any compatible pending tap before
+    /// pinch takes exclusive ownership of the qualifying and later samples.
     for (final pointerTrace in _pointers.values) {
       if (!pointerTrace.isEmpty &&
           !pointerTrace.isPostTransitionDragOnly &&
@@ -394,6 +399,8 @@ class GestureCollector {
     for (final pointerTrace in _pointers.values.toList()) {
       if (pointerTrace.type == GesturesType.drag) {
         if (pointerTrace.pointer == qualifyingTrace.pointer) {
+          /// The qualifying physical sample belongs to pinch, not both phases;
+          /// the temporary removal lets the preceding drag end before it.
           final qualifyingSample = pointerTrace.positions.removeLast();
           if (!pointerTrace.isEmpty && pointerTrace.distance >= touchSlop) {
             _emitDragEvents(pointerTrace);
@@ -420,10 +427,7 @@ class GestureCollector {
     _finishPinchSession(timestamp, preserveSurvivor: true);
   }
 
-  void _finishPinchSession(
-    int endTimestamp, {
-    required bool preserveSurvivor,
-  }) {
+  void _finishPinchSession(int endTimestamp, {required bool preserveSurvivor}) {
     final pinchSession = _pinchSession;
     if (pinchSession == null) return;
 
@@ -438,9 +442,7 @@ class GestureCollector {
     _candidatePinchBaseline = null;
     if (event != null) _engine.context.recordExploration(event);
 
-    if (!preserveSurvivor ||
-        survivorId == null ||
-        survivorPosition == null) {
+    if (!preserveSurvivor || survivorId == null || survivorPosition == null) {
       return;
     }
 
@@ -450,15 +452,11 @@ class GestureCollector {
       pointer: survivorId,
       lomRef: survivorTrace?.lomRef ?? pinchSession.lomRef,
       isLomStateResolved:
-          survivorTrace?.isLomStateResolved ??
-          pinchSession.isLomStateResolved,
+          survivorTrace?.isLomStateResolved ?? pinchSession.isLomStateResolved,
       downOrder: survivorTrace?.downOrder ?? 0,
       type: GesturesType.tap,
       isPostTransitionDragOnly: true,
-    )..add(
-        survivorPosition.position,
-        viewport: survivorPosition.viewport,
-      );
+    )..add(survivorPosition.position, viewport: survivorPosition.viewport);
   }
 
   /// Called when the pointer is lifted from the screen.
@@ -478,7 +476,8 @@ class GestureCollector {
         return;
       }
 
-      final viewport = _viewportProvider() ??
+      final viewport =
+          _viewportProvider() ??
           (pointerTrace != null && !pointerTrace.isEmpty
               ? pointerTrace.last.viewport
               : pinchSession.viewport);

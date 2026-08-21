@@ -13,6 +13,8 @@ class TreeDetector {
   TreeDetector({required SessionRecorderEngine engine})
     : _engine = engine,
       _inspector = LomTreeInspector() {
+    /// The scheduler owns timing and cause; this callback keeps physical tree
+    /// inspection and publication inside the Flutter-facing detector.
     _scheduler = LomCaptureScheduler(captureLom: _captureTreeNow);
   }
 
@@ -94,6 +96,8 @@ class TreeDetector {
     void onBuildScheduled() {
       _lastOnBuildScheduled?.call();
 
+      /// Publishing the debug notifier may schedule builds of its own; those
+      /// builds must not manufacture another capture obligation.
       if (_isPublishingCapture) return;
       _scheduler.handleBuildScheduled();
     }
@@ -135,10 +139,7 @@ class TreeDetector {
   }
 
   void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {
-    _scheduler.captureTree(
-      comesFromNavigation,
-      bypassCooldown: bypassCooldown,
-    );
+    _scheduler.captureTree(comesFromNavigation, bypassCooldown: bypassCooldown);
   }
 
   /// Resolves the LOM state to freeze into a new pointer trace.
@@ -151,6 +152,8 @@ class TreeDetector {
   }
 
   LomAbstract? _captureTreeNow(bool comesFromNavigation) {
+    /// PointerDown may enter this callback synchronously; unavailable geometry
+    /// therefore fails open instead of blocking delivery of the interaction.
     final element = _captureElement;
 
     if (element == null || !element.mounted) {
@@ -179,6 +182,8 @@ class TreeDetector {
 
     // _printTree([lom.root!], 0);
 
+    /// The context and scheduler observe the same successful result so storage
+    /// and obligation cleanup cannot disagree about capture success.
     _engine.context.recordLom(lom);
     return lom;
   }
