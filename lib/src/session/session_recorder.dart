@@ -12,8 +12,8 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 /// {@template session_record_service}
 /// Public entry point for session interaction recording and tree capture.
 ///
-/// Call [init] once from `main`, before `runApp`, then wrap the application
-/// subtree with `SessionRecorderWidget`.
+/// Call [init] once from `main`, before `runApp`, then install
+/// `SessionRecorderWidget` around the application subtree to capture.
 ///
 /// ### Complete setup
 ///
@@ -26,8 +26,11 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 ///   SessionRecorder.init(config);
 ///
 ///   runApp(
-///     SessionRecorderWidget(
-///       child: const App(),
+///     MaterialApp(
+///       home: const HomeScreen(),
+///       builder: (context, child) => SessionRecorderWidget(
+///         child: child ?? const SizedBox.shrink(),
+///       ),
 ///     ),
 ///   );
 /// }
@@ -35,9 +38,11 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 ///
 /// `WidgetsFlutterBinding.ensureInitialized()` prepares Flutter. [init]
 /// starts the engine, context, reporting, and inactivity tracking.
-/// `SessionRecorderWidget` installs the collectors, provides the application
-/// subtree used for captures, and requests one initial capture after the first
-/// frame. It does not start the context or reporting again.
+/// `SessionRecorderWidget` installs the collectors, provides the stable subtree
+/// used for captures, and requests one initial capture after the first frame.
+/// Placing it in `MaterialApp.builder` or `MaterialApp.router.builder` is
+/// recommended; wrapping `MaterialApp` externally remains supported. The
+/// widget does not start the context or reporting again.
 ///
 /// {@endtemplate}
 ///

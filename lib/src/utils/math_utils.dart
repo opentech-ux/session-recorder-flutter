@@ -151,8 +151,7 @@ class MathUtils {
 
       /// Movement relative to the centroid removes translation shared by all
       /// participating fingers before radial/tangential decomposition.
-      final v =
-          (pNow - currentCentroid) - (p0 - initialCentroid);
+      final v = (pNow - currentCentroid) - (p0 - initialCentroid);
 
       if (v.distance < 3.0) continue;
 
@@ -228,8 +227,7 @@ class MathUtils {
     if (render == null ||
         !render.attached ||
         render is! RenderBox ||
-        !render.hasSize ||
-        render.debugNeedsLayout) {
+        !render.hasSize) {
       return null;
     }
 

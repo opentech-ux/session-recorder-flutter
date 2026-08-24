@@ -16,11 +16,10 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SessionRecorderWidget.observer(
-      builder: (observer) => MaterialApp(
-        home: ExampleApp(),
-        navigatorObservers: [observer],
-        builder: (context, child) => child ?? SizedBox.shrink(),
+    return MaterialApp(
+      home: const ExampleApp(),
+      builder: (context, child) => SessionRecorderWidget(
+        child: child ?? const SizedBox.shrink(),
       ),
     );
   }

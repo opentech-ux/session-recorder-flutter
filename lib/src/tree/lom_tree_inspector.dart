@@ -128,7 +128,16 @@ class LomTreeInspector {
       _lastSignature = signature;
 
       return lom;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      final shortStack = stackTrace.toString().split('\n').take(12).join('\n');
+
+      SessionLogger.warning(
+        'LOM inspect exception '
+        'type=${error.runtimeType} '
+        'error=$error\n'
+        '$shortStack',
+      );
+
       return null;
     }
   }

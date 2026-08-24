@@ -10,11 +10,14 @@ import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// {@template session_recorder_widget}
-/// Root wrapper that activates behavior tracking for the application subtree.
+/// Explicit boundary that activates behavior tracking for an application
+/// subtree.
 ///
 /// ```dart
-/// SessionRecorderWidget(
-///   child: const App(),
+/// MaterialApp(
+///   builder: (context, child) => SessionRecorderWidget(
+///     child: child ?? const SizedBox.shrink(),
+///   ),
 /// );
 /// ```
 ///
@@ -22,6 +25,12 @@ import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 /// used by tree capture, and requests exactly one initial capture after the
 /// first frame. Later captures caused by UI mutations remain managed by the
 /// internal tree detector.
+///
+/// Installing it in `MaterialApp.builder` or `MaterialApp.router.builder` is
+/// recommended so the captured subtree starts around the application's
+/// Navigator or Router. Routes, overlays, dialogs, drawers, and modals remain
+/// descendants. Wrapping `MaterialApp` externally is also supported and
+/// captures a broader subtree.
 ///
 /// This widget does not initialize or restart the engine, context, or
 /// reporting. Call `SessionRecorder.init` before `runApp`.
@@ -33,7 +42,7 @@ import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 class SessionRecorderWidget extends StatefulWidget {
   final Widget child;
 
-  /// Creates the root wrapper for [child].
+  /// Creates the capture boundary for [child].
   const SessionRecorderWidget({super.key, required this.child});
 
   /// Creates an optional [SessionNavigatorObserver] and exposes it to
@@ -49,7 +58,9 @@ class SessionRecorderWidget extends StatefulWidget {
   /// ```
   ///
   /// This factory is not required for initial capture, gestures, scrolls, or
-  /// ordinary UI mutations.
+  /// ordinary UI mutations. It preserves the supported outer-wrapper
+  /// integration; applications using the recommended `MaterialApp.builder`
+  /// integration can create and attach [SessionNavigatorObserver] separately.
   static Widget observer({
     Key? key,
     required Widget Function(SessionNavigatorObserver observer) builder,
