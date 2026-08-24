@@ -12,14 +12,6 @@ sensitive user content.
 > This package is currently consumed from **Git**. Pub.dev publication will come
 > later, once the V2 runtime is validated.
 
-## What It Captures
-
-- **Action events**: `tap`, `doubleTap`, `longPress`.
-- **Exploration events**: `drag`, `pinch`, `scrollStart`, `scrollEnd`.
-- **LOM snapshots**: spatial structure of the visible application subtree.
-- **Session chunks**: periodic payloads sent to the configured endpoint.
-- **Debug overlay**: optional visualization of captured LOM bounds.
-
 ## Installation
 
 Add the package to your app `pubspec.yaml`:
@@ -41,13 +33,12 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 - **Dart**: `>=3.0.0 <4.0.0`
 - **Flutter**: `>=3.10.0`
 
-## Recommended Usage
+## Basic Usage
 
 The required integration has two parts:
 
 1. Initialize `SessionRecorder`.
-2. Install `SessionRecorderWidget` once in `MaterialApp.builder` or
-   `MaterialApp.router.builder`.
+2. Install one `SessionRecorderWidget`.
 
 ```dart
 void main() {
@@ -76,24 +67,52 @@ void main() {
 > Call `SessionRecorder.init()` **once**, during app startup. Do not call it from
 > a widget `build()` method or from frequent callbacks.
 
-The builder placement is recommended because it creates a more precise capture
-boundary and avoids traversing unnecessary `MaterialApp` infrastructure. The
-routing subtree remains inside the recorder, including `Router`, root and nested
-`Navigator` instances, `ShellRoute` content, navigator overlays, routes,
-dialogs, modal and persistent bottom sheets, drawers, popup menus, dropdowns,
-routing `OverlayEntry` instances, snack bars, and scaffold content. Pointer
-events and scroll notifications are captured only inside the wrapped subtree.
+`MaterialApp.builder` gives the recorder a precise boundary around the
+application's navigable subtree. This setup is sufficient for LOM, gesture,
+scroll, mutation, and LOM/event association capture.
 
-For a normal routed `MaterialApp` or `MaterialApp.router`, the example's null
-fallback is safe. In a builder-only application where `child` is null, wrap the
-application or routing widget that the builder already creates instead of using
-an empty fallback.
+## Optional Navigation Observer
 
-## Router Usage
+`SessionNavigatorObserver` is not required for the SDK to work. It only adds
+explicit navigation signals so post-navigation captures can be timed more
+precisely.
 
-`MaterialApp.router` uses the same explicit boundary:
+Create it once after `SessionRecorder.init`, keep it in a stable app or router
+owner, and preserve existing observers:
 
 ```dart
+final sessionObserver = SessionNavigatorObserver(); // after init
+
+MaterialApp(
+  navigatorObservers: [
+    anotherObserver,
+    sessionObserver,
+  ],
+  home: const HomeScreen(),
+  builder: (context, child) => SessionRecorderWidget(
+    child: child ?? const SizedBox.shrink(),
+  ),
+);
+```
+
+Do not create it in `build` or in the `MaterialApp.builder` callback. It does
+not define the capture boundary or replace existing observers.
+
+## Router / GoRouter
+
+GoRouter is optional. Keep the router and its observer stable, and place the
+capture boundary in `MaterialApp.router.builder`:
+
+```dart
+final sessionObserver = SessionNavigatorObserver(); // after init
+
+final router = GoRouter(
+  observers: [anotherObserver, sessionObserver],
+  routes: [
+    // ...
+  ],
+);
+
 MaterialApp.router(
   routerConfig: router,
   builder: (context, child) => SessionRecorderWidget(
@@ -102,23 +121,7 @@ MaterialApp.router(
 );
 ```
 
-No GoRouter-specific SDK integration is required. `ShellRoute` and nested
-navigators are naturally part of the wrapped routing subtree.
-
-`SessionNavigatorObserver` is optional. Attach it to navigators whose
-transitions should provide more precise LOM capture timing:
-
-```dart
-final router = GoRouter(
-  observers: [SessionNavigatorObserver()],
-  routes: [
-    // ...
-  ],
-);
-```
-
-The observer does not locate the capture root and is not required for initial
-capture, gestures, scrolls, or ordinary UI mutations.
+No GoRouter-specific SDK integration is required.
 
 ## Existing Builder
 
@@ -135,26 +138,59 @@ builder: (context, child) {
 }
 ```
 
-Call the existing builder exactly once. This keeps provider, localization,
-custom `MediaQuery`, theme, accessibility, and third-party wrappers inside the
-capture boundary. UI deliberately created outside the wrapped result is not
-captured.
+Call the existing builder once and wrap its final result.
 
-## Supported Outer Wrapper
+## Convenience Outer-Wrapper Integration
 
-The simpler outer-wrapper integration remains fully supported:
+`SessionRecorderWidget.observer` is a supported convenience that provides the
+optional observer while wrapping the complete application:
 
 ```dart
-SessionRecorderWidget(
-  child: MaterialApp(
+SessionRecorderWidget.observer(
+  builder: (observer) => MaterialApp(
+    navigatorObservers: [anotherObserver, observer],
     home: const HomeScreen(),
   ),
 );
 ```
 
-It behaves the same functionally but captures a broader subtree that includes
-more `MaterialApp` infrastructure. The recommended builder placement reduces
-that unnecessary traversal; it does not promise a large CPU improvement.
+Invoke it after `SessionRecorder.init` from a stable integration position. This
+outer-wrapper form remains supported, but `MaterialApp.builder` is preferred
+when a more precise capture boundary is wanted.
+
+## Advanced: Multiple Navigators
+
+Multiple navigators may each use their own `SessionNavigatorObserver` when
+their navigation signals are wanted:
+
+```dart
+final rootSessionObserver = SessionNavigatorObserver(); // after init
+final shellSessionObserver = SessionNavigatorObserver(); // after init
+
+final router = GoRouter(
+  observers: [rootSessionObserver],
+  routes: [
+    ShellRoute(
+      observers: [shellSessionObserver],
+      routes: [
+        // ...
+      ],
+    ),
+  ],
+);
+```
+
+Do not reuse the same `NavigatorObserver` instance across navigators. Each
+instance reports to the same Session Recorder runtime; observers remain
+optional and do not determine the LOM root.
+
+## What It Captures
+
+- **Action events**: `tap`, `doubleTap`, `longPress`.
+- **Exploration events**: `drag`, `pinch`, `scrollStart`, `scrollEnd`.
+- **LOM snapshots**: spatial structure of the visible application subtree.
+- **Session chunks**: periodic payloads sent to the configured endpoint.
+- **Debug overlay**: optional visualization of captured LOM bounds.
 
 ## Configuration
 
@@ -190,9 +226,9 @@ https://demo-client.ux-key.com/endpoint
 
 > [!WARNING]
 >
-> Endpoint validation can be temporarily disabled while testing local endpoints.
-> Before publishing or releasing the SDK, re-enable `SessionRecorderConfig.validate()`
-> inside `SessionRecorder.init()`.
+> Endpoint validation is temporarily disabled for local endpoint testing.
+> Before publishing or releasing the SDK, re-enable
+> `SessionRecorderConfig.validate()` inside `SessionRecorder.init()`.
 
 ## Runtime Notes
 

@@ -3,39 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 
 /// {@template session_observer}
-/// Optional observer that reports navigation transitions to the session
-/// recorder and coordinates a capture after those transitions have settled.
+/// Optional [NavigatorObserver] that gives Session Recorder explicit
+/// navigation signals.
 ///
-/// Add it only when precise post-navigation captures are wanted:
-///
-/// ```dart
-/// MaterialApp(
-///   navigatorObservers: [
-///     SessionNavigatorObserver(),
-///   ],
-///   home: const HomeScreen(),
-/// )
-/// ```
-///
-/// It is not required for initial capture, gestures, scrolls, or ordinary UI
-/// mutations.
-///
-/// ### GoRouter with ShellRoutes
-/// You may attach multiple observers (e.g. when using multiple `[ShellRoute]`
-/// navigators from `[GoRouter]` package).
-///
-/// ```dart
-/// GoRouter(
-///   observers: [SessionNavigatorObserver()],
-///   routes: [
-///     ShellRoute(
-///       observers: [SessionNavigatorObserver()],
-///       routes: [...],
-///     ),
-///   ],
-/// );
-/// ```
-/// All instances share the same `[SessionRecorder]` singleton.
+/// Create it once after `SessionRecorder.init` and add it beside existing
+/// observers. Multiple Navigators may each use their own
+/// [SessionNavigatorObserver]; do not reuse one instance across Navigators.
+/// The observer does not define the capture boundary and is not required for
+/// capture to work.
 ///
 /// {@endtemplate}
 class SessionNavigatorObserver extends NavigatorObserver {

@@ -8,7 +8,9 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 /// ### Example
 ///
 /// ```dart
-/// final config = SessionRecorderConfig(endpoint: 'https://demo-client.ux-key.com endpoint');
+/// final config = SessionRecorderConfig(
+///   endpoint: 'https://demo-client.ux-key.com/endpoint',
+/// );
 /// SessionRecorder.init(config);
 /// ```
 /// See also
@@ -21,9 +23,9 @@ class SessionRecorderConfig {
   /// This URL is provided by the the __company__ and must support **POST**
   /// requests for session uploads.
   ///
-  /// __If empty or not matching the official endpoint format,
-  /// `[validate]` throws a `[FormatException]`. During `[SessionRecorder.init]`,
-  /// invalid configuration makes the SDK fall back to no-op mode.__
+  /// If this does not match the official endpoint format, [validate] throws a
+  /// [FormatException]. Validation is currently not invoked by
+  /// `SessionRecorder.init` while local endpoints are supported.
   final String endpoint;
 
   /// Whether to show the debug logs.

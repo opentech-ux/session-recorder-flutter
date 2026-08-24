@@ -10,39 +10,12 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// {@template session_record_service}
-/// Public entry point for session interaction recording and tree capture.
+/// Public entry point for Session Recorder.
 ///
 /// Call [init] once from `main`, before `runApp`, then install
-/// `SessionRecorderWidget` around the application subtree to capture.
-///
-/// ### Complete setup
-///
-/// ```dart
-/// void main() {
-///   WidgetsFlutterBinding.ensureInitialized();
-///
-///   final config = SessionRecorderConfig(endpoint: 'https://demo-client.ux-key.com endpoint');
-///
-///   SessionRecorder.init(config);
-///
-///   runApp(
-///     MaterialApp(
-///       home: const HomeScreen(),
-///       builder: (context, child) => SessionRecorderWidget(
-///         child: child ?? const SizedBox.shrink(),
-///       ),
-///     ),
-///   );
-/// }
-/// ```
-///
-/// `WidgetsFlutterBinding.ensureInitialized()` prepares Flutter. [init]
-/// starts the engine, context, reporting, and inactivity tracking.
-/// `SessionRecorderWidget` installs the collectors, provides the stable subtree
-/// used for captures, and requests one initial capture after the first frame.
-/// Placing it in `MaterialApp.builder` or `MaterialApp.router.builder` is
-/// recommended; wrapping `MaterialApp` externally remains supported. The
-/// widget does not start the context or reporting again.
+/// one `SessionRecorderWidget` around the subtree to capture. Placing the
+/// widget in `MaterialApp.builder` or `MaterialApp.router.builder` is
+/// recommended. A navigation observer is optional.
 ///
 /// {@endtemplate}
 ///
@@ -69,17 +42,13 @@ class SessionRecorder {
   @internal
   static SessionRecorderEngineInternal get engine => _engine;
 
-  /// Initializes session recording.
+  /// Initializes the recorder.
   ///
   /// Call this method once from `main`, after
   /// `WidgetsFlutterBinding.ensureInitialized()` and before `runApp`.
   ///
-  /// This starts the engine, context, reporting, and inactivity tracking.
-  /// The initial capture after the first frame is requested by
-  /// `SessionRecorderWidget`; applications do not need to defer [init].
-  ///
-  /// Configuration and initialization errors are caught internally. When
-  /// initialization fails, the SDK continues in no-op mode.
+  /// Install one `SessionRecorderWidget` after initialization. Initialization
+  /// errors are caught internally and leave the SDK in no-op mode.
   ///
   /// See also
   ///  - `[SessionRecorderConfig]`: More information on what can be shared.
