@@ -14,6 +14,7 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 ///
 /// {@endtemplate}
 class SessionNavigatorObserver extends NavigatorObserver {
+  ///{@macro session_observer}
   SessionNavigatorObserver() {
     SessionRecorder.engine.controller.registerObserver(this);
   }
@@ -56,10 +57,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void _setAttached() => _isAttached = true;
 
   /// Reports navigation and waits for `route`'s animation to settle.
-  void _handleTransition(
-    Route<dynamic> route,
-    AnimationStatus terminalStatus,
-  ) {
+  void _handleTransition(Route<dynamic> route, AnimationStatus terminalStatus) {
     final controller = SessionRecorder.engine.controller;
     controller.beginNavigation();
 

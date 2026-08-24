@@ -23,7 +23,7 @@ class LomTreeInspector {
 
   late LomTreeConfig _config;
 
-  /// Captures the widget tree starting from `[Element]`.
+  /// Captures the widget tree from its physical capture anchor [Element].
   LomAbstract? captureLom(
     Element? element, {
     required bool comesFromNavigation,
@@ -64,6 +64,7 @@ class LomTreeInspector {
       final paintEligibility = HashMap<RenderObject, bool>.identity();
       final roots = _visitElement(
         element,
+        isCaptureAnchor: true,
         viewport: viewport,
         effectiveClip: viewport,
         nearestRenderAncestor: null,
@@ -161,6 +162,7 @@ class LomTreeInspector {
 
   static List<Root> _visitElement(
     Element element, {
+    required bool isCaptureAnchor,
     required Rect viewport,
     required Rect effectiveClip,
     required RenderObject? nearestRenderAncestor,
@@ -169,6 +171,8 @@ class LomTreeInspector {
     required LomTreeConfig config,
     required _RootCounter counter,
   }) {
+    if (isCaptureAnchor && element is! RenderObjectElement) return [];
+
     final Widget widget = element.widget;
     final String widgetType = widget.runtimeType.toString();
     var inheritedClip = effectiveClip;
@@ -198,11 +202,13 @@ class LomTreeInspector {
 
     /// Prune removes a subtree by policy; flattening below keeps descendants
     /// and propagates the same render ancestor and effective clip.
-    if (config.pruneAt.contains(widgetType)) return [];
+    if (!isCaptureAnchor && config.pruneAt.contains(widgetType)) return [];
 
     final bool hasImportanteSemantic = config.semantics.contains(widgetType);
 
-    if (widget is! RenderObjectWidget && !hasImportanteSemantic) {
+    if (!isCaptureAnchor &&
+        widget is! RenderObjectWidget &&
+        !hasImportanteSemantic) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -215,7 +221,9 @@ class LomTreeInspector {
       );
     }
 
-    if (!hasImportanteSemantic && config.noiseAt.contains(widgetType)) {
+    if (!isCaptureAnchor &&
+        !hasImportanteSemantic &&
+        config.noiseAt.contains(widgetType)) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -228,7 +236,8 @@ class LomTreeInspector {
       );
     }
 
-    if (!hasImportanteSemantic &&
+    if (!isCaptureAnchor &&
+        !hasImportanteSemantic &&
         (widgetType.startsWith('_') ||
             config.ignoreAt.any((w) => widgetType.contains(w)))) {
       return _visitChildrenFlat(
@@ -249,6 +258,7 @@ class LomTreeInspector {
     /// Missing node geometry does not prune descendants because unclipped
     /// overflow may still paint outside the parent's own bounds.
     if (rect == null || rect.width <= 0 || rect.height <= 0) {
+      if (isCaptureAnchor) return [];
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -266,6 +276,7 @@ class LomTreeInspector {
     /// A Root needs visible geometry, but its children may still overflow when
     /// the inherited clip itself remains non-empty.
     if (visibleRect.width <= 0 || visibleRect.height <= 0) {
+      if (isCaptureAnchor) return [];
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -319,6 +330,7 @@ class LomTreeInspector {
     element.debugVisitOnstageChildren((child) {
       final rootChildren = _visitElement(
         child,
+        isCaptureAnchor: false,
         viewport: viewport,
         effectiveClip: effectiveClip,
         nearestRenderAncestor: nearestRenderAncestor,

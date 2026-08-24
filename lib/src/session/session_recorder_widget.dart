@@ -11,6 +11,8 @@ import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// {@template session_recorder_widget}
 /// Defines the capture boundary for an application subtree.
+/// Its existing [Listener] supplies the stable physical capture anchor used by
+/// [TreeDetector].
 ///
 /// ```dart
 /// MaterialApp(
@@ -27,7 +29,7 @@ import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 class SessionRecorderWidget extends StatefulWidget {
   final Widget child;
 
-  /// Creates the capture boundary for [child].
+  ///{@macro session_recorder_widget}
   const SessionRecorderWidget({super.key, required this.child});
 
   /// Convenience outer-wrapper integration that provides an optional
@@ -106,11 +108,28 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   }
 
   Widget _captureBoundary(BuildContext context) {
-    final element = context as Element;
+    Element? resolvedElement;
+    context.visitAncestorElements((ancestor) {
+      if (ancestor is RenderObjectElement && ancestor.widget is Listener) {
+        resolvedElement = ancestor;
+      }
+      return false;
+    });
+
     final previous = _captureElement;
+    final element = resolvedElement;
+
+    if (element == null) {
+      if (previous != null) TreeDetector.clearCaptureElement(previous);
+      _captureElement = null;
+      return widget.child;
+    }
 
     if (!identical(previous, element)) {
       if (previous != null) TreeDetector.clearCaptureElement(previous);
+
+      /// The recorder-owned Listener supplies one physical RenderObject anchor
+      /// without depending on the client widget tree.
       _captureElement = element;
       TreeDetector.registerCaptureElement(element);
     }
