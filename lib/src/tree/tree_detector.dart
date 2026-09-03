@@ -180,18 +180,9 @@ class TreeDetector {
       _isPublishingCapture = false;
     }
 
-    // _printTree([lom.root!], 0);
-
     /// The context and scheduler observe the same successful result so storage
     /// and obligation cleanup cannot disagree about capture success.
     _engine.context.recordLom(lom);
     return lom;
   }
-
-  // static void _printTree(List<Root> nodes, int indent) {
-  //   for (final node in nodes) {
-  //     debugPrint('${'  ' * indent}${node.id} - ${node.widgetType}');
-  //     _printTree(node.children, indent + 1);
-  //   }
-  // }
 }

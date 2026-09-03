@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
-import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 
 /// Internal contract for session state, tree analysis, and data recording.
@@ -11,10 +10,7 @@ abstract interface class SessionRecorderContext {
   void start();
   void dispose();
 
-  void captureTree(
-    bool comesFromNavigation, {
-    bool bypassCooldown = false,
-  });
+  void captureTree(bool comesFromNavigation, {bool bypassCooldown = false});
   ValueListenable<LomAbstract?>? get notifier;
   void setCurrentlyNavigating();
   void setScrollActive(bool isActive);
@@ -59,10 +55,7 @@ class NoOpContext implements SessionRecorderContext {
   @override
   void recordLom(LomAbstract? lom) {}
   @override
-  void captureTree(
-    bool comesFromNavigation, {
-    bool bypassCooldown = false,
-  }) {}
+  void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) {}
   @override
   ValueListenable<LomAbstract?>? get notifier => null;
   @override
@@ -146,15 +139,10 @@ class ContextImpl implements SessionRecorderContext {
     if (lom is LocalLomRef) return;
 
     _currentChunk.addLom(lom);
-
-    SessionLogger.verbose("LOM SAVED - ${lom.id}");
   }
 
   @override
-  void captureTree(
-    bool comesFromNavigation, {
-    bool bypassCooldown = false,
-  }) =>
+  void captureTree(bool comesFromNavigation, {bool bypassCooldown = false}) =>
       _detector?.captureTree(
         comesFromNavigation,
         bypassCooldown: bypassCooldown,

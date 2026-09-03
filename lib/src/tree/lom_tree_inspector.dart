@@ -76,13 +76,9 @@ class LomTreeInspector {
 
       if (roots.length != 1) {
         if (kDebugMode) {
-          final widgetTypes = roots
-              .map((root) => root.widgetType)
-              .toList(growable: false);
           SessionLogger.warning(
             'LOM inspection skipped: expected '
-            'exactly one top-level root, found ${roots.length}; '
-            'top-level widgetTypes: $widgetTypes',
+            'exactly one top-level root, found ${roots.length}',
           );
         }
         return null;
@@ -129,15 +125,8 @@ class LomTreeInspector {
       _lastSignature = signature;
 
       return lom;
-    } catch (error, stackTrace) {
-      final shortStack = stackTrace.toString().split('\n').take(12).join('\n');
-
-      SessionLogger.warning(
-        'LOM inspect exception '
-        'type=${error.runtimeType} '
-        'error=$error\n'
-        '$shortStack',
-      );
+    } catch (error) {
+      SessionLogger.warning('LOM inspection failed with ${error.runtimeType}');
 
       return null;
     }

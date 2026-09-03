@@ -316,8 +316,6 @@ class LomCaptureScheduler {
     bool bypassCooldown = false,
     int? navigationEpoch,
   }) {
-    if (reason != null) _logCaptureReason(reason);
-
     if (!comesFromNavigation && _isNavigationBarrierActive) {
       _deferMutationCapture();
       return null;
@@ -451,14 +449,6 @@ class LomCaptureScheduler {
       );
     });
     WidgetsBinding.instance.ensureVisualUpdate();
-  }
-
-  void _logCaptureReason(LomCaptureReason reason) {
-    try {
-      SessionLogger.verbose('LOM capture attempt reason=${reason.name}');
-    } catch (_) {
-      // Diagnostics cannot affect capture or the client application.
-    }
   }
 
   void _logPriorityCaptureError(

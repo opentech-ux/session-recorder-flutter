@@ -7,19 +7,13 @@ It records **metadata** about gestures, scrolls, navigation, and layout
 geometry. It does **not** capture text values, form values, screenshots, or
 sensitive user content.
 
-> [!IMPORTANT]
->
-> This package is currently consumed from **Git**. Pub.dev publication will come
-> later, once the V2 runtime is validated.
-
 ## Installation
 
 Add the package to your app `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  session_recorder_flutter:
-    git: https://github.com/opentech-ux/session-recorder-flutter.git
+  session_recorder_flutter: ^2.0.0
 ```
 
 Then import the public API:
@@ -235,7 +229,7 @@ https://demo-client.ux-key.com/endpoint
 - `SessionRecorderWidget` should be installed **once** in the app tree.
 - Chunks are sent periodically; user interactions do not force immediate HTTP uploads.
 - In debug mode, chunks are not sent unless `debugSendSession` is `true`.
-- The payload contains layout geometry and zone identifiers, not private UI content.
+- The payload contains layout geometry and LOM identifiers, not private UI content.
 
 > [!NOTE]
 >

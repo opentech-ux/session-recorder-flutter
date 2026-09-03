@@ -13,11 +13,11 @@ class Chunk {
   final List<ActionEvent> actionsEvents;
 
   Chunk()
-    : timestamp = DateTime.now().millisecondsSinceEpoch,
-      sId = "",
-      actionsEvents = [],
-      explorationEvents = [],
-      loms = [];
+      : timestamp = DateTime.now().millisecondsSinceEpoch,
+        sId = "",
+        actionsEvents = [],
+        explorationEvents = [],
+        loms = [];
 
   bool get isChunkEmpty =>
       loms.isEmpty && explorationEvents.isEmpty && actionsEvents.isEmpty;
@@ -44,6 +44,7 @@ class Chunk {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
+      'framework': 'Flutter',
       'type': libraryType,
       'ts': timestamp,
       'sid': sId,

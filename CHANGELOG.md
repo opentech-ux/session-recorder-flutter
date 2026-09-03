@@ -1,12 +1,14 @@
 ## 2.0.0
 
 - **BREAKING** Refactored the public API around `SessionRecorder.init`, `SessionRecorderConfig`, `SessionRecorderWidget`, and `SessionNavigatorObserver`.
-- **CHANGED** Reworked runtime internals into session, core, collectors, tree, models, and observers.
-- **ADDED** LOM deduplication with lightweight `LomRef` records.
-- **ADDED** Strict endpoint validation for `https://[subdomain].ux-key.com/endpoint`.
+- **ADDED** Visible-only LOM capture in viewport coordinates with a stable physical capture boundary and `Lom`/`LomRef` deduplication.
+- **ADDED** Recommended `MaterialApp.builder` integration with an optional navigation observer.
+- **ADDED** Navigation, mutation, interaction-consequence, and post-scroll capture scheduling.
+- **ADDED** Tap, double tap, long press, drag, pinch, and scroll gesture capture.
+- **ADDED** A required top-level `framework: "Flutter"` discriminator in every chunk.
 - **ADDED** Reporter safeguards for concurrent flushes, HTTP timeout, and short in-memory retry.
-- **FIXED** Zone resolution after a `LomRef` by keeping a local LOM root cache.
-- **UPDATED** Documentation and examples for the V2 integration flow.
+- **IMPROVED** Profile/Release robustness, memory use, and runtime performance compared with V1.
+- **UPDATED** Documentation and examples for the V2 integration and viewport-based event/LOM association.
 
 ## 1.1.1
 
