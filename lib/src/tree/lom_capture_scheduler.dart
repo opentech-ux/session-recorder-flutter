@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart' show kProfileMode;
 import 'package:flutter/widgets.dart';
 
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
@@ -224,6 +226,27 @@ class LomCaptureScheduler {
               scheduledNavigationEpoch != _navigationEpoch ||
               !_isNavigationBarrierActive ||
               _isScrollCaptureSuppressed) {
+            return;
+          }
+          if (_mutationRevision != capturedMutationRevision) {
+            if (kProfileMode) {
+              developer.log(
+                'LOM ts=${DateTime.now().millisecondsSinceEpoch} '
+                'scheduler=${identityHashCode(this).toRadixString(16)} '
+                'epoch=$_navigationEpoch navigation stale skipped '
+                'capturedMutationRevision=$capturedMutationRevision '
+                'currentMutationRevision=$_mutationRevision',
+                name: 'SessionRecorder.P1',
+              );
+            }
+            // A newer build invalidates this attempt before inspection and
+            // publication; hand off dirty work without the null-result retry.
+            _completeNavigationCapture(
+              false,
+              false,
+              scheduledNavigationEpoch,
+              invalidatedByMutation: true,
+            );
             return;
           }
           _captureNow(
@@ -457,15 +480,17 @@ class LomCaptureScheduler {
   void _completeNavigationCapture(
     bool navigationCaptureProducedLom,
     bool navigationCaptureCoveredLatestMutation,
-    int completedNavigationEpoch,
-  ) {
+    int completedNavigationEpoch, {
+    bool invalidatedByMutation = false,
+  }) {
     if (completedNavigationEpoch != _navigationEpoch) return;
 
     final hadDeferredCapture = _hasDeferredMutationCapture;
     _hasDeferredMutationCapture = false;
     _isNavigationBarrierActive = false;
 
-    if (navigationCaptureProducedLom) {
+    // Invalidated attempts share the ordinary handoff, not inspection failure.
+    if (navigationCaptureProducedLom || invalidatedByMutation) {
       if (!navigationCaptureCoveredLatestMutation && _isRunning) {
         _scheduleDebouncedCapture(restart: false);
       }
