@@ -5,7 +5,7 @@
 - **ADDED** Recommended `MaterialApp.builder` integration with an optional navigation observer.
 - **ADDED** Navigation, mutation, interaction-consequence, and post-scroll capture scheduling.
 - **ADDED** Tap, double tap, long press, drag, pinch, and scroll gesture capture.
-- **ADDED** A required top-level `framework: "Flutter"` discriminator in every chunk.
+- **CHANGED** Every Flutter chunk now carries `env: {fwk: "flutter", os: "android" | "ios", bmd: "debug" | "profile" | "release"}` instead of top-level `framework`. OS and build mode are detected internally without client configuration or new dependencies. `lib_v` remains `2.0.0`; consumers that only read `framework` need a separate update.
 - **ADDED** Reporter safeguards for concurrent flushes, HTTP timeout, and short in-memory retry.
 - **IMPROVED** Profile/Release robustness, memory use, and runtime performance compared with V1.
 - **UPDATED** Documentation and examples for the V2 integration and viewport-based event/LOM association.

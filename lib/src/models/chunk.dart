@@ -1,8 +1,28 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kDebugMode, kProfileMode;
 
 import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import 'models.dart';
+
+Map<String, String> _chunkEnvironment() {
+  final String os;
+  if (Platform.isAndroid) {
+    os = 'android';
+  } else if (Platform.isIOS) {
+    os = 'ios';
+  } else {
+    throw UnsupportedError('Flutter chunk environment requires Android or iOS');
+  }
+
+  return {
+    'fwk': 'flutter',
+    'os': os,
+    'bmd': kDebugMode ? 'debug' : (kProfileMode ? 'profile' : 'release'),
+  };
+}
 
 class Chunk {
   String sId;
@@ -44,8 +64,8 @@ class Chunk {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
-      'framework': 'flutter',
       'type': libraryType,
+      'env': _chunkEnvironment(),
       'ts': timestamp,
       'sid': sId,
       'loms': loms.map((x) => x.toMap()).toList(),
