@@ -44,7 +44,7 @@ class Chunk {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
-      'framework': 'Flutter',
+      'framework': 'flutter',
       'type': libraryType,
       'ts': timestamp,
       'sid': sId,

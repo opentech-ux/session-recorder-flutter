@@ -48,6 +48,7 @@ class LomCaptureScheduler {
   DateTime? _interactionConsequenceArmedAt;
   bool _isInteractionConsequenceScheduled = false;
   int _navigationEpoch = 0;
+  int _mutationRevision = 0;
 
   /// All LOM deadlines share this timer; their reason determines whether the
   /// deadline is fixed or trailing/restartable.
@@ -166,6 +167,7 @@ class LomCaptureScheduler {
   void handleBuildScheduled() {
     if (!_isRunning || _isScrollCaptureSuppressed) return;
 
+    _mutationRevision += 1;
     _markTreeChanged();
     if (_isNavigationBarrierActive) {
       _deferMutationCapture();
@@ -212,11 +214,25 @@ class LomCaptureScheduler {
             _isScrollCaptureSuppressed) {
           return;
         }
-        _captureNow(
-          LomCaptureReason.navigation,
-          comesFromNavigation: true,
-          navigationEpoch: scheduledNavigationEpoch,
-        );
+
+        /// Capture only after the pending frame has committed. [endOfFrame]
+        /// schedules a frame when called while idle, so this fence cannot be
+        /// skipped merely because no frame was already requested.
+        final capturedMutationRevision = _mutationRevision;
+        WidgetsBinding.instance.endOfFrame.then((_) {
+          if (!_isRunning ||
+              scheduledNavigationEpoch != _navigationEpoch ||
+              !_isNavigationBarrierActive ||
+              _isScrollCaptureSuppressed) {
+            return;
+          }
+          _captureNow(
+            LomCaptureReason.navigation,
+            comesFromNavigation: true,
+            navigationEpoch: scheduledNavigationEpoch,
+            capturedMutationRevision: capturedMutationRevision,
+          );
+        });
       });
       return;
     }
@@ -315,6 +331,7 @@ class LomCaptureScheduler {
     required bool comesFromNavigation,
     bool bypassCooldown = false,
     int? navigationEpoch,
+    int? capturedMutationRevision,
   }) {
     if (!comesFromNavigation && _isNavigationBarrierActive) {
       _deferMutationCapture();
@@ -355,18 +372,24 @@ class LomCaptureScheduler {
       _isInteractionConsequenceScheduled = false;
     }
 
+    final captureRevision = capturedMutationRevision ?? _mutationRevision;
+    var navigationCaptureCoveredLatestMutation = false;
+
     try {
       final lom = _captureLom(comesFromNavigation);
       if (lom == null) return null;
 
       _lastCaptureTime = DateTime.now();
-      _markTreeCaptured();
+      navigationCaptureCoveredLatestMutation = _markTreeCaptured(
+        captureRevision,
+      );
       navigationCaptureProducedLom = comesFromNavigation;
       return lom;
     } finally {
       if (comesFromNavigation) {
         _completeNavigationCapture(
           navigationCaptureProducedLom,
+          navigationCaptureCoveredLatestMutation,
           navigationEpoch!,
         );
       }
@@ -384,16 +407,23 @@ class LomCaptureScheduler {
     }
   }
 
-  void _markTreeCaptured() {
-    /// One successful capture absorbs every weaker freshness obligation and
-    /// cancels any redundant deadline through this shared path.
+  bool _markTreeCaptured(int capturedMutationRevision) {
+    /// A valid capture always satisfies existing post-scroll debt, but it must
+    /// not erase mutation work observed after the represented revision.
     _needsPostScrollCapture = false;
+    if (_mutationRevision != capturedMutationRevision) {
+      _hasUncapturedTreeChange = true;
+      _hasAttemptedPriorityCaptureForCurrentState = false;
+      return false;
+    }
+
     _hasUncapturedTreeChange = false;
     _hasAttemptedPriorityCaptureForCurrentState = false;
     _interactionConsequenceArmedAt = null;
     _isInteractionConsequenceScheduled = false;
     _captureTimer?.cancel();
     _captureTimer = null;
+    return true;
   }
 
   void _scheduleDebouncedCapture({
@@ -426,6 +456,7 @@ class LomCaptureScheduler {
 
   void _completeNavigationCapture(
     bool navigationCaptureProducedLom,
+    bool navigationCaptureCoveredLatestMutation,
     int completedNavigationEpoch,
   ) {
     if (completedNavigationEpoch != _navigationEpoch) return;
@@ -434,7 +465,14 @@ class LomCaptureScheduler {
     _hasDeferredMutationCapture = false;
     _isNavigationBarrierActive = false;
 
-    if (navigationCaptureProducedLom || !hadDeferredCapture || !_isRunning) {
+    if (navigationCaptureProducedLom) {
+      if (!navigationCaptureCoveredLatestMutation && _isRunning) {
+        _scheduleDebouncedCapture(restart: false);
+      }
+      return;
+    }
+
+    if (!hadDeferredCapture || !_isRunning) {
       return;
     }
 
