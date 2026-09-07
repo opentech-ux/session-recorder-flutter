@@ -17,7 +17,7 @@ class ScrollCollector {
   final SessionRecorderEngineInternal _engine;
 
   ScrollCollector({SessionRecorderEngineInternal? engine})
-    : _engine = engine ?? SessionRecorder.engine;
+      : _engine = engine ?? SessionRecorder.engine;
 
   bool _isScrolling = false;
 
@@ -25,6 +25,9 @@ class ScrollCollector {
   /// tolerance; an unvalidated bounce emits no logical scroll session.
   bool _isValidated = false;
   bool _isDisposed = false;
+
+  /// Origin token only; a missing owner preserves the existing fail-open path.
+  BuildContext? _activeOwner;
   ScrollExplorationEvent? _provisionalStart;
   String? _activeLomRef;
   Rect? _activeViewportBounds;
@@ -73,6 +76,7 @@ class ScrollCollector {
 
     _isScrolling = true;
     _isValidated = false;
+    _activeOwner = notification.context;
     _activeViewportBounds = rect;
     _initialOffset = offset;
     _activeOffset = offset;
@@ -93,6 +97,7 @@ class ScrollCollector {
 
   void _handleScrollUpdate(BuildContext? context, ScrollMetrics scrollMetrics) {
     if (!_isScrolling) return;
+    if (_activeOwner != null && !identical(context, _activeOwner)) return;
 
     final rect = _captureViewportGeometry(context);
     if (rect != null) _activeViewportBounds = rect;
@@ -106,6 +111,7 @@ class ScrollCollector {
 
   void _handleScrollEnd(BuildContext? context, ScrollMetrics scrollMetrics) {
     if (!_isScrolling) return;
+    if (_activeOwner != null && !identical(context, _activeOwner)) return;
 
     try {
       final rect = _captureViewportGeometry(context);
@@ -275,6 +281,7 @@ class ScrollCollector {
   void _resetSessionState() {
     _isScrolling = false;
     _isValidated = false;
+    _activeOwner = null;
     _provisionalStart = null;
     _activeLomRef = null;
     _activeViewportBounds = null;
