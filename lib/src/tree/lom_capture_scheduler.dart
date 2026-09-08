@@ -110,9 +110,14 @@ class LomCaptureScheduler {
         _isNavigationBarrierActive = false;
         _hasDeferredMutationCapture = false;
       }
-    } else if (_isInteractionConsequenceScheduled) {
+    } else if (!_needsPostScrollCapture) {
+      // An unvalidated scroll cannot discard pre-existing dirty work. Resume
+      // its consequence or ordinary deadline without replacing an active one.
       _scheduleDebouncedCapture(
-        reason: LomCaptureReason.interactionConsequence,
+        restart: false,
+        reason: _isInteractionConsequenceScheduled
+            ? LomCaptureReason.interactionConsequence
+            : LomCaptureReason.ordinaryMutation,
       );
     }
   }
