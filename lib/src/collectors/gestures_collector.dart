@@ -19,8 +19,8 @@ class GestureCollector {
   GestureCollector({
     SessionRecorderEngineInternal? engine,
     required Rect? Function() viewportProvider,
-  }) : _engine = engine ?? SessionRecorder.engine,
-       _viewportProvider = viewportProvider {
+  })  : _engine = engine ?? SessionRecorder.engine,
+        _viewportProvider = viewportProvider {
     _doubleTapTracker = DoubleTapTracker(
       recordAction: _engine.context.recordAction,
     );
@@ -104,8 +104,7 @@ class GestureCollector {
       // PointerTrace. An unrelated Move cannot join the gesture.
       if (!pinchSession.hasActiveTrack(pointer)) return;
 
-      final viewport =
-          _viewportProvider() ??
+      final viewport = _viewportProvider() ??
           (pointerTrace != null && !pointerTrace.isEmpty
               ? pointerTrace.last.viewport
               : pinchSession.viewport);
@@ -325,9 +324,8 @@ class GestureCollector {
   void _updateCandidatePinchBaseline() {
     if (_pinchSession != null) return;
 
-    final emptyPointers = _pointers.entries
-        .where((entry) => entry.value.isEmpty)
-        .toList();
+    final emptyPointers =
+        _pointers.entries.where((entry) => entry.value.isEmpty).toList();
     for (final entry in emptyPointers) {
       _pointers.remove(entry.key);
       _ignoredPointers.add(entry.key);
@@ -376,8 +374,7 @@ class GestureCollector {
       startTimestamp: qualifyingPosition.timestamp,
       viewport: qualifyingPosition.viewport,
       lomRef: oldestPointer?.lomRef ?? qualifyingTrace.lomRef,
-      isLomStateResolved:
-          oldestPointer?.isLomStateResolved ??
+      isLomStateResolved: oldestPointer?.isLomStateResolved ??
           qualifyingTrace.isLomStateResolved,
     );
     _pinchSession = pinchSession;
@@ -435,9 +432,8 @@ class GestureCollector {
     if (pinchSession == null) return;
 
     final survivorId = pinchSession.soleActivePointerId;
-    final survivorPosition = survivorId == null
-        ? null
-        : pinchSession.lastPositionFor(survivorId);
+    final survivorPosition =
+        survivorId == null ? null : pinchSession.lastPositionFor(survivorId);
     final survivorTrace = survivorId == null ? null : _pointers[survivorId];
     final event = pinchSession.finish(endTimestamp);
 
@@ -479,8 +475,7 @@ class GestureCollector {
         return;
       }
 
-      final viewport =
-          _viewportProvider() ??
+      final viewport = _viewportProvider() ??
           (pointerTrace != null && !pointerTrace.isEmpty
               ? pointerTrace.last.viewport
               : pinchSession.viewport);
@@ -526,6 +521,12 @@ class GestureCollector {
           pointerTrace.distance >= touchSlop) {
         _evaluateDrag(pointerTrace);
       }
+      return;
+    }
+
+    /// A recognized drag stays drag even when Up returns near its origin.
+    if (pointerTrace.type == GesturesType.drag) {
+      _evaluateDrag(pointerTrace);
       return;
     }
 
