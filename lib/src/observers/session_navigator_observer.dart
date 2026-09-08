@@ -20,6 +20,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   }
 
   bool _isAttached = false;
+  final Map<Route<dynamic>, VoidCallback> _pendingTransitions = Map.identity();
 
   /// True if this observer was ever attached to a Navigator and is now detached.
   @pragma('vm:prefer-inline')
@@ -43,6 +44,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     _setAttached();
+    if (oldRoute != null) _pendingTransitions.remove(oldRoute)?.call();
     if (newRoute == null) return;
     _handleTransition(newRoute, AnimationStatus.completed);
   }
@@ -51,6 +53,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didRemove(route, previousRoute);
     _setAttached();
+    _pendingTransitions.remove(route)?.call();
   }
 
   @pragma('vm:prefer-inline')
@@ -58,31 +61,41 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   /// Reports navigation and waits for `route`'s animation to settle.
   void _handleTransition(Route<dynamic> route, AnimationStatus terminalStatus) {
+    // Superseding a wait closes only this route's previous transition.
+    _pendingTransitions.remove(route)?.call();
     final controller = SessionRecorder.engine.controller;
     controller.beginNavigation();
 
     final animation = (route is TransitionRoute) ? route.animation : null;
 
     bool didFinish = false;
+    AnimationStatusListener? listener;
 
     void finish() {
       if (didFinish) return;
       didFinish = true;
+      final pendingListener = listener;
+      if (pendingListener != null) {
+        animation?.removeStatusListener(pendingListener);
+      }
+      _pendingTransitions.remove(route);
 
+      // Keep the existing frame boundary; a replacement begins before this
+      // decrement, so it cannot briefly complete all navigation transitions.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         controller.finishNavigation();
       });
     }
+
+    _pendingTransitions[route] = finish;
 
     if (animation == null || animation.status == terminalStatus) {
       finish();
       return;
     }
 
-    late final AnimationStatusListener listener;
     listener = (AnimationStatus status) {
       if (status == terminalStatus) {
-        animation.removeStatusListener(listener);
         finish();
       }
     };
@@ -90,7 +103,6 @@ class SessionNavigatorObserver extends NavigatorObserver {
     animation.addStatusListener(listener);
 
     if (animation.status == terminalStatus) {
-      animation.removeStatusListener(listener);
       finish();
     }
   }
