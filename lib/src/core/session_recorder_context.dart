@@ -138,7 +138,10 @@ class ContextImpl implements SessionRecorderContext {
 
     if (lom is LocalLomRef) return;
 
-    _currentChunk.addLom(lom);
+    // Keep the inspected tree locally, not in a ref queued only for its ID/ts.
+    _currentChunk.addLom(
+      lom is LomRef ? LomRef(id: lom.id, timestamp: lom.timestamp) : lom,
+    );
   }
 
   @override
