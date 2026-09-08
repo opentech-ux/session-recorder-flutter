@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart' show kProfileMode;
 import 'package:flutter/widgets.dart';
 
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
@@ -229,16 +227,6 @@ class LomCaptureScheduler {
             return;
           }
           if (_mutationRevision != capturedMutationRevision) {
-            if (kProfileMode) {
-              developer.log(
-                'LOM ts=${DateTime.now().millisecondsSinceEpoch} '
-                'scheduler=${identityHashCode(this).toRadixString(16)} '
-                'epoch=$_navigationEpoch navigation stale skipped '
-                'capturedMutationRevision=$capturedMutationRevision '
-                'currentMutationRevision=$_mutationRevision',
-                name: 'SessionRecorder.P1',
-              );
-            }
             // A newer build invalidates this attempt before inspection and
             // publication; hand off dirty work without the null-result retry.
             _completeNavigationCapture(
@@ -272,7 +260,23 @@ class LomCaptureScheduler {
   ({String lomRef, bool isResolved}) resolveLomStateForPointerDown({
     required String currentLomRef,
   }) {
-    if (!_isRunning || _isNavigationBarrierActive) {
+    if (!_isRunning) {
+      return (lomRef: currentLomRef, isResolved: false);
+    }
+
+    if (_isNavigationBarrierActive) {
+      if (_hasUncapturedTreeChange) {
+        // This publishes the interaction frame, not completion of any debt.
+        // In particular, do not enter _captureNow or consume a priority here.
+        try {
+          final lom = _captureLom(false);
+          if (lom != null && lom.id.isNotEmpty) {
+            return (lomRef: lom.id, isResolved: true);
+          }
+        } catch (_) {
+          // An interaction snapshot failure preserves the unresolved fallback.
+        }
+      }
       return (lomRef: currentLomRef, isResolved: false);
     }
 

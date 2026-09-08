@@ -19,7 +19,10 @@ abstract interface class SessionRecorderController {
   void dispose();
   void pingInactivity() {}
 
-  void onInterrupt(VoidCallback? onInterrupt);
+  void onInterrupt(
+    VoidCallback? onInterrupt, {
+    VoidCallback? onNavigationInterrupt,
+  });
   void interrupt();
 }
 
@@ -42,7 +45,10 @@ class NoOpController implements SessionRecorderController {
   @override
   void interrupt() {}
   @override
-  void onInterrupt(VoidCallback? onInterrupt) {}
+  void onInterrupt(
+    VoidCallback? onInterrupt, {
+    VoidCallback? onNavigationInterrupt,
+  }) {}
   @override
   void stopReporting() {}
   @override
@@ -61,6 +67,7 @@ class ControllerImpl implements SessionRecorderController {
   bool _isDisposed = false;
 
   VoidCallback? _onCollectorInterrupt;
+  VoidCallback? _onNavigationInterrupt;
 
   @override
   bool get isNavigationAttached {
@@ -94,7 +101,7 @@ class ControllerImpl implements SessionRecorderController {
     if (!isFirstTransition) return;
 
     _engine.context.setCurrentlyNavigating();
-    interrupt();
+    (_onNavigationInterrupt ?? _onCollectorInterrupt)?.call();
   }
 
   @override
@@ -134,14 +141,20 @@ class ControllerImpl implements SessionRecorderController {
   void interrupt() => _onCollectorInterrupt?.call();
 
   @override
-  void onInterrupt(VoidCallback? onInterrupt) =>
-      _onCollectorInterrupt = onInterrupt;
+  void onInterrupt(
+    VoidCallback? onInterrupt, {
+    VoidCallback? onNavigationInterrupt,
+  }) {
+    _onCollectorInterrupt = onInterrupt;
+    _onNavigationInterrupt = onNavigationInterrupt;
+  }
 
   @override
   void dispose() {
     _isDisposed = true;
     _activeNavigationTransitions = 0;
     _onCollectorInterrupt = null;
+    _onNavigationInterrupt = null;
     stopReporting();
     _reporter?.close();
     _reporter = null;

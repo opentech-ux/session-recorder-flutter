@@ -224,10 +224,10 @@ class GestureCollector {
   }
 
   /// Forced shutdown when the collection is interrupted.
-  void forceRecordCollector() {
-    // Drain pending taps before active traces so each physical tap has one
-    // owner.
-    _doubleTapTracker.drain();
+  void forceRecordCollector({bool preservePendingTaps = false}) {
+    // Terminal drains flush completed taps first. Navigation preserves them,
+    // including while an active trace is finalized below.
+    if (!preservePendingTaps) _doubleTapTracker.drain();
 
     if (_pinchSession != null) {
       _finishPinchSession(
@@ -248,7 +248,7 @@ class GestureCollector {
 
     for (final pointer in _pointers.values) {
       if (pointer.isEmpty) continue;
-      _drainPointerTrace(pointer);
+      _drainPointerTrace(pointer, preservePendingTaps: preservePendingTaps);
     }
 
     _pointers.clear();
@@ -257,7 +257,10 @@ class GestureCollector {
   }
 
   /// Emit any valid gesture in progress before a system interrupt.
-  void _drainPointerTrace(PointerTrace pointer) {
+  void _drainPointerTrace(
+    PointerTrace pointer, {
+    bool preservePendingTaps = false,
+  }) {
     if (pointer.type == GesturesType.drag) {
       _emitDragEvents(pointer);
     } else if (pointer.isPostTransitionDragOnly) {
@@ -268,9 +271,9 @@ class GestureCollector {
     } else if (pointer.type == GesturesType.longPress ||
         (pointer.duration >= longPressTimeout &&
             pointer.distance < touchSlop)) {
-      _evaluateLongPress(pointer);
+      _evaluateLongPress(pointer, resolvePendingTaps: !preservePendingTaps);
     } else if (pointer.distance >= touchSlop) {
-      _evaluateDrag(pointer);
+      _evaluateDrag(pointer, resolvePendingTaps: !preservePendingTaps);
     }
   }
 
@@ -541,8 +544,12 @@ class GestureCollector {
     _doubleTapTracker.completeTap(pointerTrace, upOrder: upOrder);
   }
 
-  void _evaluateDrag(PointerTrace pointerTrace) {
-    if (pointerTrace.type == GesturesType.tap &&
+  void _evaluateDrag(
+    PointerTrace pointerTrace, {
+    bool resolvePendingTaps = true,
+  }) {
+    if (resolvePendingTaps &&
+        pointerTrace.type == GesturesType.tap &&
         !pointerTrace.isPostTransitionDragOnly) {
       _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }
@@ -552,8 +559,12 @@ class GestureCollector {
     }
   }
 
-  void _evaluateLongPress(PointerTrace pointerTrace) {
-    if (pointerTrace.type == GesturesType.tap &&
+  void _evaluateLongPress(
+    PointerTrace pointerTrace, {
+    bool resolvePendingTaps = true,
+  }) {
+    if (resolvePendingTaps &&
+        pointerTrace.type == GesturesType.tap &&
         !pointerTrace.isPostTransitionDragOnly) {
       _doubleTapTracker.resolveRelatedPendingBeforeNonTap(pointerTrace);
     }

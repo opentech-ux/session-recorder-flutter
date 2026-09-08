@@ -16,7 +16,7 @@ final class DoubleTapTracker {
   int _contactOrder = 0;
 
   DoubleTapTracker({required void Function(ActionEvent event) recordAction})
-    : _recordAction = recordAction;
+      : _recordAction = recordAction;
 
   int registerPointerDown() => ++_contactOrder;
 
@@ -56,9 +56,8 @@ final class DoubleTapTracker {
 
     final expired = _takeExpiredPendingTaps(trace.lastTimestamp);
     final relatedIndex = _findRelatedPendingForInteraction(trace);
-    final related = relatedIndex == null
-        ? null
-        : _pendingTaps.removeAt(relatedIndex);
+    final related =
+        relatedIndex == null ? null : _pendingTaps.removeAt(relatedIndex);
 
     if (expired.isNotEmpty || related != null) {
       _rescheduleDoubleTapExpiry();

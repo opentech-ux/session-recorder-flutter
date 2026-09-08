@@ -70,7 +70,11 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     _gestures = GestureCollector(viewportProvider: _resolvePointerViewport);
     _scrolls = ScrollCollector();
 
-    SessionRecorder.engine.controller.onInterrupt(_dispatchPendingEvents);
+    SessionRecorder.engine.controller.onInterrupt(
+      _dispatchPendingEvents,
+      onNavigationInterrupt: () =>
+          _dispatchPendingEvents(preservePendingTaps: true),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -96,8 +100,8 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   @override
   void onSessionSuspended() => _dispatchPendingEvents();
 
-  void _dispatchPendingEvents() {
-    _gestures.forceRecordCollector();
+  void _dispatchPendingEvents({bool preservePendingTaps = false}) {
+    _gestures.forceRecordCollector(preservePendingTaps: preservePendingTaps);
     _scrolls.forceRecordCollector();
   }
 
