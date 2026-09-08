@@ -10,7 +10,6 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 @internal
 abstract interface class SessionRecorderController {
   void registerObserver(SessionNavigatorObserver observer);
-  bool get isNavigationAttached;
   void beginNavigation();
   void finishNavigation();
 
@@ -41,8 +40,6 @@ class NoOpController implements SessionRecorderController {
   @override
   void startReporting() {}
   @override
-  bool get isNavigationAttached => false;
-  @override
   void interrupt() {}
   @override
   void onInterrupt(
@@ -68,12 +65,6 @@ class ControllerImpl implements SessionRecorderController {
 
   VoidCallback? _onCollectorInterrupt;
   VoidCallback? _onNavigationInterrupt;
-
-  @override
-  bool get isNavigationAttached {
-    _removeDisposedObservers();
-    return _observers.any((o) => o.navigator != null);
-  }
 
   late final InactivityDetector _inactivity = InactivityDetector(
     onActive: startReporting,

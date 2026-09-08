@@ -92,7 +92,8 @@ class LomTreeInspector {
         final cacheId = _findCachedLomId(signature);
         if (cacheId == null) return null;
 
-        /// Refresh local hit-test data without adding network noise.
+        /// Refresh the current tree for local state and the debug overlay
+        /// without adding a wire record.
         return LocalLomRef(
           id: cacheId,
           timestamp: DateTime.now().millisecondsSinceEpoch,

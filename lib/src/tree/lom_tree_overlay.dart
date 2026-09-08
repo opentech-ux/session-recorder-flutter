@@ -5,9 +5,8 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 
 /// Debug overlay that paints `[Root]` bounding boxes on top of the app.
 ///
-/// Only renders in debug builds (`[kDebugMode]`). Each node is drawn as a
-/// semi-transparent colored rectangle. Leaf nodes (no children) are painted
-/// in green to highlight interactive widgets; containers are painted in blue.
+/// Only renders in debug builds (`[kDebugMode]`). Every node uses the same
+/// semi-transparent red outline, without distinguishing interactive nodes.
 ///
 /// Enable via `[SessionRecorderConfig.debugShowTree]`.
 class LomTreeOverlay extends StatelessWidget {

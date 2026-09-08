@@ -8,8 +8,8 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
 
-/// Collects scroll position data and emits one [ScrollSessionEndEvent] per
-/// gesture.
+/// Collects scroll position data and emits start/end [ScrollExplorationEvent]
+/// records for validated scroll sessions.
 class ScrollCollector {
   static const double _movementTolerance = 1.0;
   static const Duration _captureStabilization = Duration(milliseconds: 600);

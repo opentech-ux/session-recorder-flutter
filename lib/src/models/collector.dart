@@ -62,10 +62,6 @@ class PointerTrace {
     );
   }
 
-  void clear() {
-    positions.clear();
-  }
-
   PointerTrace splitForTransition({
     required GesturesType newType,
     bool isPostTransitionDragOnly = false,
