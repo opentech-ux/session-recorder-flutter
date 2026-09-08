@@ -41,8 +41,11 @@ class InactivityDetector {
     _reset();
   }
 
-  /// Starts the inactivity timer.
-  void start() => _reset();
+  /// Starts a fresh active window without reporting a user activation.
+  void start() {
+    _state = InactivityState.active;
+    _reset();
+  }
 
   /// Starts the inactivity countdown if not already running.
   void _reset() {
