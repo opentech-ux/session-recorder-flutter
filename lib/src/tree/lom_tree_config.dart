@@ -75,6 +75,8 @@ class LomTreeConfig {
       'NavigationBar',
       'BottomNavigationBar',
       'NavigationRail',
+      'PhysicalModel',
+      'PhysicalShape',
     },
   });
 }
