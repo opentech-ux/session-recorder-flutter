@@ -1,15 +1,17 @@
 # Session Recorder Flutter
 
-**Session Recorder Flutter** is a lightweight Flutter SDK for capturing user
-interaction sessions and spatial UI snapshots.
+**Session Recorder Flutter** is a lightweight Flutter SDK for recording user
+interactions and spatial UI structure during an application session.
 
-It records **metadata** about gestures, scrolls, navigation, and layout
-geometry. It does **not** capture text values, form values, screenshots, or
-sensitive user content.
+It records metadata about gestures, scrolling, navigation, and visible layout
+geometry.
+
+It does **not** capture screenshots, text values, form values, or sensitive UI
+content.
 
 ## Installation
 
-Add the package to your app `pubspec.yaml`:
+Add the published package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -24,15 +26,18 @@ import 'package:session_recorder_flutter/session_recorder.dart';
 
 ## Compatibility
 
-- **Dart**: `>=3.0.0 <4.0.0`
-- **Flutter**: `>=3.10.0`
+- **Dart:** `>=3.0.0 <4.0.0`
+- **Platforms:** Android and iOS
+- **Flutter:** see the minimum supported SDK version declared in `pubspec.yaml`
 
-## Basic Usage
+Web and desktop are not currently supported runtime targets.
 
-The required integration has two parts:
+## Quick Start
+
+V2 requires only two integration steps:
 
 1. Initialize `SessionRecorder`.
-2. Install one `SessionRecorderWidget`.
+2. Add one `SessionRecorderWidget` around the application content.
 
 ```dart
 void main() {
@@ -40,8 +45,7 @@ void main() {
 
   SessionRecorder.init(
     const SessionRecorderConfig(
-      endpoint: 'https://demo-client.ux-key.com/endpoint',
-      debugLog: true,
+      endpoint: 'https://your-subdomain.ux-key.com/endpoint',
     ),
   );
 
@@ -58,24 +62,78 @@ void main() {
 
 > [!IMPORTANT]
 >
-> Call `SessionRecorder.init()` **once**, during app startup. Do not call it from
-> a widget `build()` method or from frequent callbacks.
+> Call `SessionRecorder.init()` once during application startup, after
+> `WidgetsFlutterBinding.ensureInitialized()` and before `runApp()`.
+>
+> Do not initialize the recorder from a widget `build()` method or from
+> frequently executed callbacks.
 
-`MaterialApp.builder` gives the recorder a precise boundary around the
-application's navigable subtree. This setup is sufficient for LOM, gesture,
-scroll, mutation, and LOM/event association capture.
+Using `MaterialApp.builder` is the recommended integration because it gives the
+recorder a stable boundary around the application's navigable UI.
+
+The same approach works with `MaterialApp.router`.
+
+## What It Records
+
+Session Recorder can record:
+
+- taps, double taps, and long presses;
+- drag and pinch gestures;
+- scrolling activity;
+- the spatial structure of the visible UI;
+- layout geometry used to associate interactions with the UI.
+
+Only UI that is currently materialized and visible is represented in the
+captured structure.
+
+The SDK does not record screenshots, text input values, form values, or the
+contents of private UI fields.
+
+## Configuration
+
+```dart
+const SessionRecorderConfig(
+  endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+  debugLog: false,
+  debugShowTree: false,
+  debugSendSession: false,
+);
+```
+
+### `endpoint`
+
+Backend endpoint that receives Session Recorder chunks.
+
+```text
+https://your-subdomain.ux-key.com/endpoint
+```
+
+### `debugLog`
+
+Enables internal SDK logs useful in Debug mode.
+
+### `debugShowTree`
+
+Displays the captured UI bounds in Debug mode.
+
+### `debugSendSession`
+
+Allows session chunks to be sent from Debug and Profile builds.
+
+Release builds send normally.
 
 ## Optional Navigation Observer
 
-`SessionNavigatorObserver` is not required for the SDK to work. It only adds
-explicit navigation signals so post-navigation captures can be timed more
-precisely.
+`SessionNavigatorObserver` is optional in V2.
 
-Create it once after `SessionRecorder.init`, keep it in a stable app or router
-owner, and preserve existing observers:
+The recorder works with only `SessionRecorder.init()` and
+`SessionRecorderWidget`. The observer adds explicit navigation signals so
+post-navigation captures can be timed more precisely.
+
+If you use it, create the observer once after initialization and keep it stable:
 
 ```dart
-final sessionObserver = SessionNavigatorObserver(); // after init
+final sessionObserver = SessionNavigatorObserver();
 
 MaterialApp(
   navigatorObservers: [
@@ -89,19 +147,28 @@ MaterialApp(
 );
 ```
 
-Do not create it in `build` or in the `MaterialApp.builder` callback. It does
-not define the capture boundary or replace existing observers.
+Do not create the observer inside `build`.
 
-## Router / GoRouter
+Keep existing application observers and add the Session Recorder observer
+alongside them.
 
-GoRouter is optional. Keep the router and its observer stable, and place the
-capture boundary in `MaterialApp.router.builder`:
+Use a separate `SessionNavigatorObserver` instance for each Navigator.
+
+## Advanced Integration
+
+### Router / GoRouter
+
+For router-based applications, use the same capture boundary with
+`MaterialApp.router.builder`:
 
 ```dart
-final sessionObserver = SessionNavigatorObserver(); // after init
+final sessionObserver = SessionNavigatorObserver();
 
 final router = GoRouter(
-  observers: [anotherObserver, sessionObserver],
+  observers: [
+    anotherObserver,
+    sessionObserver,
+  ],
   routes: [
     // ...
   ],
@@ -115,12 +182,14 @@ MaterialApp.router(
 );
 ```
 
-No GoRouter-specific SDK integration is required.
+No GoRouter-specific Session Recorder integration is required.
 
-## Existing Builder
+The navigation observer remains optional.
 
-If the application already has a builder, preserve its composition and wrap
-the final widget it produces:
+### Existing MaterialApp builder
+
+If your application already uses a builder, preserve it and wrap the final
+widget it produces:
 
 ```dart
 builder: (context, child) {
@@ -134,105 +203,152 @@ builder: (context, child) {
 
 Call the existing builder once and wrap its final result.
 
-## Convenience Outer-Wrapper Integration
+### Multiple Navigators
 
-`SessionRecorderWidget.observer` is a supported convenience that provides the
-optional observer while wrapping the complete application:
+Applications with multiple Navigators may attach an optional
+`SessionNavigatorObserver` to each one.
+
+Use a different observer instance for every Navigator.
+
+```dart
+final rootObserver = SessionNavigatorObserver();
+final shellObserver = SessionNavigatorObserver();
+```
+
+All observer instances report to the same Session Recorder runtime.
+
+They provide navigation signals only and do not determine which UI subtree is
+captured.
+
+### Outer-wrapper convenience
+
+An outer-wrapper integration is also supported:
 
 ```dart
 SessionRecorderWidget.observer(
   builder: (observer) => MaterialApp(
-    navigatorObservers: [anotherObserver, observer],
+    navigatorObservers: [
+      anotherObserver,
+      observer,
+    ],
     home: const HomeScreen(),
   ),
 );
 ```
 
-Invoke it after `SessionRecorder.init` from a stable integration position. This
-outer-wrapper form remains supported, but `MaterialApp.builder` is preferred
-when a more precise capture boundary is wanted.
-
-## Advanced: Multiple Navigators
-
-Multiple navigators may each use their own `SessionNavigatorObserver` when
-their navigation signals are wanted:
-
-```dart
-final rootSessionObserver = SessionNavigatorObserver(); // after init
-final shellSessionObserver = SessionNavigatorObserver(); // after init
-
-final router = GoRouter(
-  observers: [rootSessionObserver],
-  routes: [
-    ShellRoute(
-      observers: [shellSessionObserver],
-      routes: [
-        // ...
-      ],
-    ),
-  ],
-);
-```
-
-Do not reuse the same `NavigatorObserver` instance across navigators. Each
-instance reports to the same Session Recorder runtime; observers remain
-optional and do not determine the LOM root.
-
-## What It Captures
-
-- **Action events**: `tap`, `doubleTap`, `longPress`.
-- **Exploration events**: `drag`, `pinch`, `scrollStart`, `scrollEnd`.
-- **LOM snapshots**: spatial structure of the visible application subtree.
-- **Session chunks**: periodic payloads sent to the configured endpoint.
-- **Debug overlay**: optional visualization of captured LOM bounds.
-
-## Configuration
-
-```dart
-const SessionRecorderConfig(
-  endpoint: 'https://demo-client.ux-key.com/endpoint',
-  debugLog: true,
-  debugShowTree: false,
-  debugSendSession: false,
-);
-```
-
-Options:
-
-- `endpoint`: backend endpoint that receives session chunks.
-- `debugLog`: enables SDK internal logs.
-- `debugShowTree`: paints captured LOM bounds in debug builds.
-- `debugSendSession`: sends chunks in debug mode. Release builds always send.
-
-## Endpoint Format
-
-The production endpoint format is:
-
-```text
-https://[subdomain].ux-key.com/endpoint
-```
-
-Example:
-
-```text
-https://demo-client.ux-key.com/endpoint
-```
-
-> [!WARNING]
->
-> Endpoint validation is temporarily disabled for local endpoint testing.
-> Before publishing or releasing the SDK, re-enable
-> `SessionRecorderConfig.validate()` inside `SessionRecorder.init()`.
+`MaterialApp.builder` remains the recommended integration when a more precise
+application boundary is desired.
 
 ## Runtime Notes
 
-- `SessionRecorderWidget` should be installed **once** in the app tree.
-- Chunks are sent periodically; user interactions do not force immediate HTTP uploads.
-- In debug mode, chunks are not sent unless `debugSendSession` is `true`.
-- The payload contains layout geometry and LOM identifiers, not private UI content.
+- Install only one `SessionRecorderWidget` for the same application boundary.
+- User interactions do not trigger an HTTP request for every event; session data
+  is grouped into chunks and reported periodically.
+- Debug and Profile builds do not send session chunks unless
+  `debugSendSession` is enabled.
+- Release builds send session chunks normally.
+- Scroll interactions preserve their start, trajectory, and end as one
+  exploration sequence.
 
-> [!NOTE]
->
-> During scroll, the SDK keeps the sequence
-> `scrollStart -> drag... -> scrollEnd`. The `drag` points represent the scroll
-> trajectory and are interpreted as part of the same scroll exploration.
+## Migrating from V1 (GitHub) to V2
+
+V1 was distributed directly from GitHub. V2 is available as the published Dart
+package.
+
+### 1. Update the dependency
+
+V1:
+
+```yaml
+dependencies:
+  session_recorder_flutter:
+    git: https://github.com/opentech-ux/session-recorder-flutter.git
+```
+
+V2:
+
+```yaml
+dependencies:
+  session_recorder_flutter: ^2.0.0
+```
+
+The public import remains unchanged:
+
+```dart
+import 'package:session_recorder_flutter/session_recorder.dart';
+```
+
+### 2. Update initialization
+
+V1:
+
+```dart
+SessionRecorder.instance.init(
+  SessionRecorderParams(
+    endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+  ),
+);
+```
+
+V2:
+
+```dart
+SessionRecorder.init(
+  const SessionRecorderConfig(
+    endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+  ),
+);
+```
+
+Initialize once in `main`, after:
+
+```dart
+WidgetsFlutterBinding.ensureInitialized();
+```
+
+and before `runApp()`.
+
+### 3. Add the V2 capture boundary
+
+`SessionRecorderWidget` is required.
+
+The recommended integration is:
+
+```dart
+MaterialApp(
+  home: const HomeScreen(),
+  builder: (context, child) => SessionRecorderWidget(
+    child: child ?? const SizedBox.shrink(),
+  ),
+);
+```
+
+For router-based applications, use the same approach with
+`MaterialApp.router.builder`.
+
+### 4. Navigation tracking is now optional
+
+V1 required navigation observer integration.
+
+In V2, `SessionNavigatorObserver` is optional. The required integration is only:
+
+```text
+SessionRecorder.init(...)
++
+SessionRecorderWidget
+```
+
+If navigation observers are used, create them once outside `build` and use a
+different instance for each Navigator.
+
+### What improves in V2?
+
+V2 introduces a new visible-only UI capture model, improved gesture and scroll
+recording, and substantially reduced runtime and memory overhead compared with
+V1.
+
+Navigation, lifecycle handling, session reporting, and UI-change capture are
+also more robust.
+
+Applications that consume Session Recorder payloads directly should review the
+V2 protocol documentation before upgrading.

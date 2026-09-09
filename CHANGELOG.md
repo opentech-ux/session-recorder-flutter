@@ -1,14 +1,24 @@
 ## 2.0.0
 
-- **BREAKING** Refactored the public API around `SessionRecorder.init`, `SessionRecorderConfig`, `SessionRecorderWidget`, and `SessionNavigatorObserver`.
-- **ADDED** Visible-only LOM capture in viewport coordinates with a stable physical capture boundary and `Lom`/`LomRef` deduplication.
-- **ADDED** Recommended `MaterialApp.builder` integration with an optional navigation observer.
-- **ADDED** Navigation, mutation, interaction-consequence, and post-scroll capture scheduling.
-- **ADDED** Tap, double tap, long press, drag, pinch, and scroll gesture capture.
-- **CHANGED** Every Flutter chunk now carries `env: {fwk: "flutter", os: "android" | "ios", bmd: "debug" | "profile" | "release"}` instead of top-level `framework`. OS and build mode are detected internally without client configuration or new dependencies. `lib_v` remains `2.0.0`; consumers that only read `framework` need a separate update.
-- **ADDED** Reporter safeguards for concurrent flushes, HTTP timeout, and short in-memory retry.
-- **IMPROVED** Profile/Release robustness, memory use, and runtime performance compared with V1.
-- **UPDATED** Documentation and examples for the V2 integration and viewport-based event/LOM association.
+### Breaking
+
+- New V2 API: use `SessionRecorder.init(SessionRecorderConfig(...))` instead of the V1 singleton and parameters.
+- Payload changes require custom consumers to follow the V2 protocol/payload documentation.
+
+### Added
+
+- Visible-only LOM capture of the application's UI structure.
+- Optional `SessionNavigatorObserver`; only initialization and `SessionRecorderWidget` are required.
+
+### Improved
+
+- More reliable gesture and scroll recording.
+- Significant performance and memory improvements.
+- More robust navigation, lifecycle handling, and reporting.
+
+### Documentation
+
+- Simplified V1-to-V2 migration guide and recommended `MaterialApp.builder` / `MaterialApp.router.builder` integration.
 
 ## 1.1.1
 
