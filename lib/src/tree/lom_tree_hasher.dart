@@ -16,7 +16,7 @@ class LomTreeHasher {
       seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
 
   /// Generates a hash for a single `node` based on its visible geometry and
-  /// number of children.
+  /// number of children and the Widget type serialized as `t`.
   static int _hashRoot(Root root) {
     int s = 0;
 
@@ -25,6 +25,7 @@ class LomTreeHasher {
     s = _hashCombine(s, _bucket(root.box.width));
     s = _hashCombine(s, _bucket(root.box.height));
     s = _hashCombine(s, root.children.length);
+    s = _hashCombine(s, root.widgetType.hashCode);
 
     return s;
   }

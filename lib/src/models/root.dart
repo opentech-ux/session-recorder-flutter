@@ -31,10 +31,9 @@ class Root {
 
     return <String, dynamic>{
       'id': "z$id",
+      't': widgetType,
       'b': b,
       'c': children.map((x) => x.toMap()).toList(),
-      // TODO: Remove widgetType from the debug payload.
-      if (kDebugMode) 'widgetType': widgetType,
     };
   }
 
