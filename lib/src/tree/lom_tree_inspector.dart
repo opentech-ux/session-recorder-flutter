@@ -28,9 +28,8 @@ class LomTreeInspector {
     Element? element, {
     required bool comesFromNavigation,
   }) {
-    if (element == null || !element.mounted) return null;
-
     try {
+      if (element == null || !element.mounted) return null;
       final view = View.maybeOf(element);
       if (view == null) return null;
 
@@ -58,6 +57,7 @@ class LomTreeInspector {
 
       final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
       final counter = _RootCounter();
+      final typeClassifications = <Type, _WidgetTypeClassification>{};
 
       /// Resolve each real parent edge only once per capture.
       final effectiveClips = HashMap<RenderObject, Rect>.identity();
@@ -71,6 +71,7 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: _config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
 
@@ -159,12 +160,23 @@ class LomTreeInspector {
     required HashMap<RenderObject, Rect> effectiveClips,
     required HashMap<RenderObject, bool> paintEligibility,
     required LomTreeConfig config,
+    required Map<Type, _WidgetTypeClassification> typeClassifications,
     required _RootCounter counter,
   }) {
     if (isCaptureAnchor && element is! RenderObjectElement) return [];
 
     final Widget widget = element.widget;
-    final String widgetType = widget.runtimeType.toString();
+    final type = widget.runtimeType;
+    var classification = typeClassifications[type];
+    if (classification == null) {
+      classification = _WidgetTypeClassification(
+        type.toString(),
+        widget,
+        config,
+      );
+      typeClassifications[type] = classification;
+    }
+    final widgetType = classification.name;
     var inheritedClip = effectiveClip;
     var inheritedRenderAncestor = nearestRenderAncestor;
 
@@ -192,12 +204,14 @@ class LomTreeInspector {
 
     /// Prune removes a subtree by policy; flattening below keeps descendants
     /// and propagates the same render ancestor and effective clip.
-    if (!isCaptureAnchor && config.pruneAt.contains(widgetType)) return [];
+    if (!isCaptureAnchor && classification.prune) {
+      return [];
+    }
 
-    final bool hasImportanteSemantic = config.semantics.contains(widgetType);
+    final bool hasImportanteSemantic = classification.semantic;
 
     if (!isCaptureAnchor &&
-        widget is! RenderObjectWidget &&
+        !classification.renderObjectWidget &&
         !hasImportanteSemantic) {
       return _visitChildrenFlat(
         element,
@@ -207,13 +221,14 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
     }
 
     if (!isCaptureAnchor &&
         !hasImportanteSemantic &&
-        config.noiseAt.contains(widgetType)) {
+        classification.noise) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -222,14 +237,14 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
     }
 
     if (!isCaptureAnchor &&
         !hasImportanteSemantic &&
-        (widgetType.startsWith('_') ||
-            config.ignoreAt.any((w) => widgetType.contains(w)))) {
+        classification.ignored) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -238,12 +253,13 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
     }
 
     final renderObject = element.renderObject;
-    final Rect? rect = MathUtils.transformRect(renderObject);
+    final rect = MathUtils.transformRect(renderObject);
 
     /// Missing node geometry does not prune descendants because unclipped
     /// overflow may still paint outside the parent's own bounds.
@@ -257,6 +273,7 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
     }
@@ -275,6 +292,7 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
     }
@@ -288,10 +306,11 @@ class LomTreeInspector {
       effectiveClips: effectiveClips,
       paintEligibility: paintEligibility,
       config: config,
+      typeClassifications: typeClassifications,
       counter: counter,
     );
 
-    return [
+    final roots = [
       Root(
         id: id,
         objectId: renderObject.hashCode.toRadixString(16),
@@ -301,6 +320,7 @@ class LomTreeInspector {
         children: children,
       ),
     ];
+    return roots;
   }
 
   /// Visite children in flat mode using heavy spread to avoid unnecessary lists
@@ -312,6 +332,7 @@ class LomTreeInspector {
     required HashMap<RenderObject, Rect> effectiveClips,
     required HashMap<RenderObject, bool> paintEligibility,
     required LomTreeConfig config,
+    required Map<Type, _WidgetTypeClassification> typeClassifications,
     required _RootCounter counter,
   }) {
     final children = <Root>[];
@@ -327,6 +348,7 @@ class LomTreeInspector {
         effectiveClips: effectiveClips,
         paintEligibility: paintEligibility,
         config: config,
+        typeClassifications: typeClassifications,
         counter: counter,
       );
       if (rootChildren.isNotEmpty) {
@@ -424,12 +446,15 @@ class LomTreeInspector {
     }
   }
 
-  static Rect? _globalPaintClip(RenderObject parent, RenderObject child) {
+  static Rect? _globalPaintClip(
+    RenderObject parent,
+    RenderObject child,
+  ) {
     try {
       final localClip = parent.describeApproximatePaintClip(child);
       if (localClip == null || !_isFiniteRect(localClip)) return null;
 
-      final transform = parent.getTransformTo(null);
+      final Matrix4 transform = parent.getTransformTo(null);
       final globalClip = MatrixUtils.transformRect(transform, localClip);
       return _isFiniteRect(globalClip) ? globalClip : null;
     } catch (_) {
@@ -445,6 +470,24 @@ class LomTreeInspector {
         rect.right.isFinite &&
         rect.bottom.isFinite;
   }
+}
+
+/// Immutable type facts only; instances and capture-anchor policy stay uncached.
+class _WidgetTypeClassification {
+  final String name;
+  final bool prune;
+  final bool semantic;
+  final bool renderObjectWidget;
+  final bool noise;
+  final bool ignored;
+
+  _WidgetTypeClassification(this.name, Widget widget, LomTreeConfig config)
+    : prune = config.pruneAt.contains(name),
+      semantic = config.semantics.contains(name),
+      renderObjectWidget = widget is RenderObjectWidget,
+      noise = config.noiseAt.contains(name),
+      ignored = name.startsWith('_') ||
+          config.ignoreAt.any((pattern) => name.contains(pattern));
 }
 
 class _RootCounter {

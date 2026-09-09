@@ -232,7 +232,7 @@ class MathUtils {
     }
 
     try {
-      final transform = render.getTransformTo(null);
+      final Matrix4 transform = render.getTransformTo(null);
       final Rect localRect = Offset.zero & render.size;
       return MatrixUtils.transformRect(transform, localRect);
     } catch (_) {
