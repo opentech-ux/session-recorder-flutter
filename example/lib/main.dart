@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 // ignore: depend_on_referenced_packages
-import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SessionRecorder.init(SessionRecorderConfig(debugLog: true, endpoint: ""));
+  SessionRecorder.init(SessionRecorderConfig(endpoint: ""));
 
   runApp(const MainApp());
 }
@@ -18,9 +18,8 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: const ExampleApp(),
-      builder: (context, child) => SessionRecorderWidget(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) =>
+          SessionRecorderWidget(child: child ?? const SizedBox.shrink()),
     );
   }
 }

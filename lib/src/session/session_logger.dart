@@ -1,17 +1,16 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
-import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 
 enum SessionLogLevel { error, warning, info, verbose }
 
-typedef SessionLoggerCallback =
-    void Function(
-      SessionLogLevel level,
-      String message, {
-      Object? error,
-      StackTrace? stackTrace,
-    });
+typedef SessionLoggerCallback = void Function(
+  SessionLogLevel level,
+  String message, {
+  Object? error,
+  StackTrace? stackTrace,
+});
 
 void defaultSessionLogger(
   SessionLogLevel level,
