@@ -21,7 +21,7 @@ dependencies:
 Then import the public API:
 
 ```dart
-import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 ```
 
 ## Compatibility
@@ -275,7 +275,7 @@ dependencies:
 The public import remains unchanged:
 
 ```dart
-import 'package:session_recorder_flutter/session_recorder.dart';
+import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 ```
 
 ### 2. Update initialization
