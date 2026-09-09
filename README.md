@@ -272,9 +272,13 @@ dependencies:
   session_recorder_flutter: ^2.0.0
 ```
 
-The public import remains unchanged:
+Update the public import:
 
 ```dart
+// V1
+import 'package:session_recorder_flutter/session_recorder.dart';
+
+// V2
 import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 ```
 

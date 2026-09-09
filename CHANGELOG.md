@@ -3,6 +3,7 @@
 ### Breaking
 
 - New V2 API: use `SessionRecorder.init(SessionRecorderConfig(...))` instead of the V1 singleton and parameters.
+- The public entrypoint is now `package:session_recorder_flutter/session_recorder_flutter.dart`; replace imports of `package:session_recorder_flutter/session_recorder.dart`.
 - Payload changes require custom consumers to follow the V2 protocol/payload documentation.
 
 ### Added
