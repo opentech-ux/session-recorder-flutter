@@ -275,8 +275,8 @@ class LomCaptureScheduler {
         // In particular, do not enter _captureNow or consume a priority here.
         try {
           final lom = _captureLom(false);
-          if (lom != null && lom.id.isNotEmpty) {
-            return (lomRef: lom.id, isResolved: true);
+          if (lom != null && lom.ref.isNotEmpty) {
+            return (lomRef: lom.ref, isResolved: true);
           }
         } catch (_) {
           // An interaction snapshot failure preserves the unresolved fallback.
@@ -301,8 +301,8 @@ class LomCaptureScheduler {
           bypassCooldown: true,
         );
         if (lom != null) {
-          final lomRef = _preserveCurrentLomRef(lom.id, currentLomRef);
-          return (lomRef: lomRef, isResolved: lom.id.isNotEmpty);
+          final lomRef = _preserveCurrentLomRef(lom.ref, currentLomRef);
+          return (lomRef: lomRef, isResolved: lom.ref.isNotEmpty);
         }
       } catch (error, stackTrace) {
         _logPriorityCaptureError(
@@ -336,8 +336,8 @@ class LomCaptureScheduler {
         bypassCooldown: true,
       );
       if (lom != null) {
-        final lomRef = _preserveCurrentLomRef(lom.id, currentLomRef);
-        return (lomRef: lomRef, isResolved: lom.id.isNotEmpty);
+        final lomRef = _preserveCurrentLomRef(lom.ref, currentLomRef);
+        return (lomRef: lomRef, isResolved: lom.ref.isNotEmpty);
       }
     } catch (error, stackTrace) {
       _logPriorityCaptureError(

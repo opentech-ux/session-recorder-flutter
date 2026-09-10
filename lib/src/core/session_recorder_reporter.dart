@@ -200,59 +200,59 @@ class SessionRecorderReporter {
   void _replaceUnknownRefsWithFullLoms(Chunk chunk) {
     if (_rescuedLoms.isEmpty) return;
 
-    final referencedIds = <String>{
+    final referencedRefs = <String>{
       for (final action in chunk.actionsEvents)
         if (action.lomRef.isNotEmpty) action.lomRef,
       for (final exploration in chunk.explorationEvents)
         if (exploration.lomRef.isNotEmpty) exploration.lomRef,
     };
-    if (referencedIds.isEmpty) return;
+    if (referencedRefs.isEmpty) return;
 
-    final fullIds = <String>{
+    final fullRefs = <String>{
       for (final lom in chunk.loms)
-        if (lom is Lom) lom.id,
+        if (lom is Lom) lom.ref,
     };
-    final recordIds = <String>{for (final lom in chunk.loms) lom.id};
+    final recordRefs = <String>{for (final lom in chunk.loms) lom.ref};
 
     for (var i = 0; i < chunk.loms.length; i++) {
       final lom = chunk.loms[i];
       if (lom is! LomRef) continue;
-      if (!referencedIds.contains(lom.id)) continue;
-      if (fullIds.contains(lom.id)) continue;
+      if (!referencedRefs.contains(lom.ref)) continue;
+      if (fullRefs.contains(lom.ref)) continue;
 
-      final rescued = _rescuedLoms[lom.id];
+      final rescued = _rescuedLoms[lom.ref];
       if (rescued == null) continue;
 
       chunk.loms[i] = rescued;
-      fullIds.add(lom.id);
+      fullRefs.add(lom.ref);
     }
 
-    for (final id in referencedIds) {
-      if (fullIds.contains(id) || recordIds.contains(id)) continue;
+    for (final ref in referencedRefs) {
+      if (fullRefs.contains(ref) || recordRefs.contains(ref)) continue;
 
-      final rescued = _rescuedLoms[id];
+      final rescued = _rescuedLoms[ref];
       if (rescued == null) continue;
 
       chunk.loms.add(rescued);
-      fullIds.add(id);
-      recordIds.add(id);
+      fullRefs.add(ref);
+      recordRefs.add(ref);
     }
   }
 
   /// Stops rescuing a LOM once a full version was sent.
   void _forgetSentFullLoms(Chunk chunk) {
     for (final lom in chunk.loms) {
-      if (lom is Lom) _rescuedLoms.remove(lom.id);
+      if (lom is Lom) _rescuedLoms.remove(lom.ref);
     }
   }
 
   void _rememberRescuedLom(Lom lom) {
-    _rescuedLoms.remove(lom.id);
+    _rescuedLoms.remove(lom.ref);
     if (_rescuedLoms.length >= _maxRescuedLoms) {
       _rescuedLoms.remove(_rescuedLoms.keys.first);
     }
 
-    _rescuedLoms[lom.id] = lom;
+    _rescuedLoms[lom.ref] = lom;
   }
 }
 

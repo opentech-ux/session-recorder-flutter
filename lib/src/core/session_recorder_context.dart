@@ -18,7 +18,7 @@ abstract interface class SessionRecorderContext {
   void capturePendingPostScrollLom();
   bool get hasPendingPostScrollCapture;
 
-  /// Current LOM id used to bind events to their screen snapshot.
+  /// Current LOM state ref used to bind events to their screen snapshot.
   String? get currentLomRef;
 
   /// Resolves the LOM state to freeze when a pointer starts.
@@ -106,7 +106,7 @@ class ContextImpl implements SessionRecorderContext {
   }
 
   @override
-  String? get currentLomRef => _currentLom?.id;
+  String? get currentLomRef => _currentLom?.ref;
 
   @override
   bool get hasPendingPostScrollCapture =>
@@ -138,9 +138,9 @@ class ContextImpl implements SessionRecorderContext {
 
     if (lom is LocalLomRef) return;
 
-    // Keep the inspected tree locally, not in a ref queued only for its ID/ts.
+    // Keep the inspected tree locally, not in a ref queued only for its ref/ts.
     _currentChunk.addLom(
-      lom is LomRef ? LomRef(id: lom.id, timestamp: lom.timestamp) : lom,
+      lom is LomRef ? LomRef(ref: lom.ref, timestamp: lom.timestamp) : lom,
     );
   }
 

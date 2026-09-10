@@ -17,8 +17,8 @@ class LomTreeInspector {
     _config = const LomTreeConfig();
   }
 
-  String _lastSignature = "";
-  final LinkedHashMap<String, String> _cache = LinkedHashMap();
+  String _lastRef = "";
+  final LinkedHashSet<String> _cache = LinkedHashSet();
   static const int _maxCachedSignatures = 4096;
 
   late LomTreeConfig _config;
@@ -86,28 +86,21 @@ class LomTreeInspector {
       }
       final root = roots.single;
 
-      final signature = LomTreeHasher.signatureRoots([root]);
-      final isSameAsLast = signature == _lastSignature;
+      final ref = LomTreeHasher.signatureRoots([root]);
+      final isSameAsLast = ref == _lastRef;
 
-      if (isSameAsLast && !comesFromNavigation) {
-        final cacheId = _findCachedLomId(signature);
-        if (cacheId == null) return null;
-
-        /// Refresh the current tree for local state and the debug overlay
-        /// without adding a wire record.
-        return LocalLomRef(
-          id: cacheId,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          root: root,
-        );
-      }
-
-      final cacheId = _findCachedLomId(signature);
-      if (cacheId != null) {
-        _lastSignature = signature;
-
+      if (_touchKnownRef(ref)) {
+        _lastRef = ref;
+        if (isSameAsLast && !comesFromNavigation) {
+          // Refresh local state and overlay without a wire record.
+          return LocalLomRef(
+            ref: ref,
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            root: root,
+          );
+        }
         return LomRef(
-          id: cacheId,
+          ref: ref,
           timestamp: DateTime.now().millisecondsSinceEpoch,
           root: root,
         );
@@ -117,14 +110,15 @@ class LomTreeInspector {
 
       final Lom lom = Lom(
         id: lomId,
+        ref: ref,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         width: viewportWidth.toInt(),
         height: viewportHeight.toInt(),
         root: root,
       );
 
-      _rememberSignature(signature, lomId);
-      _lastSignature = signature;
+      _rememberRef(ref);
+      _lastRef = ref;
 
       return lom;
     } catch (error) {
@@ -135,20 +129,18 @@ class LomTreeInspector {
   }
 
   /// Keeps signature cache bounded during long sessions.
-  void _rememberSignature(String signature, String lomId) {
-    if (_cache.containsKey(signature)) {
-      _cache.remove(signature);
-    } else if (_cache.length >= _maxCachedSignatures) {
-      _cache.remove(_cache.keys.first);
+  void _rememberRef(String ref) {
+    _cache.remove(ref);
+    if (_cache.length >= _maxCachedSignatures) {
+      _cache.remove(_cache.first);
     }
-
-    _cache[signature] = lomId;
+    _cache.add(ref);
   }
 
-  String? _findCachedLomId(String signature) {
-    final lomId = _cache.remove(signature);
-    if (lomId != null) _cache[signature] = lomId;
-    return lomId;
+  bool _touchKnownRef(String ref) {
+    if (!_cache.remove(ref)) return false;
+    _cache.add(ref);
+    return true;
   }
 
   static List<Root> _visitElement(
