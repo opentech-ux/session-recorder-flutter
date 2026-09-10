@@ -250,6 +250,16 @@ application boundary is desired.
 - Scroll interactions preserve their start, trajectory, and end as one
   exploration sequence.
 
+## Obfuscated builds
+
+Session Recorder supports apps built with `--obfuscate`. Flutter widgets known
+to the SDK use stable canonical names. Custom, third-party, or unrecognized
+widgets may appear with an obfuscated, best-effort `t` label; names are not
+guaranteed to match across normal and obfuscated builds for every widget.
+
+This does not prevent capturing visible geometry, gestures, or scroll. You do
+not need to upload obfuscation maps or symbol files, or configure anything extra.
+
 ## Migrating from V1 (GitHub) to V2
 
 V1 was distributed directly from GitHub. V2 is available as the published Dart

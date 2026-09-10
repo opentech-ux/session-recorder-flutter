@@ -170,7 +170,8 @@ class LomTreeInspector {
     var classification = typeClassifications[type];
     if (classification == null) {
       classification = _WidgetTypeClassification(
-        type.toString(),
+        config.canonicalName(type) ?? type.toString(),
+        type,
         widget,
         config,
       );
@@ -481,12 +482,17 @@ class _WidgetTypeClassification {
   final bool noise;
   final bool ignored;
 
-  _WidgetTypeClassification(this.name, Widget widget, LomTreeConfig config)
-    : prune = config.pruneAt.contains(name),
-      semantic = config.semantics.contains(name),
+  _WidgetTypeClassification(
+    this.name,
+    Type type,
+    Widget widget,
+    LomTreeConfig config,
+  ) : prune = config.pruneAt.containsKey(type),
+      semantic = config.semantics.containsKey(type),
       renderObjectWidget = widget is RenderObjectWidget,
-      noise = config.noiseAt.contains(name),
-      ignored = name.startsWith('_') ||
+      noise = config.noiseAt.containsKey(type),
+      ignored = LomTreeConfig.ignoredTypes.containsKey(type) ||
+          name.startsWith('_') ||
           config.ignoreAt.any((pattern) => name.contains(pattern));
 }
 
