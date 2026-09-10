@@ -47,6 +47,7 @@ class LomTreeConfig {
     RawImage: 'RawImage',
     RichText: 'RichText',
     Wrap: 'Wrap',
+    Table: 'Table',
   };
 
   String? canonicalName(Type type) =>
