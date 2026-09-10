@@ -17,6 +17,7 @@ class LomTreeConfig {
     ClipPath: 'ClipPath',
     Transform: 'Transform',
     CompositedTransformTarget: 'CompositedTransformTarget',
+    CompositedTransformFollower: 'CompositedTransformFollower',
     FadeTransition: 'FadeTransition',
     Offstage: 'Offstage',
     Viewport: 'Viewport',

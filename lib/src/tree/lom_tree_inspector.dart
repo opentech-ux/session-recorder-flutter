@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderStack;
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 import 'package:uuid/uuid.dart';
@@ -219,9 +220,13 @@ class LomTreeInspector {
       );
     }
 
+    // Inspect the actual instance, not a component's descendant or a cached
+    // Widget Type fact. Custom RenderStack subclasses keep their own policy.
     if (!isCaptureAnchor &&
         !hasImportanteSemantic &&
-        classification.noise) {
+        (classification.noise ||
+            (element is RenderObjectElement &&
+                element.renderObject.runtimeType == RenderStack))) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
