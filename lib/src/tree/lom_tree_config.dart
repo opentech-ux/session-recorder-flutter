@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Controls which widget types appear in the captured tree.
 class LomTreeConfig {
@@ -15,11 +16,15 @@ class LomTreeConfig {
     ClipOval: 'ClipOval',
     ClipPath: 'ClipPath',
     Transform: 'Transform',
+    CompositedTransformTarget: 'CompositedTransformTarget',
+    FadeTransition: 'FadeTransition',
     Offstage: 'Offstage',
     Viewport: 'Viewport',
     ShrinkWrappingViewport: 'ShrinkWrappingViewport',
+    NestedScrollViewViewport: 'NestedScrollViewViewport',
     LayoutBuilder: 'LayoutBuilder',
     SliverLayoutBuilder: 'SliverLayoutBuilder',
+    SizeChangedLayoutNotifier: 'SizeChangedLayoutNotifier',
     OverflowBox: 'OverflowBox',
     SizedOverflowBox: 'SizedOverflowBox',
     CustomSingleChildLayout: 'CustomSingleChildLayout',
@@ -30,6 +35,9 @@ class LomTreeConfig {
     IndexedSemantics: 'IndexedSemantics',
     SliverOffstage: 'SliverOffstage',
     SliverIgnorePointer: 'SliverIgnorePointer',
+    // The former 'Overlay' substring matched this exact type argument.
+    AnnotatedRegion<SystemUiOverlayStyle>:
+        'AnnotatedRegion<SystemUiOverlayStyle>',
   };
 
   // Already retained physical widgets; naming does not add filter exceptions.
