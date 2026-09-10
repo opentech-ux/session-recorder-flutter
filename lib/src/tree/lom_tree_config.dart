@@ -46,6 +46,7 @@ class LomTreeConfig {
     DecoratedBox: 'DecoratedBox',
     RawImage: 'RawImage',
     RichText: 'RichText',
+    Wrap: 'Wrap',
   };
 
   String? canonicalName(Type type) =>
