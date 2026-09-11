@@ -280,7 +280,12 @@ class LomTreeInspector {
 
     /// A Root needs visible geometry, but its children may still overflow when
     /// the inherited clip itself remains non-empty.
-    if (visibleRect.width <= 0 || visibleRect.height <= 0) {
+    /// Match Root.toMap() truncation so positive subpixel fragments do not
+    /// become zero-sized wire boxes. Keep the original double geometry.
+    if (visibleRect.width <= 0 ||
+        visibleRect.height <= 0 ||
+        visibleRect.width.toInt() <= 0 ||
+        visibleRect.height.toInt() <= 0) {
       if (isCaptureAnchor) return [];
       return _visitChildrenFlat(
         element,
