@@ -1,24 +1,52 @@
 ## 2.0.0
 
+> **Breaking:** This release introduces a new public API and integration model.
+
 ### Breaking
 
-- New V2 API: use `SessionRecorder.init(SessionRecorderConfig(...))` instead of the V1 singleton and parameters.
-- The public entrypoint is now `package:session_recorder_flutter/session_recorder_flutter.dart`; replace imports of `package:session_recorder_flutter/session_recorder.dart`.
+* Replaced the V1 singleton initialization with:
+  `SessionRecorder.init(SessionRecorderConfig(...))`.
+* `SessionRecorderWidget` is now required as the capture boundary around the application UI.
+* Changed the public package entrypoint to:
+  `package:session_recorder_flutter/session_recorder_flutter.dart`.
+* UI structure capture now represents only materialized elements visible within the application viewport.
 
 ### Added
 
-- Visible-only LOM capture of the application's UI structure.
-- Optional `SessionNavigatorObserver`; only initialization and `SessionRecorderWidget` are required.
+* Visible-only UI structure capture using application viewport coordinates.
+* Automatic UI-change detection and capture after relevant layout updates.
+* Optional `SessionNavigatorObserver` for more precise post-navigation capture timing.
+* Debug visualization of captured UI bounds through `debugShowTree`.
 
 ### Improved
 
-- More reliable gesture and scroll recording.
-- Significant performance and memory improvements.
-- More robust navigation, lifecycle handling, and reporting.
+* Gesture capture for taps, double taps, long presses, drags, and pinch interactions.
+* Scroll recording and post-scroll UI capture.
+* LOM deduplication to avoid reporting unchanged UI structures.
+* Runtime CPU and memory usage compared with V1.
+* Navigation transitions, lifecycle handling, session reporting, and capture scheduling.
+
+### Integration
+
+The minimum integration is now:
+
+```text
+SessionRecorder.init(...)
++
+SessionRecorderWidget
+```
+
+`SessionNavigatorObserver` is optional.
+
+`MaterialApp.builder` and `MaterialApp.router.builder` are the recommended integration points.
 
 ### Documentation
 
-- Simplified V1-to-V2 migration guide and recommended `MaterialApp.builder` / `MaterialApp.router.builder` integration.
+* Added updated installation and Quick Start documentation.
+* Added a Data Collection & Privacy section describing what the SDK captures and does not capture.
+* Added V1-to-V2 migration instructions.
+* Added guidance for `MaterialApp`, `MaterialApp.router`, GoRouter, existing builders, multiple Navigators, and obfuscated builds.
+
 
 ## 1.1.1
 

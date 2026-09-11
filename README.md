@@ -1,17 +1,14 @@
 # Session Recorder Flutter
 
-**Session Recorder Flutter** is a lightweight Flutter SDK for recording user
-interactions and spatial UI structure during an application session.
+**Session Recorder Flutter** is a lightweight SDK for capturing user interactions and visible UI layout metadata during a Flutter application session.
 
-It records metadata about gestures, scrolling, navigation, and visible layout
-geometry.
+It captures gestures, scrolling, navigation signals, and the position and size of visible UI elements without recording screenshots, displayed text, or form values.
 
-It does **not** capture screenshots, text values, form values, or sensitive UI
-content.
+> **Privacy by design:** Session Recorder captures interaction and layout metadata, not screenshots or screen content.
 
 ## Installation
 
-Add the published package to your `pubspec.yaml`:
+Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -26,15 +23,14 @@ import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 
 ## Compatibility
 
-- **Dart:** `>=3.0.0 <4.0.0`
-- **Platforms:** Android and iOS
-- **Flutter:** see the minimum supported SDK version declared in `pubspec.yaml`
+* **Dart:** `>=3.0.0 <4.0.0`
+* **Platforms:** Android and iOS
 
 Web and desktop are not currently supported runtime targets.
 
 ## Quick Start
 
-V2 requires only two integration steps:
+Integration requires only two steps:
 
 1. Initialize `SessionRecorder`.
 2. Add one `SessionRecorderWidget` around the application content.
@@ -68,26 +64,40 @@ void main() {
 > Do not initialize the recorder from a widget `build()` method or from
 > frequently executed callbacks.
 
-Using `MaterialApp.builder` is the recommended integration because it gives the
-recorder a stable boundary around the application's navigable UI.
+Using `MaterialApp.builder` is the recommended integration because it provides a stable boundary around the application's navigable UI.
 
 The same approach works with `MaterialApp.router`.
 
-## What It Records
+## Data Collection & Privacy
 
-Session Recorder can record:
+Session Recorder captures interaction and layout metadata required to understand how users interact with the visible application UI.
 
-- taps, double taps, and long presses;
-- drag and pinch gestures;
-- scrolling activity;
-- the spatial structure of the visible UI;
-- layout geometry used to associate interactions with the UI.
+### Captured
 
-Only UI that is currently materialized and visible is represented in the
-captured structure.
+Session Recorder can capture:
 
-The SDK does not record screenshots, text input values, form values, or the
-contents of private UI fields.
+* tap, double-tap, and long-press interactions;
+* drag and pinch gestures;
+* interaction coordinates within the application viewport;
+* scrolling activity and scroll sequences;
+* navigation signals when a navigation observer is configured;
+* the structure of UI elements that are currently visible;
+* element positions and sizes within the visible application viewport;
+* structural widget/type identifiers used to describe the visible UI.
+
+Only UI elements that are currently materialized and visible are represented in the captured UI structure.
+
+### Not Captured
+
+Session Recorder does **not** capture:
+
+* screenshots or screen pixels;
+* displayed text content;
+* text entered by users;
+* form field values;
+* image or media content.
+
+Session data is grouped into chunks and sent to the endpoint configured by the application. User interactions do not trigger a separate HTTP request for every event.
 
 ## Configuration
 
@@ -110,7 +120,7 @@ https://your-subdomain.ux-key.com/endpoint
 
 ### `debugLog`
 
-Enables internal SDK logs useful in Debug mode.
+Enables internal SDK logs useful during development.
 
 ### `debugShowTree`
 
@@ -120,17 +130,23 @@ Displays the captured UI bounds in Debug mode.
 
 Allows session chunks to be sent from Debug and Profile builds.
 
-Release builds send normally.
+Release builds send session chunks normally.
 
 ## Optional Navigation Observer
 
-`SessionNavigatorObserver` is optional in V2.
+`SessionNavigatorObserver` is optional.
 
-The recorder works with only `SessionRecorder.init()` and
-`SessionRecorderWidget`. The observer adds explicit navigation signals so
-post-navigation captures can be timed more precisely.
+Session Recorder works with only:
 
-If you use it, create the observer once after initialization and keep it stable:
+```text
+SessionRecorder.init(...)
++
+SessionRecorderWidget
+```
+
+Adding a navigation observer provides explicit navigation signals so captures after route transitions can be timed more precisely.
+
+Create the observer once and keep it stable:
 
 ```dart
 final sessionObserver = SessionNavigatorObserver();
@@ -149,8 +165,7 @@ MaterialApp(
 
 Do not create the observer inside `build`.
 
-Keep existing application observers and add the Session Recorder observer
-alongside them.
+Keep existing application observers and add the Session Recorder observer alongside them.
 
 Use a separate `SessionNavigatorObserver` instance for each Navigator.
 
@@ -158,8 +173,7 @@ Use a separate `SessionNavigatorObserver` instance for each Navigator.
 
 ### Router / GoRouter
 
-For router-based applications, use the same capture boundary with
-`MaterialApp.router.builder`:
+For router-based applications, use the same capture boundary with `MaterialApp.router.builder`:
 
 ```dart
 final sessionObserver = SessionNavigatorObserver();
@@ -186,10 +200,9 @@ No GoRouter-specific Session Recorder integration is required.
 
 The navigation observer remains optional.
 
-### Existing MaterialApp builder
+### Existing `MaterialApp.builder`
 
-If your application already uses a builder, preserve it and wrap the final
-widget it produces:
+If your application already uses a builder, preserve it and wrap the final widget it produces:
 
 ```dart
 builder: (context, child) {
@@ -205,10 +218,9 @@ Call the existing builder once and wrap its final result.
 
 ### Multiple Navigators
 
-Applications with multiple Navigators may attach an optional
-`SessionNavigatorObserver` to each one.
+Applications with multiple Navigators may attach an optional `SessionNavigatorObserver` to each one.
 
-Use a different observer instance for every Navigator.
+Use a different observer instance for every Navigator:
 
 ```dart
 final rootObserver = SessionNavigatorObserver();
@@ -217,10 +229,9 @@ final shellObserver = SessionNavigatorObserver();
 
 All observer instances report to the same Session Recorder runtime.
 
-They provide navigation signals only and do not determine which UI subtree is
-captured.
+Observers provide navigation signals only and do not determine which UI subtree is captured.
 
-### Outer-wrapper convenience
+### Outer-Wrapper Convenience
 
 An outer-wrapper integration is also supported:
 
@@ -236,36 +247,33 @@ SessionRecorderWidget.observer(
 );
 ```
 
-`MaterialApp.builder` remains the recommended integration when a more precise
-application boundary is desired.
+`MaterialApp.builder` remains the recommended integration when a more precise application boundary is desired.
 
-## Runtime Notes
+## Runtime Behavior
 
-- Install only one `SessionRecorderWidget` for the same application boundary.
-- User interactions do not trigger an HTTP request for every event; session data
-  is grouped into chunks and reported periodically.
-- Debug and Profile builds do not send session chunks unless
-  `debugSendSession` is enabled.
-- Release builds send session chunks normally.
-- Scroll interactions preserve their start, trajectory, and end as one
-  exploration sequence.
+* Install only one `SessionRecorderWidget` for the same application boundary.
+* Session data is grouped into chunks instead of sending one HTTP request for every interaction.
+* Debug and Profile builds do not send session chunks unless `debugSendSession` is enabled.
+* Release builds send session chunks normally.
+* UI captures represent only elements that are materialized and visible at capture time.
 
-## Obfuscated builds
+## Obfuscated Builds
 
-Session Recorder supports apps built with `--obfuscate`. Flutter widgets known
-to the SDK use stable canonical names. Custom, third-party, or unrecognized
-widgets may appear with an obfuscated, best-effort `t` label; names are not
-guaranteed to match across normal and obfuscated builds for every widget.
+Session Recorder supports applications built with `--obfuscate`.
 
-This does not prevent capturing visible geometry, gestures, or scroll. You do
-not need to upload obfuscation maps or symbol files, or configure anything extra.
+Flutter widgets known to the SDK use stable canonical names. Custom, third-party, or unrecognized widgets may appear with an obfuscated, best-effort `t` label.
 
-## Migrating from V1 (GitHub) to V2
+Widget names are therefore not guaranteed to match between normal and obfuscated builds in every case.
 
-V1 was distributed directly from GitHub. V2 is available as the published Dart
-package.
+This does not prevent Session Recorder from capturing visible UI geometry, gestures, or scrolling activity.
 
-### 1. Update the dependency
+No obfuscation maps, symbol files, or additional configuration are required.
+
+## Migrating from V1
+
+V1 was distributed directly from GitHub. Version `2.0.0` is the first version distributed through pub.dev.
+
+### 1. Update the Dependency
 
 V1:
 
@@ -282,17 +290,21 @@ dependencies:
   session_recorder_flutter: ^2.0.0
 ```
 
-Update the public import:
+Update the public import.
+
+V1:
 
 ```dart
-// V1
 import 'package:session_recorder_flutter/session_recorder.dart';
+```
 
-// V2
+V2:
+
+```dart
 import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 ```
 
-### 2. Update initialization
+### 2. Update Initialization
 
 V1:
 
@@ -314,7 +326,7 @@ SessionRecorder.init(
 );
 ```
 
-Initialize once in `main`, after:
+Initialize Session Recorder once in `main`, after:
 
 ```dart
 WidgetsFlutterBinding.ensureInitialized();
@@ -322,7 +334,7 @@ WidgetsFlutterBinding.ensureInitialized();
 
 and before `runApp()`.
 
-### 3. Add the V2 capture boundary
+### 3. Add the Capture Boundary
 
 `SessionRecorderWidget` is required.
 
@@ -337,10 +349,9 @@ MaterialApp(
 );
 ```
 
-For router-based applications, use the same approach with
-`MaterialApp.router.builder`.
+For router-based applications, use the same approach with `MaterialApp.router.builder`.
 
-### 4. Navigation tracking is now optional
+### 4. Navigation Tracking Is Now Optional
 
 V1 required navigation observer integration.
 
@@ -352,17 +363,12 @@ SessionRecorder.init(...)
 SessionRecorderWidget
 ```
 
-If navigation observers are used, create them once outside `build` and use a
-different instance for each Navigator.
+If navigation observers are used, create them once outside `build` and use a different instance for each Navigator.
 
-### What improves in V2?
+### What Improves in V2?
 
-V2 introduces a new visible-only UI capture model, improved gesture and scroll
-recording, and substantially reduced runtime and memory overhead compared with
-V1.
+V2 introduces a visible-only UI capture model, improved gesture and scroll recording, and substantially reduced runtime and memory overhead compared with V1.
 
-Navigation, lifecycle handling, session reporting, and UI-change capture are
-also more robust.
+Navigation, lifecycle handling, session reporting, and UI-change capture are also more robust.
 
-Applications that consume Session Recorder payloads directly should review the
-V2 protocol documentation before upgrading.
+Applications that consume Session Recorder payloads directly should review the V2 protocol documentation before upgrading.
