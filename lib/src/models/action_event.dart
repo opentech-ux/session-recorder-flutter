@@ -20,11 +20,11 @@ abstract class ActionEvent {
 
   @protected
   List<String> get baseParts => [
-    timestampRelative.toString(),
-    actionType.name,
-    '${viewport.left.toInt()},${viewport.top.toInt()}',
-    '${position.dx.toInt()},${position.dy.toInt()}',
-  ];
+        timestampRelative.toString(),
+        actionType.name,
+        '${viewport.left.toInt()},${viewport.top.toInt()}',
+        '${position.dx.toInt()},${position.dy.toInt()}',
+      ];
 
   String concatenateString() {
     return [...baseParts, lomRef].join(':');
@@ -53,9 +53,9 @@ class DoubleTapActionEvent extends ActionEvent {
     required this.secondTimestamp,
     required List<Offset> positions,
     required super.lomRef,
-  }) : assert(positions.length == 2),
-       positions = List<Offset>.unmodifiable(positions),
-       super(actionType: GesturesType.doubleTap);
+  })  : assert(positions.length == 2),
+        positions = List<Offset>.unmodifiable(positions),
+        super(actionType: GesturesType.doubleTap);
 
   @override
   Offset get position => positions.first;

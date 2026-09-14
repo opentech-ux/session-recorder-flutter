@@ -240,9 +240,7 @@ class LomTreeInspector {
       );
     }
 
-    if (!isCaptureAnchor &&
-        !hasImportanteSemantic &&
-        classification.ignored) {
+    if (!isCaptureAnchor && !hasImportanteSemantic && classification.ignored) {
       return _visitChildrenFlat(
         element,
         viewport: viewport,
@@ -489,13 +487,13 @@ class _WidgetTypeClassification {
     Type type,
     Widget widget,
     LomTreeConfig config,
-  ) : prune = config.pruneAt.containsKey(type),
-      semantic = config.semantics.containsKey(type),
-      renderObjectWidget = widget is RenderObjectWidget,
-      noise = config.noiseAt.containsKey(type),
-      ignored = LomTreeConfig.ignoredTypes.containsKey(type) ||
-          name.startsWith('_') ||
-          config.ignoreAt.any((pattern) => name.contains(pattern));
+  )   : prune = config.pruneAt.containsKey(type),
+        semantic = config.semantics.containsKey(type),
+        renderObjectWidget = widget is RenderObjectWidget,
+        noise = config.noiseAt.containsKey(type),
+        ignored = LomTreeConfig.ignoredTypes.containsKey(type) ||
+            name.startsWith('_') ||
+            config.ignoreAt.any((pattern) => name.contains(pattern));
 }
 
 class _RootCounter {

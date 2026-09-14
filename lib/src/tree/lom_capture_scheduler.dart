@@ -28,7 +28,7 @@ typedef LomCaptureCallback = LomAbstract? Function(bool comesFromNavigation);
 /// Owns LOM capture state, priority decisions, and timer scheduling.
 class LomCaptureScheduler {
   LomCaptureScheduler({required LomCaptureCallback captureLom})
-    : _captureLom = captureLom;
+      : _captureLom = captureLom;
 
   final LomCaptureCallback _captureLom;
 

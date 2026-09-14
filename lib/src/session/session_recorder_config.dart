@@ -65,8 +65,8 @@ class SessionRecorderConfig {
 
     ///{@macro session_logger}
     SessionLoggerCallback? logger,
-  }) : shouldSend = kReleaseMode || debugSendSession,
-       logger = logger ?? defaultSessionLogger;
+  })  : shouldSend = kReleaseMode || debugSendSession,
+        logger = logger ?? defaultSessionLogger;
 
   void validate() {
     if (!_endpointRegExp.hasMatch(endpoint)) {

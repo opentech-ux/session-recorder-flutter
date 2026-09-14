@@ -11,8 +11,8 @@ class TreeDetector {
   static TreeDetector? _activeDetector;
 
   TreeDetector({required SessionRecorderEngine engine})
-    : _engine = engine,
-      _inspector = LomTreeInspector() {
+      : _engine = engine,
+        _inspector = LomTreeInspector() {
     /// The scheduler owns timing and cause; this callback keeps physical tree
     /// inspection and publication inside the Flutter-facing detector.
     _scheduler = LomCaptureScheduler(captureLom: _captureTreeNow);
@@ -114,8 +114,7 @@ class TreeDetector {
     final buildOwner = WidgetsBinding.instance.buildOwner;
     final installedCallback = _installedOnBuildScheduled;
 
-    final didRestoreHook =
-        _isBuildHookInstalled &&
+    final didRestoreHook = _isBuildHookInstalled &&
         buildOwner != null &&
         installedCallback != null &&
         identical(buildOwner.onBuildScheduled, installedCallback);

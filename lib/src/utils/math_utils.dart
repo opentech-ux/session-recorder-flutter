@@ -20,9 +20,8 @@ class MathUtils {
   /// ```
   ///
   static Offset getCentroid(Map<int, PointerTrace> pointers) {
-    final positions = pointers.values
-        .map((pointer) => pointer.lastPosition)
-        .toList();
+    final positions =
+        pointers.values.map((pointer) => pointer.lastPosition).toList();
     final sum = positions.fold(Offset.zero, (last, current) => last + current);
     return sum / positions.length.toDouble();
   }
@@ -32,9 +31,8 @@ class MathUtils {
   static double getAverageDistance(Map<int, PointerTrace> pointers) {
     if (pointers.length < 2) return 0;
 
-    final positions = pointers.values
-        .map((pointer) => pointer.lastPosition)
-        .toList();
+    final positions =
+        pointers.values.map((pointer) => pointer.lastPosition).toList();
 
     final centroid = getCentroid(pointers);
 
@@ -104,8 +102,7 @@ class MathUtils {
     ///
     /// `math.max()` uses the greater of the two thresholds, so radial
     /// must exceed the more demanding one.
-    final bool radialDominates =
-        stats.avgRadial.abs() >
+    final bool radialDominates = stats.avgRadial.abs() >
         math.max(pinchSlop, radialToTang * stats.tangentialRms);
 
     /// Requires that the fraction of fingers pointing in the same radial

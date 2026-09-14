@@ -91,10 +91,9 @@ class TimedPosition {
   final String lomRef;
 
   TimedPosition(this.position, {required this.viewport, this.lomRef = ''})
-    : timestamp = DateTime.now().millisecondsSinceEpoch;
+      : timestamp = DateTime.now().millisecondsSinceEpoch;
 
   @override
   String toString() =>
       'TimedPosition(timestamp: $timestamp, position: $position, viewport: $viewport, lomRef: $lomRef)';
 }
-

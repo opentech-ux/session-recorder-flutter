@@ -155,13 +155,15 @@ class SessionRecorderReporter {
     try {
       final body = chunk.toJson();
       final uri = Uri.parse(_engine.config.endpoint);
-      final response = await _httpClient.post(
-        uri,
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: body,
-      ).timeout(_requestTimeout);
+      final response = await _httpClient
+          .post(
+            uri,
+            headers: <String, String>{
+              'Content-Type': 'application/json; charset=UTF-8',
+            },
+            body: body,
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
