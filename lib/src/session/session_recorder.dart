@@ -61,8 +61,7 @@ class SessionRecorder {
     try {
       SessionLogger.configure(configuration: config);
 
-      // TODO: Re-enable before publishing. Kept disabled for local endpoint tests.
-      // config.validate();
+      config.validate();
 
       _engine = SessionRecorderEngine(config);
       _engine.start();
