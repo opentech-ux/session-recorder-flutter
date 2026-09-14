@@ -23,7 +23,8 @@ import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 
 ## Compatibility
 
-* **Dart:** `>=3.0.0 <4.0.0`
+* **Flutter:** `>=3.22.0`
+* **Dart:** `>=3.4.0 <4.0.0`
 * **Platforms:** Android and iOS
 
 Web and desktop are not currently supported runtime targets.

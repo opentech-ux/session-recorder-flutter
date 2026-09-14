@@ -4,6 +4,7 @@
 
 ### Breaking
 
+* Requires Flutter 3.22.0 or later and Dart `>=3.4.0 <4.0.0`.
 * Replaced the V1 singleton initialization with:
   `SessionRecorder.init(SessionRecorderConfig(...))`.
 * `SessionRecorderWidget` is now required as the capture boundary around the application UI.
