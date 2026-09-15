@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// Capture causes ordered by conceptual precedence.
 ///
@@ -212,41 +213,50 @@ class LomCaptureScheduler {
       /// Navigation stabilization is fixed so transition builds cannot defer
       /// its authoritative capture indefinitely.
       _captureTimer = Timer(kDebounceTime, () {
-        _captureTimer = null;
-        if (!_isRunning ||
-            scheduledNavigationEpoch != _navigationEpoch ||
-            !_isNavigationBarrierActive ||
-            _isScrollCaptureSuppressed) {
-          return;
-        }
-
-        /// Capture only after the pending frame has committed. [endOfFrame]
-        /// schedules a frame when called while idle, so this fence cannot be
-        /// skipped merely because no frame was already requested.
-        final capturedMutationRevision = _mutationRevision;
-        WidgetsBinding.instance.endOfFrame.then((_) {
+        runRecorderCallback('navigation capture timer', () {
+          _captureTimer = null;
           if (!_isRunning ||
               scheduledNavigationEpoch != _navigationEpoch ||
               !_isNavigationBarrierActive ||
               _isScrollCaptureSuppressed) {
             return;
           }
-          if (_mutationRevision != capturedMutationRevision) {
-            // A newer build invalidates this attempt before inspection and
-            // publication; hand off dirty work without the null-result retry.
-            _completeNavigationCapture(
-              false,
-              false,
-              scheduledNavigationEpoch,
-              invalidatedByMutation: true,
-            );
-            return;
-          }
-          _captureNow(
-            LomCaptureReason.navigation,
-            comesFromNavigation: true,
-            navigationEpoch: scheduledNavigationEpoch,
-            capturedMutationRevision: capturedMutationRevision,
+
+          /// Capture only after the pending frame has committed. [endOfFrame]
+          /// schedules a frame when idle, so the fence is always reached.
+          final capturedMutationRevision = _mutationRevision;
+          WidgetsBinding.instance.endOfFrame.then<void>(
+            (_) {
+              runRecorderCallback('navigation capture frame', () {
+                if (!_isRunning ||
+                    scheduledNavigationEpoch != _navigationEpoch ||
+                    !_isNavigationBarrierActive ||
+                    _isScrollCaptureSuppressed) {
+                  return;
+                }
+                if (_mutationRevision != capturedMutationRevision) {
+                  // A newer build invalidates this attempt before inspection.
+                  _completeNavigationCapture(
+                    false,
+                    false,
+                    scheduledNavigationEpoch,
+                    invalidatedByMutation: true,
+                  );
+                  return;
+                }
+
+                _captureNow(
+                  LomCaptureReason.navigation,
+                  comesFromNavigation: true,
+                  navigationEpoch: scheduledNavigationEpoch,
+                  capturedMutationRevision: capturedMutationRevision,
+                );
+              });
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              SessionLogger.error(
+                  'Navigation frame wait failed', error, stackTrace);
+            },
           );
         });
       });
@@ -482,7 +492,9 @@ class LomCaptureScheduler {
         return;
       }
 
-      _captureNow(reason, comesFromNavigation: false);
+      runRecorderCallback('scheduled capture', () {
+        _captureNow(reason, comesFromNavigation: false);
+      });
     });
   }
 
@@ -514,11 +526,13 @@ class LomCaptureScheduler {
     /// dirty work one fail-open post-frame attempt.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isRunning || completedNavigationEpoch != _navigationEpoch) return;
-      _captureNow(
-        LomCaptureReason.navigation,
-        comesFromNavigation: false,
-        bypassCooldown: true,
-      );
+      runRecorderCallback('deferred navigation capture', () {
+        _captureNow(
+          LomCaptureReason.navigation,
+          comesFromNavigation: false,
+          bypassCooldown: true,
+        );
+      });
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }

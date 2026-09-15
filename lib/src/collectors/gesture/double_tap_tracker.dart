@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/constants/gestures_constants.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 final class DoubleTapTracker {
   final void Function(ActionEvent event) _recordAction;
@@ -195,7 +196,9 @@ final class DoubleTapTracker {
       if (!identical(_doubleTapTimer, timer)) return;
       _doubleTapTimer = null;
       _scheduledDoubleTapExpiry = null;
-      _emitExpiredPendingTaps(DateTime.now().millisecondsSinceEpoch);
+      runRecorderCallback('double tap expiry', () {
+        _emitExpiredPendingTaps(DateTime.now().millisecondsSinceEpoch);
+      });
     });
     _doubleTapTimer = timer;
   }
@@ -208,7 +211,8 @@ final class DoubleTapTracker {
 
   void _emitPendingTaps(Iterable<_PendingTap> pendingTaps) {
     for (final pending in pendingTaps) {
-      _emitPendingTap(pending);
+      // A failed delivery must not discard the other independent pending taps.
+      runRecorderCallback('pending tap delivery', () => _emitPendingTap(pending));
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 enum InactivityState { active, inactive }
 
@@ -55,7 +56,7 @@ class InactivityDetector {
       _state = InactivityState.inactive;
 
       SessionLogger.verbose("Inactivity after ${_interval.inSeconds}s");
-      onInactive();
+      runRecorderCallback('inactivity expiry', onInactive);
     });
   }
 

@@ -40,8 +40,10 @@ void defaultSessionLogger(
 ///
 /// This prevents console pollution and gives the client application absolute
 /// control over how, when, and where logs are stored or displayed.
-/// Exceptions thrown by the callback are contained and never reported back
-/// through that callback.
+/// Synchronous exceptions thrown by the callback are contained and never
+/// reported back through that callback. The callback is not awaited: adapters
+/// must handle errors from any asynchronous reporting they start themselves.
+/// Custom loggers receive errors even in Release with debugLog disabled.
 ///
 /// __Common use cases:__
 /// * __Default behavior:__ If a custom logger is not provided, the SDK uses
@@ -99,8 +101,7 @@ class SessionLogger {
 
   @internal
   static void error(String message, [Object? e, StackTrace? s]) {
-    if (!_config.debugLog && kReleaseMode) return;
-
+    // The default delegate itself remains silent in Release.
     _log(SessionLogLevel.error, message, error: e, stackTrace: s);
   }
 

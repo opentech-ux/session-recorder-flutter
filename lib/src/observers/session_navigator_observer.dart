@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// {@template session_observer}
 /// Optional [NavigatorObserver] that gives Session Recorder explicit
@@ -16,7 +17,9 @@ import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 class SessionNavigatorObserver extends NavigatorObserver {
   ///{@macro session_observer}
   SessionNavigatorObserver() {
-    SessionRecorder.engine.controller.registerObserver(this);
+    runRecorderCallback('navigation observer registration', () {
+      SessionRecorder.engine.controller.registerObserver(this);
+    });
   }
 
   bool _isAttached = false;
@@ -44,7 +47,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     _setAttached();
-    if (oldRoute != null) _pendingTransitions.remove(oldRoute)?.call();
+    if (oldRoute != null) _finishPending(oldRoute);
     if (newRoute == null) return;
     _handleTransition(newRoute, AnimationStatus.completed);
   }
@@ -53,7 +56,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didRemove(route, previousRoute);
     _setAttached();
-    _pendingTransitions.remove(route)?.call();
+    _finishPending(route);
   }
 
   @pragma('vm:prefer-inline')
@@ -61,10 +64,22 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   /// Reports navigation and waits for `route`'s animation to settle.
   void _handleTransition(Route<dynamic> route, AnimationStatus terminalStatus) {
+    if (!runRecorderCallback('navigation transition', () {
+      _startTransition(route, terminalStatus);
+    })) {
+      _finishPending(route);
+    }
+  }
+
+  void _finishPending(Route<dynamic> route) {
+    final finish = _pendingTransitions.remove(route);
+    if (finish != null) runRecorderCallback('navigation cleanup', finish);
+  }
+
+  void _startTransition(Route<dynamic> route, AnimationStatus terminalStatus) {
     // Superseding a wait closes only this route's previous transition.
-    _pendingTransitions.remove(route)?.call();
+    _finishPending(route);
     final controller = SessionRecorder.engine.controller;
-    controller.beginNavigation();
 
     final animation = (route is TransitionRoute) ? route.animation : null;
 
@@ -76,18 +91,23 @@ class SessionNavigatorObserver extends NavigatorObserver {
       didFinish = true;
       final pendingListener = listener;
       if (pendingListener != null) {
-        animation?.removeStatusListener(pendingListener);
+        runRecorderCallback('navigation listener cleanup', () {
+          animation?.removeStatusListener(pendingListener);
+        });
       }
       _pendingTransitions.remove(route);
 
       // Keep the existing frame boundary; a replacement begins before this
       // decrement, so it cannot briefly complete all navigation transitions.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        controller.finishNavigation();
+        runRecorderCallback('navigation completion', controller.finishNavigation);
       });
     }
 
     _pendingTransitions[route] = finish;
+
+    // Register cleanup before begin can fail while draining SDK collectors.
+    controller.beginNavigation();
 
     if (animation == null || animation.status == terminalStatus) {
       finish();
@@ -96,7 +116,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
     listener = (AnimationStatus status) {
       if (status == terminalStatus) {
-        finish();
+        runRecorderCallback('navigation animation completion', finish);
       }
     };
 

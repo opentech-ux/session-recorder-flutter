@@ -9,6 +9,7 @@ import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// Detects and records tap, double-tap, long-press, drag, and pinch gestures.
 class GestureCollector {
@@ -34,6 +35,14 @@ class GestureCollector {
 
   /// Called when a pointer first touches the screen.
   void onPointerDown(PointerDownEvent details) {
+    _runPointerCallback(
+      'pointer down',
+      details.pointer,
+      () => _onPointerDown(details),
+    );
+  }
+
+  void _onPointerDown(PointerDownEvent details) {
     final pointer = details.pointer;
 
     /// Physical contact ordering includes contacts that gesture recognition
@@ -91,6 +100,14 @@ class GestureCollector {
 
   /// Called whenever the pointer moves across the screen.
   void onPointerMove(PointerMoveEvent details) {
+    _runPointerCallback(
+      'pointer move',
+      details.pointer,
+      () => _onPointerMove(details),
+    );
+  }
+
+  void _onPointerMove(PointerMoveEvent details) {
     final pointer = details.pointer;
     final position = details.position;
 
@@ -188,6 +205,14 @@ class GestureCollector {
 
   /// Called whenever the pointer cancels on the screen (e.g. a phone call).
   void onPointerCancel(PointerCancelEvent details) {
+    _runPointerCallback(
+      'pointer cancel',
+      details.pointer,
+      () => _onPointerCancel(details),
+    );
+  }
+
+  void _onPointerCancel(PointerCancelEvent details) {
     final pointer = details.pointer;
     _ignoredPointers.remove(pointer);
     final pointerTrace = _pointers[pointer];
@@ -224,6 +249,17 @@ class GestureCollector {
 
   /// Forced shutdown when the collection is interrupted.
   void forceRecordCollector({bool preservePendingTaps = false}) {
+    if (!runRecorderCallback('gesture drain', () {
+      _forceRecordCollector(preservePendingTaps: preservePendingTaps);
+    })) {
+      _pointers.clear();
+      _ignoredPointers.clear();
+      _pinchSession = null;
+      _candidatePinchBaseline = null;
+    }
+  }
+
+  void _forceRecordCollector({bool preservePendingTaps = false}) {
     // Terminal drains flush completed taps first. Navigation preserves them,
     // including while an active trace is finalized below.
     if (!preservePendingTaps) _doubleTapTracker.drain();
@@ -460,6 +496,31 @@ class GestureCollector {
 
   /// Called when the pointer is lifted from the screen.
   void onPointerUp(PointerUpEvent details) {
+    _runPointerCallback(
+      'pointer up',
+      details.pointer,
+      () => _onPointerUp(details),
+    );
+  }
+
+  void _runPointerCallback(
+      String operation, int pointer, VoidCallback callback) {
+    final hadPinchSession = _pinchSession != null;
+    if (runRecorderCallback(operation, callback)) return;
+
+    // Abandon only the failed contact, or its shared pinch. Completed pending
+    // taps remain owned by DoubleTapTracker and are not emitted again.
+    if (hadPinchSession || _pinchSession != null) {
+      _pointers.clear();
+      _pinchSession = null;
+    } else {
+      _pointers.remove(pointer);
+    }
+    _ignoredPointers.remove(pointer);
+    _candidatePinchBaseline = null;
+  }
+
+  void _onPointerUp(PointerUpEvent details) {
     final pointer = details.pointer;
 
     // Up advances the same physical contact ordering even when the pointer was

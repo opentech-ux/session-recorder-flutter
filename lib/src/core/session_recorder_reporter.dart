@@ -119,6 +119,8 @@ class SessionRecorderReporter {
       if (chunk != null) _enqueue(chunk);
 
       await _drainQueue();
+    } catch (error, stackTrace) {
+      SessionLogger.error('Reporting flush failed', error, stackTrace);
     } finally {
       _isFlushing = false;
     }

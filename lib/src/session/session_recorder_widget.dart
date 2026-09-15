@@ -7,6 +7,7 @@ import 'package:session_recorder_flutter/src/observers/session_navigator_observe
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_overlay.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// {@template session_recorder_widget}
 /// Defines the capture boundary for an application subtree.
@@ -70,30 +71,41 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     _gestures = GestureCollector(viewportProvider: _resolvePointerViewport);
     _scrolls = ScrollCollector();
 
-    SessionRecorder.engine.controller.onInterrupt(
-      _dispatchPendingEvents,
-      onNavigationInterrupt: () =>
-          _dispatchPendingEvents(preservePendingTaps: true),
-    );
+    runRecorderCallback('collector registration', () {
+      SessionRecorder.engine.controller.onInterrupt(
+        _dispatchPendingEvents,
+        onNavigationInterrupt: () =>
+            _dispatchPendingEvents(preservePendingTaps: true),
+      );
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      SessionRecorder.engine.context.captureTree(false);
+      runRecorderCallback('initial capture', () {
+        SessionRecorder.engine.context.captureTree(false);
+      });
     });
   }
 
   @override
   void dispose() {
     _dispatchPendingEvents();
-    _scrolls.dispose();
+    runRecorderCallback('scroll dispose', _scrolls.dispose);
     final captureElement = _captureElement;
     if (captureElement != null) {
-      TreeDetector.clearCaptureElement(captureElement);
+      runRecorderCallback('capture anchor cleanup', () {
+        TreeDetector.clearCaptureElement(captureElement);
+      });
       _captureElement = null;
     }
-    SessionRecorder.engine.controller.onInterrupt(null);
-    SessionRecorder.engine.controller.dispose();
-    SessionRecorder.engine.context.dispose();
+    runRecorderCallback('collector unregistration', () {
+      SessionRecorder.engine.controller.onInterrupt(null);
+    });
+    runRecorderCallback(
+      'controller dispose',
+      SessionRecorder.engine.controller.dispose,
+    );
+    runRecorderCallback('context dispose', SessionRecorder.engine.context.dispose);
     super.dispose();
   }
 
@@ -106,6 +118,14 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
   }
 
   Widget _captureBoundary(BuildContext context) {
+    runRecorderCallback('capture anchor registration', () {
+      _registerCaptureBoundary(context);
+    });
+    // Returning the child does not build it inside the SDK error boundary.
+    return widget.child;
+  }
+
+  void _registerCaptureBoundary(BuildContext context) {
     Element? resolvedElement;
     context.visitAncestorElements((ancestor) {
       if (ancestor is RenderObjectElement && ancestor.widget is Listener) {
@@ -120,7 +140,7 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
     if (element == null) {
       if (previous != null) TreeDetector.clearCaptureElement(previous);
       _captureElement = null;
-      return widget.child;
+      return;
     }
 
     if (!identical(previous, element)) {
@@ -131,8 +151,6 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
       _captureElement = element;
       TreeDetector.registerCaptureElement(element);
     }
-
-    return widget.child;
   }
 
   Rect? _resolvePointerViewport() {

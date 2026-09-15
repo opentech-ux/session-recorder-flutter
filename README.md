@@ -133,6 +133,57 @@ Allows session chunks to be sent from Debug and Profile builds.
 
 Release builds send session chunks normally.
 
+## Error Reporting / Custom Logger
+
+Session Recorder is designed so that internal SDK errors do not interrupt your application.
+
+If an internal error occurs, a capture or event may be skipped, but the host application continues running normally.
+
+You can optionally provide a custom logger to send Session Recorder errors to your existing monitoring service.
+
+```dart
+SessionRecorder.init(
+  SessionRecorderConfig(
+    endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+    debugLog: false,
+    logger: (level, message, {error, stackTrace}) {
+      if (level.name != 'error') return;
+
+      reportRecorderError(
+        message,
+        error,
+        stackTrace,
+      );
+    },
+  ),
+);
+```
+
+The adapter is implemented by your application:
+
+```dart
+void reportRecorderError(
+  String message,
+  Object? error,
+  StackTrace? stackTrace,
+) {
+  // Send the error to your monitoring provider.
+}
+```
+
+You can connect it to tools such as:
+
+| Provider             | Example use                          |
+| -------------------- | ------------------------------------ |
+| Sentry               | Report a handled exception or error. |
+| Firebase Crashlytics | Record a non-fatal error.            |
+| Datadog              | Send an error-level log.             |
+| Bugsnag              | Report a handled error.              |
+
+Session Recorder does not add dependencies for any monitoring provider.
+
+When `debugLog` is disabled, diagnostic logs remain silent, but error-level messages are still sent to your custom logger when one is configured.
+
 ## Optional Navigation Observer
 
 `SessionNavigatorObserver` is optional.

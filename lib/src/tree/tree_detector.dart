@@ -5,6 +5,7 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/tree/lom_capture_scheduler.dart';
 import 'package:session_recorder_flutter/src/tree/lom_tree_inspector.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// Watches for widget tree structural changes and executes LOM captures.
 class TreeDetector {
@@ -84,7 +85,9 @@ class TreeDetector {
 
     if (buildOwner == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scheduler.isRunning) _buildOrDefer();
+        if (_scheduler.isRunning) {
+          runRecorderCallback('deferred build hook registration', _buildOrDefer);
+        }
       });
       return;
     }
@@ -99,7 +102,8 @@ class TreeDetector {
       /// Publishing the debug notifier may schedule builds of its own; those
       /// builds must not manufacture another capture obligation.
       if (_isPublishingCapture) return;
-      _scheduler.handleBuildScheduled();
+      // The previous (host/framework) callback above is deliberately outside.
+      runRecorderCallback('build scheduled', _scheduler.handleBuildScheduled);
     }
 
     _installedOnBuildScheduled = onBuildScheduled;

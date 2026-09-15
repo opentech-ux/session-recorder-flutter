@@ -7,6 +7,8 @@ import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/session/session_recorder.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 
 /// Collects scroll position data and emits start/end [ScrollExplorationEvent]
 /// records for validated scroll sessions.
@@ -38,6 +40,16 @@ class ScrollCollector {
   /// Handles incoming [ScrollNotification] events to detect and record scroll
   /// interactions.
   bool handleScrollNotification(ScrollNotification notification) {
+    if (!runRecorderCallback('scroll notification', () {
+      _handleScrollNotification(notification);
+    })) {
+      _cancelPendingCapture();
+      _releaseSuppressionAndReset();
+    }
+    return false;
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
     if (_isDisposed) return false;
     if (notification is OverscrollNotification) return false;
     if (notification is! ScrollStartNotification &&
@@ -65,7 +77,8 @@ class ScrollCollector {
     if (_isScrolling) {
       try {
         _finishSession(scheduleCapture: false);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        SessionLogger.error('Scroll replacement failed', error, stackTrace);
         _releaseSuppressionAndReset();
       }
     }
@@ -124,7 +137,8 @@ class ScrollCollector {
       }
 
       _finishSession();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll end failed', error, stackTrace);
       _releaseSuppressionAndReset();
     }
   }
@@ -171,7 +185,8 @@ class ScrollCollector {
       }
 
       return visibleRect;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll geometry failed', error, stackTrace);
       return null;
     }
   }
@@ -192,7 +207,8 @@ class ScrollCollector {
       return scrollMetrics.axis == Axis.horizontal
           ? Offset(effectivePixels, 0)
           : Offset(0, effectivePixels);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll offset failed', error, stackTrace);
       return null;
     }
   }
@@ -219,7 +235,8 @@ class ScrollCollector {
 
     try {
       _finishSession();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll drain failed', error, stackTrace);
       _releaseSuppressionAndReset();
     }
   }
@@ -230,11 +247,7 @@ class ScrollCollector {
     _cancelPendingCapture();
 
     if (_isScrolling) {
-      try {
-        _engine.context.setScrollActive(false);
-      } finally {
-        _resetSessionState();
-      }
+      _releaseSuppressionAndReset();
       return;
     }
 
@@ -273,6 +286,9 @@ class ScrollCollector {
   void _releaseSuppressionAndReset() {
     try {
       _engine.context.setScrollActive(false);
+    } catch (error, stackTrace) {
+      SessionLogger.error(
+          'Scroll suppression cleanup failed', error, stackTrace);
     } finally {
       _resetSessionState();
     }
@@ -300,8 +316,8 @@ class ScrollCollector {
 
       try {
         _engine.context.capturePendingPostScrollLom();
-      } catch (_) {
-        // Tree capture stays fail-open.
+      } catch (error, stackTrace) {
+        SessionLogger.error('Post-scroll capture failed', error, stackTrace);
       }
     });
     _captureTimer = timer;
