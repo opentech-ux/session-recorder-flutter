@@ -48,7 +48,8 @@ class SessionRecorder {
   /// `WidgetsFlutterBinding.ensureInitialized()` and before `runApp`.
   ///
   /// Install one `SessionRecorderWidget` after initialization. Initialization
-  /// errors are caught internally and leave the SDK in no-op mode.
+  /// errors trigger best-effort cleanup of any partially started engine and
+  /// leave the SDK in no-op mode.
   ///
   /// See also
   ///  - `[SessionRecorderConfig]`: More information on what can be shared.
@@ -58,14 +59,26 @@ class SessionRecorder {
       return;
     }
 
+    SessionRecorderEngine? initializingEngine;
     try {
       SessionLogger.configure(configuration: config);
 
       config.validate();
 
-      _engine = SessionRecorderEngine(config);
-      _engine.start();
+      initializingEngine = SessionRecorderEngine(config);
+      _engine = initializingEngine;
+      initializingEngine.start();
     } catch (e, stack) {
+      try {
+        initializingEngine?.controller.dispose();
+      } catch (_) {
+        // Preserve the initialization error and still clean up the context.
+      }
+      try {
+        initializingEngine?.context.dispose();
+      } catch (_) {
+        // Cleanup is best-effort and must not prevent the no-op fallback.
+      }
       _engine = NoOpSessionRecorderEngine();
       SessionLogger.error('Cannot initialized the SDK', e, stack);
     }

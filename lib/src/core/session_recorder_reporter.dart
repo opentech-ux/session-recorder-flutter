@@ -48,11 +48,14 @@ class SessionRecorderReporter {
   /// One retry keeps the reporter resilient without blocking the app.
   static const int _maxRetries = 1;
 
-  late final IOClient _httpClient = IOClient(
-    HttpClient()
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => kDebugMode,
-  );
+  IOClient? _httpClient;
+
+  /// Owned exclusively by the reporter; recreated lazily after a timeout.
+  IOClient get _activeHttpClient => _httpClient ??= IOClient(
+        HttpClient()
+          ..badCertificateCallback =
+              (X509Certificate cert, String host, int port) => kDebugMode,
+      );
 
   /// Starts the session record timer subsystem.
   void start() {
@@ -79,12 +82,28 @@ class SessionRecorderReporter {
     stop();
     _pendingChunks.clear();
     _rescuedLoms.clear();
-    _httpClient.close();
+    _closeHttpClient();
+  }
+
+  void _closeHttpClient() {
+    final client = _httpClient;
+    _httpClient = null;
+    try {
+      // IOClient.close force-closes its HttpClient, including active requests.
+      client?.close();
+    } catch (error, stackTrace) {
+      // If cancellation cannot be confirmed, never start another request.
+      _isClosed = true;
+      stop();
+      _pendingChunks.clear();
+      _rescuedLoms.clear();
+      SessionLogger.error('HTTP client cleanup failed', error, stackTrace);
+    }
   }
 
   /// Validates the [Chunk] before to send it into the server.
   Future<void> _flush() async {
-    if (_isFlushing) return;
+    if (_isClosed || _isFlushing) return;
     _isFlushing = true;
 
     try {
@@ -155,7 +174,7 @@ class SessionRecorderReporter {
     try {
       final body = chunk.toJson();
       final uri = Uri.parse(_engine.config.endpoint);
-      final response = await _httpClient
+      final response = await _activeHttpClient
           .post(
             uri,
             headers: <String, String>{
@@ -177,6 +196,9 @@ class SessionRecorderReporter {
     } on SocketException catch (e, s) {
       SessionLogger.error("Network error while sending data", e, s);
     } on TimeoutException catch (e, s) {
+      // Cancel the physical operation before the queue can retry or release
+      // the flush guard. Future.timeout alone only stops waiting.
+      _closeHttpClient();
       SessionLogger.error("Request timed out", e, s);
     } on FormatException catch (e, s) {
       SessionLogger.error("Response format error", e, s);

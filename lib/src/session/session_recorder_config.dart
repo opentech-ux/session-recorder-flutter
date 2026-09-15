@@ -24,8 +24,8 @@ class SessionRecorderConfig {
   /// requests for session uploads.
   ///
   /// If this does not match the official endpoint format, [validate] throws a
-  /// [FormatException]. Validation is currently not invoked by
-  /// `SessionRecorder.init` while local endpoints are supported.
+  /// [FormatException]. `SessionRecorder.init` validates in every build mode
+  /// and falls back to no-op for invalid endpoints, including local URLs.
   final String endpoint;
 
   /// Whether to show the debug logs.
