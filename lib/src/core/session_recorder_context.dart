@@ -3,6 +3,8 @@ import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
+import 'package:session_recorder_flutter/src/utils/anonymous_route.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// Internal contract for session state, tree analysis, and data recording.
 @internal
@@ -20,6 +22,8 @@ abstract interface class SessionRecorderContext {
 
   /// Current LOM state ref used to bind events to their screen snapshot.
   String? get currentLomRef;
+  List<String>? get observedAnonymousRoute;
+  void observeRouteName(String? name);
 
   /// Resolves the LOM state to freeze when a pointer starts.
   ({String lomRef, bool isResolved}) resolveLomStateForPointerDown();
@@ -43,6 +47,10 @@ class NoOpContext implements SessionRecorderContext {
   void dispose() {}
   @override
   String? get currentLomRef => null;
+  @override
+  List<String>? get observedAnonymousRoute => null;
+  @override
+  void observeRouteName(String? name) {}
   @override
   bool get hasPendingPostScrollCapture => false;
   @override
@@ -82,6 +90,18 @@ class ContextImpl implements SessionRecorderContext {
   late Chunk _currentChunk;
   late Session _currentSession;
   LomAbstract? _currentLom;
+  List<String>? _observedAnonymousRoute;
+
+  @override
+  List<String>? get observedAnonymousRoute => _observedAnonymousRoute;
+
+  @override
+  void observeRouteName(String? name) {
+    _observedAnonymousRoute = null;
+    runRecorderCallback('anonymous route', () {
+      _observedAnonymousRoute = anonymousRoute(name);
+    });
+  }
 
   TreeDetector? _detector;
 
@@ -102,6 +122,7 @@ class ContextImpl implements SessionRecorderContext {
     _detector?.dispose();
     _detector = null;
     _currentLom = null;
+    _observedAnonymousRoute = null;
     _currentChunk = _createChunk();
   }
 
@@ -138,9 +159,15 @@ class ContextImpl implements SessionRecorderContext {
 
     if (lom is LocalLomRef) return;
 
-    // Keep the inspected tree locally, not in a ref queued only for its ref/ts.
+    // Keep the tree locally; queued refs retain only record-local metadata.
     _currentChunk.addLom(
-      lom is LomRef ? LomRef(ref: lom.ref, timestamp: lom.timestamp) : lom,
+      lom is LomRef
+          ? LomRef(
+              ref: lom.ref,
+              timestamp: lom.timestamp,
+              anonymousRoute: lom.anonymousRoute,
+            )
+          : lom,
     );
   }
 

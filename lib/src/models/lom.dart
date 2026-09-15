@@ -11,7 +11,15 @@ abstract class LomAbstract {
   final int timestamp;
   final Root? root;
 
-  const LomAbstract({required this.ref, required this.timestamp, this.root});
+  /// Record-local navigation metadata; null means unknown, never inherited.
+  final List<String>? anonymousRoute;
+
+  const LomAbstract({
+    required this.ref,
+    required this.timestamp,
+    this.root,
+    this.anonymousRoute,
+  });
 
   Map<String, dynamic> toMap();
 }
@@ -28,6 +36,7 @@ class Lom extends LomAbstract {
     required this.width,
     required this.height,
     super.root,
+    super.anonymousRoute,
   });
 
   @override
@@ -36,6 +45,7 @@ class Lom extends LomAbstract {
       'id': id,
       'ref': ref,
       'ts': timestamp,
+      if (anonymousRoute != null) 'ar': anonymousRoute,
       'w': width,
       'h': height,
       'r': (root == null) ? "" : root?.toMap(),
@@ -51,11 +61,20 @@ class Lom extends LomAbstract {
 }
 
 class LomRef extends LomAbstract {
-  const LomRef({required super.ref, required super.timestamp, super.root});
+  const LomRef({
+    required super.ref,
+    required super.timestamp,
+    super.root,
+    super.anonymousRoute,
+  });
 
   @override
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{'ref': ref, 'ts': timestamp};
+    return <String, dynamic>{
+      'ref': ref,
+      'ts': timestamp,
+      if (anonymousRoute != null) 'ar': anonymousRoute,
+    };
   }
 
   String toJson() => json.encode(toMap());
@@ -71,5 +90,6 @@ class LocalLomRef extends LomRef {
     required super.ref,
     required super.timestamp,
     required super.root,
+    super.anonymousRoute,
   });
 }

@@ -19,6 +19,7 @@ class LomTreeInspector {
   }
 
   String _lastRef = "";
+  List<String>? _lastAnonymousRoute;
   final LinkedHashSet<String> _cache = LinkedHashSet();
   static const int _maxCachedSignatures = 4096;
 
@@ -28,6 +29,7 @@ class LomTreeInspector {
   LomAbstract? captureLom(
     Element? element, {
     required bool comesFromNavigation,
+    List<String>? anonymousRoute,
   }) {
     try {
       if (element == null || !element.mounted) return null;
@@ -89,18 +91,22 @@ class LomTreeInspector {
 
       final ref = LomTreeHasher.signatureRoots([root]);
       final isSameAsLast = ref == _lastRef;
+      final isSameRoute = listEquals(anonymousRoute, _lastAnonymousRoute);
 
       if (_touchKnownRef(ref)) {
         _lastRef = ref;
-        if (isSameAsLast && !comesFromNavigation) {
+        _lastAnonymousRoute = anonymousRoute;
+        if (isSameAsLast && isSameRoute && !comesFromNavigation) {
           // Refresh local state and overlay without a wire record.
           return LocalLomRef(
+            anonymousRoute: anonymousRoute,
             ref: ref,
             timestamp: DateTime.now().millisecondsSinceEpoch,
             root: root,
           );
         }
         return LomRef(
+          anonymousRoute: anonymousRoute,
           ref: ref,
           timestamp: DateTime.now().millisecondsSinceEpoch,
           root: root,
@@ -110,6 +116,7 @@ class LomTreeInspector {
       final String lomId = Uuid().v7();
 
       final Lom lom = Lom(
+        anonymousRoute: anonymousRoute,
         id: lomId,
         ref: ref,
         timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -120,6 +127,7 @@ class LomTreeInspector {
 
       _rememberRef(ref);
       _lastRef = ref;
+      _lastAnonymousRoute = anonymousRoute;
 
       return lom;
     } catch (error) {

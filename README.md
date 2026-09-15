@@ -36,6 +36,9 @@ Integration requires only two steps:
 1. Initialize `SessionRecorder`.
 2. Add one `SessionRecorderWidget` around the application content.
 
+These two steps are **required**. A `SessionNavigatorObserver` is
+**recommended**, but not required, for better navigation signals and context.
+
 ```dart
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,7 +84,7 @@ Session Recorder can capture:
 * drag and pinch gestures;
 * interaction coordinates within the application viewport;
 * scrolling activity and scroll sequences;
-* navigation signals when a navigation observer is configured;
+* navigation signals and hashed route segments when an observer is configured;
 * the structure of UI elements that are currently visible;
 * element positions and sizes within the visible application viewport;
 * structural widget/type identifiers used to describe the visible UI.
@@ -184,9 +187,11 @@ Session Recorder does not add dependencies for any monitoring provider.
 
 When `debugLog` is disabled, diagnostic logs remain silent, but error-level messages are still sent to your custom logger when one is configured.
 
-## Optional Navigation Observer
+## Recommended Navigation Observer
 
-`SessionNavigatorObserver` is optional.
+`SessionNavigatorObserver` is recommended, not required. Without it, LOM
+capture, mutations, gestures, scroll, event association and reporting still
+work normally, without a missing-observer warning or error.
 
 Session Recorder works with only:
 
@@ -198,7 +203,7 @@ SessionRecorderWidget
 
 Adding a navigation observer provides explicit navigation signals so captures after route transitions can be timed more precisely.
 
-Create the observer once and keep it stable:
+Create the observer once after `SessionRecorder.init` and keep it stable:
 
 ```dart
 final sessionObserver = SessionNavigatorObserver();
@@ -250,7 +255,7 @@ MaterialApp.router(
 
 No GoRouter-specific Session Recorder integration is required.
 
-The navigation observer remains optional.
+The navigation observer remains recommended, not required.
 
 ### Existing `MaterialApp.builder`
 
@@ -281,7 +286,9 @@ final shellObserver = SessionNavigatorObserver();
 
 All observer instances report to the same Session Recorder runtime.
 
-Observers provide navigation signals only and do not determine which UI subtree is captured.
+Observers provide navigation signals and best-effort anonymous context, without
+determining which UI subtree is captured. With multiple Navigators, context
+follows the latest observed route change; the SDK does not infer a main screen.
 
 ### Outer-Wrapper Convenience
 
@@ -415,7 +422,9 @@ SessionRecorder.init(...)
 SessionRecorderWidget
 ```
 
-If navigation observers are used, create them once outside `build` and use a different instance for each Navigator.
+The observer is recommended for navigation signals and anonymous context, not
+required. If used, create it once outside `build` after initialization and use
+a different instance for each Navigator.
 
 ### What Improves in V2?
 

@@ -86,7 +86,8 @@ class TreeDetector {
     if (buildOwner == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scheduler.isRunning) {
-          runRecorderCallback('deferred build hook registration', _buildOrDefer);
+          runRecorderCallback(
+              'deferred build hook registration', _buildOrDefer);
         }
       });
       return;
@@ -172,6 +173,7 @@ class TreeDetector {
     final lom = _inspector.captureLom(
       element,
       comesFromNavigation: comesFromNavigation,
+      anonymousRoute: _engine.context.observedAnonymousRoute,
     );
 
     if (lom == null) return null;

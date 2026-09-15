@@ -6,7 +6,8 @@ bool runRecorderCallback(String operation, void Function() callback) {
     callback();
     return true;
   } catch (error, stackTrace) {
-    SessionLogger.error('Session Recorder: $operation failed', error, stackTrace);
+    SessionLogger.error(
+        'Session Recorder: $operation failed', error, stackTrace);
     return false;
   }
 }

@@ -105,7 +105,8 @@ class _SessionRecorderWidgetState extends State<SessionRecorderWidget>
       'controller dispose',
       SessionRecorder.engine.controller.dispose,
     );
-    runRecorderCallback('context dispose', SessionRecorder.engine.context.dispose);
+    runRecorderCallback(
+        'context dispose', SessionRecorder.engine.context.dispose);
     super.dispose();
   }
 

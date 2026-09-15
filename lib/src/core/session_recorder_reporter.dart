@@ -227,6 +227,8 @@ class SessionRecorderReporter {
     if (_rescuedLoms.isEmpty) return;
 
     final referencedRefs = <String>{
+      for (final lom in chunk.loms)
+        if (lom is LomRef) lom.ref,
       for (final action in chunk.actionsEvents)
         if (action.lomRef.isNotEmpty) action.lomRef,
       for (final exploration in chunk.explorationEvents)
@@ -236,32 +238,31 @@ class SessionRecorderReporter {
 
     final fullRefs = <String>{
       for (final lom in chunk.loms)
-        if (lom is Lom) lom.ref,
+        if (lom is Lom && lom.root != null) lom.ref,
     };
-    final recordRefs = <String>{for (final lom in chunk.loms) lom.ref};
-
     for (var i = 0; i < chunk.loms.length; i++) {
       final lom = chunk.loms[i];
       if (lom is! LomRef) continue;
-      if (!referencedRefs.contains(lom.ref)) continue;
       if (fullRefs.contains(lom.ref)) continue;
 
       final rescued = _rescuedLoms[lom.ref];
       if (rescued == null) continue;
 
-      chunk.loms[i] = rescued;
+      // Supply the tree before its first ref, without replacing the occurrence
+      // or inheriting the rescued full's timestamp/navigation metadata.
+      chunk.loms.insert(i, rescued);
+      i++;
       fullRefs.add(lom.ref);
     }
 
     for (final ref in referencedRefs) {
-      if (fullRefs.contains(ref) || recordRefs.contains(ref)) continue;
+      if (fullRefs.contains(ref)) continue;
 
       final rescued = _rescuedLoms[ref];
       if (rescued == null) continue;
 
       chunk.loms.add(rescued);
       fullRefs.add(ref);
-      recordRefs.add(ref);
     }
   }
 

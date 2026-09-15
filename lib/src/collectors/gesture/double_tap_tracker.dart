@@ -212,7 +212,8 @@ final class DoubleTapTracker {
   void _emitPendingTaps(Iterable<_PendingTap> pendingTaps) {
     for (final pending in pendingTaps) {
       // A failed delivery must not discard the other independent pending taps.
-      runRecorderCallback('pending tap delivery', () => _emitPendingTap(pending));
+      runRecorderCallback(
+          'pending tap delivery', () => _emitPendingTap(pending));
     }
   }
 
