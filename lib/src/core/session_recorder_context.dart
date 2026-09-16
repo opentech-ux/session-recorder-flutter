@@ -1,11 +1,10 @@
-import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 
 import 'package:session_recorder_flutter/src/models/models.dart';
 import 'package:session_recorder_flutter/src/tree/tree_detector.dart';
 import 'package:session_recorder_flutter/src/utils/anonymous_route.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
 import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// Internal contract for session state, tree analysis, and data recording.
@@ -25,9 +24,8 @@ abstract interface class SessionRecorderContext {
   /// Current LOM state ref used to bind events to their screen snapshot.
   String? get currentLomRef;
   List<String>? get observedAnonymousRoute;
-  Object? get anonymousRouteOwner;
-  void observeRouteName(Object observer, String? name, {bool activate = true});
-  void releaseRouteContext(Object observer);
+  void refreshScreenName();
+  void observeRouteName(String? name);
 
   /// Resolves the LOM state to freeze when a pointer starts.
   ({String lomRef, bool isResolved}) resolveLomStateForPointerDown();
@@ -54,11 +52,9 @@ class NoOpContext implements SessionRecorderContext {
   @override
   List<String>? get observedAnonymousRoute => null;
   @override
-  Object? get anonymousRouteOwner => null;
+  void refreshScreenName() {}
   @override
-  void observeRouteName(Object observer, String? name, {bool activate = true}) {}
-  @override
-  void releaseRouteContext(Object observer) {}
+  void observeRouteName(String? name) {}
   @override
   bool get hasPendingPostScrollCapture => false;
   @override
@@ -98,31 +94,34 @@ class ContextImpl implements SessionRecorderContext {
   late Chunk _currentChunk;
   late Session _currentSession;
   LomAbstract? _currentLom;
-  // Activation order, not Navigator hierarchy. A null entry is an active
-  // unnamed screen and must mask older named contexts rather than skip them.
-  final _routeContexts = LinkedHashMap<Object, List<String>?>.identity();
+  // Only anonymized metadata; the configured source is exclusive.
+  List<String>? _anonymousRoute;
 
   @override
-  List<String>? get observedAnonymousRoute =>
-      _routeContexts.isEmpty ? null : _routeContexts.values.last;
-
-  @override
-  Object? get anonymousRouteOwner =>
-      _routeContexts.isEmpty ? null : _routeContexts.keys.last;
-
-  @override
-  void observeRouteName(Object observer, String? name, {bool activate = true}) {
-    // A background pop/remove updates only its existing slot, not ownership.
-    if (!activate && !_routeContexts.containsKey(observer)) return;
-    if (activate) _routeContexts.remove(observer);
-    _routeContexts[observer] = null;
-    runRecorderCallback('anonymous route', () {
-      _routeContexts[observer] = anonymousRoute(name);
-    });
+  void refreshScreenName() {
+    final provider = _engine.config.screenNameProvider;
+    if (provider == null) return;
+    _anonymousRoute = null;
+    try {
+      // Never retain or log the raw return value, including on failure.
+      _anonymousRoute = anonymousRoute(provider());
+    } catch (error, stackTrace) {
+      SessionLogger.error(
+          'Session Recorder: screenNameProvider failed', error, stackTrace);
+    }
   }
 
   @override
-  void releaseRouteContext(Object observer) => _routeContexts.remove(observer);
+  List<String>? get observedAnonymousRoute => _anonymousRoute;
+
+  @override
+  void observeRouteName(String? name) {
+    if (_engine.config.screenNameProvider != null) return;
+    _anonymousRoute = null;
+    runRecorderCallback('anonymous route', () {
+      _anonymousRoute = anonymousRoute(name);
+    });
+  }
 
   TreeDetector? _detector;
 
@@ -143,7 +142,7 @@ class ContextImpl implements SessionRecorderContext {
     _detector?.dispose();
     _detector = null;
     _currentLom = null;
-    _routeContexts.clear();
+    _anonymousRoute = null;
     _currentChunk = _createChunk();
   }
 

@@ -5,9 +5,11 @@ import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
 
 /// {@template session_observer}
 /// Recommended, optional [NavigatorObserver] for explicit navigation signals
-/// and hashed path segments from Route.settings.name (never the raw name).
-/// PopupRoute overlays preserve the underlying screen context. Each Navigator
-/// keeps an independent contribution; an unnamed screen still means unknown.
+/// and automatic hashed path segments from Route.settings.name. A configured
+/// screenNameProvider overrides this metadata, never the navigation signals.
+/// Automatic selection is local and best-effort. PopupRoute overlays preserve
+/// the screen context; unnamed screens mean unknown. Use screenNameProvider
+/// for precise logical screen context with complex or multiple Navigators.
 ///
 /// Create it once after `SessionRecorder.init` and add it beside existing
 /// observers. Multiple Navigators may each use their own
@@ -26,9 +28,6 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   bool _isAttached = false;
   Route<dynamic>? _observedRoute;
-  // Screen underneath this observer's takeover of another Navigator's context.
-  // This is one return boundary, not a route stack or a Navigator hierarchy.
-  Route<dynamic>? _returnRoute;
   final Map<Route<dynamic>, VoidCallback> _pendingTransitions = Map.identity();
 
   /// True if this observer was ever attached to a Navigator and is now detached.
@@ -37,6 +36,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    SessionRecorder.engine.context.refreshScreenName();
     super.didPush(route, previousRoute);
     _setAttached();
     _observeRoute(route);
@@ -45,23 +45,22 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    SessionRecorder.engine.context.refreshScreenName();
     super.didPop(route, previousRoute);
     _setAttached();
-    if (route is! PopupRoute) {
-      _observeRoute(previousRoute, returning: true);
+    if (identical(route, _observedRoute)) {
+      _observeRoute(previousRoute);
     }
     _handleTransition(route, AnimationStatus.dismissed);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    SessionRecorder.engine.context.refreshScreenName();
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     _setAttached();
-    if (oldRoute != null && identical(oldRoute, _returnRoute)) {
-      _returnRoute = newRoute;
-    }
-    if (identical(oldRoute, _observedRoute)) {
-      _observeRoute(newRoute, activate: oldRoute == null);
+    if (oldRoute != null && identical(oldRoute, _observedRoute)) {
+      _observeRoute(newRoute);
     }
     if (oldRoute != null) _finishPending(oldRoute);
     if (newRoute == null) return;
@@ -70,39 +69,29 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    SessionRecorder.engine.context.refreshScreenName();
     super.didRemove(route, previousRoute);
     _setAttached();
-    if (identical(route, _returnRoute)) _returnRoute = null;
     if (identical(route, _observedRoute)) {
-      _observeRoute(previousRoute, returning: true);
+      _observeRoute(previousRoute);
     }
     _finishPending(route);
   }
 
-  void _observeRoute(
-    Route<dynamic>? route, {
-    bool returning = false,
-    bool activate = true,
-  }) {
-    // Dialogs, popup menus and modal sheets still signal navigation, but do
-    // not replace the screen's context, whether or not they have a name.
+  // No super call: older supported Flutter versions do not expose this hook.
+  // It reconciles the local screen only, without starting a transition.
+  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
+    SessionRecorder.engine.context.refreshScreenName();
+    _observeRoute(topRoute);
+  }
+
+  void _observeRoute(Route<dynamic>? route) {
+    if (SessionRecorder.engine.config.screenNameProvider != null) return;
+    // Preserve the underlying screen for popups, without discovering a stack.
     if (route is PopupRoute || identical(route, _observedRoute)) return;
     runRecorderCallback('observed route', () {
-      final context = SessionRecorder.engine.context;
-      final isOwner = identical(context.anonymousRouteOwner, this);
-      final relinquish = returning &&
-          (route == null || identical(route, _returnRoute));
-      if (activate && !returning && !isOwner) {
-        _returnRoute = context.anonymousRouteOwner == null ? null : _observedRoute;
-      }
       _observedRoute = route;
-      if (relinquish || route == null) {
-        _returnRoute = null;
-        context.releaseRouteContext(this);
-        return;
-      }
-      context.observeRouteName(this, route.settings.name,
-          activate: (activate && !returning) || isOwner);
+      SessionRecorder.engine.context.observeRouteName(route?.settings.name);
     });
   }
 

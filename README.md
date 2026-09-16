@@ -1,10 +1,10 @@
 # Session Recorder Flutter
 
-**Session Recorder Flutter** is a lightweight SDK for capturing user interactions and visible UI layout metadata during a Flutter application session.
+**Session Recorder Flutter** is a lightweight SDK for recording user interactions and the structure of the visible UI.
 
-It captures gestures, scrolling, navigation signals, and the position and size of visible UI elements without recording screenshots, displayed text, or form values.
+It captures gestures, scrolling, navigation context, and visible element geometry without recording screenshots, displayed text, or form values.
 
-> **Privacy by design:** Session Recorder captures interaction and layout metadata, not screenshots or screen content.
+> Session Recorder captures interaction and layout metadata, not screen content.
 
 ## Installation
 
@@ -15,7 +15,7 @@ dependencies:
   session_recorder_flutter: ^2.0.0
 ```
 
-Then import the public API:
+Import the public API:
 
 ```dart
 import 'package:session_recorder_flutter/session_recorder_flutter.dart';
@@ -27,7 +27,7 @@ import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 * **Dart:** `>=3.4.0 <4.0.0`
 * **Platforms:** Android and iOS
 
-Web and desktop are not currently supported runtime targets.
+Web and desktop are not currently supported.
 
 ## Quick Start
 
@@ -35,9 +35,6 @@ Integration requires only two steps:
 
 1. Initialize `SessionRecorder`.
 2. Add one `SessionRecorderWidget` around the application content.
-
-These two steps are **required**. A `SessionNavigatorObserver` is
-**recommended**, but not required, for better navigation signals and context.
 
 ```dart
 void main() {
@@ -60,34 +57,133 @@ void main() {
 }
 ```
 
-> [!IMPORTANT]
->
-> Call `SessionRecorder.init()` once during application startup, after
-> `WidgetsFlutterBinding.ensureInitialized()` and before `runApp()`.
->
-> Do not initialize the recorder from a widget `build()` method or from
-> frequently executed callbacks.
+Call `SessionRecorder.init()` once during application startup, after:
 
-Using `MaterialApp.builder` is the recommended integration because it provides a stable boundary around the application's navigable UI.
+```dart
+WidgetsFlutterBinding.ensureInitialized();
+```
 
-The same approach works with `MaterialApp.router`.
+and before `runApp()`.
+
+`MaterialApp.builder` is the recommended integration point.
+
+The same approach can be used with `MaterialApp.router.builder`.
+
+That's all that is required.
+
+Navigation options can be added when more precise navigation context is needed.
+
+## Navigation
+
+Session Recorder works without a navigation observer.
+
+For standard Flutter navigation, `SessionNavigatorObserver` is recommended to provide explicit navigation signals and improve capture timing after route changes.
+
+```dart
+final sessionObserver = SessionNavigatorObserver();
+
+MaterialApp(
+  navigatorObservers: [
+    sessionObserver,
+  ],
+  home: const HomeScreen(),
+  builder: (context, child) => SessionRecorderWidget(
+    child: child ?? const SizedBox.shrink(),
+  ),
+);
+```
+
+Create the observer once and keep it stable.
+
+### Complex Navigation
+
+For router-based applications or applications with complex navigation, you can
+provide the current logical screen name directly:
+
+```dart
+SessionRecorder.init(
+  SessionRecorderConfig(
+    endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+    screenNameProvider: () => navigationState.currentScreenName,
+  ),
+);
+```
+
+`navigationState.currentScreenName` s only an example. The callback should
+return the logical screen name from your application's own navigation system.
+
+For complex navigation, use `screenNameProvider` when you need more accurate screen context. Without it, recording still works, but navigation context may be less precise.
+
+For example, with [GoRouter](https://pub.dev/packages/go_router):
+
+```dart
+screenNameProvider: () {
+  final configuration = router.routerDelegate.currentConfiguration;
+
+  if (configuration.isEmpty) {
+    return null;
+  }
+
+  return configuration.last.route.name;
+},
+```
+
+Give relevant routes stable names:
+
+```dart
+GoRoute(
+  name: 'home',
+  path: '/home',
+  builder: (context, state) => const HomeScreen(),
+)
+```
+
+The provider should return a stable, non-sensitive logical screen name.
+Do not return route arguments or user data.
+
+Screen names are hashed before being stored or sent.
+
+`screenNameProvider` is optional.
+
+## Configuration
+
+```dart
+SessionRecorderConfig(
+  endpoint: 'https://your-subdomain.ux-key.com/endpoint',
+  debugLog: false,
+  debugShowTree: false,
+  debugSendSession: false,
+  screenNameProvider: null,
+  logger: null,
+);
+```
+
+| Option               | Purpose                                                   |
+| -------------------- | --------------------------------------------------------- |
+| `endpoint`           | Endpoint that receives session data.                      |
+| `debugLog`           | Enables SDK diagnostic logs.                              |
+| `debugShowTree`      | Shows captured UI bounds in Debug.                        |
+| `debugSendSession`   | Allows sessions to be sent from Debug and Profile builds. |
+| `screenNameProvider` | Provides a logical screen name for complex navigation.    |
+| `logger`             | Receives SDK logs and errors through a custom callback.   |
+
+Release builds send session data normally.
 
 ## Data Collection & Privacy
 
-Session Recorder captures interaction and layout metadata required to understand how users interact with the visible application UI.
+Session Recorder captures interaction and layout metadata used to understand how users interact with the visible application UI.
 
 ### Captured
 
-Session Recorder can capture:
-
-* tap, double-tap, and long-press interactions;
-* drag and pinch gestures;
-* interaction coordinates within the application viewport;
-* scrolling activity and scroll sequences;
-* navigation signals and hashed route segments when an observer is configured;
-* the structure of UI elements that are currently visible;
-* element positions and sizes within the visible application viewport;
-* structural widget/type identifiers used to describe the visible UI.
+* Taps, double taps, and long presses.
+* Drag and pinch gestures.
+* Interaction coordinates.
+* Scrolling activity.
+* Visible UI structure.
+* Positions and sizes of visible UI elements.
+* Structural widget/type identifiers.
+* Hashed navigation context when available.
+* Session and timing metadata required to associate interactions with captures.
 
 Only UI elements that are currently materialized and visible are represented in the captured UI structure.
 
@@ -95,74 +191,40 @@ Only UI elements that are currently materialized and visible are represented in 
 
 Session Recorder does **not** capture:
 
-* screenshots or screen pixels;
-* displayed text content;
-* text entered by users;
-* form field values;
-* image or media content.
+* Screenshots or screen pixels.
+* Displayed text content.
+* Text entered by users.
+* Form field values.
+* Image or media content.
 
-Session data is grouped into chunks and sent to the endpoint configured by the application. User interactions do not trigger a separate HTTP request for every event.
+Session data is grouped into chunks and sent to the configured endpoint.
 
-## Configuration
+A separate HTTP request is not sent for every user interaction.
 
-```dart
-const SessionRecorderConfig(
-  endpoint: 'https://your-subdomain.ux-key.com/endpoint',
-  debugLog: false,
-  debugShowTree: false,
-  debugSendSession: false,
-);
-```
-
-### `endpoint`
-
-Backend endpoint that receives Session Recorder chunks.
-
-```text
-https://your-subdomain.ux-key.com/endpoint
-```
-
-### `debugLog`
-
-Enables internal SDK logs useful during development.
-
-### `debugShowTree`
-
-Displays the captured UI bounds in Debug mode.
-
-### `debugSendSession`
-
-Allows session chunks to be sent from Debug and Profile builds.
-
-Release builds send session chunks normally.
-
-## Error Reporting / Custom Logger
+## Error Reporting
 
 Session Recorder is designed so that internal SDK errors do not interrupt your application.
 
-If an internal error occurs, a capture or event may be skipped, but the host application continues running normally.
-
-You can optionally provide a custom logger to send Session Recorder errors to your existing monitoring service.
+If needed, you can forward SDK errors to your existing monitoring service:
 
 ```dart
 SessionRecorder.init(
   SessionRecorderConfig(
     endpoint: 'https://your-subdomain.ux-key.com/endpoint',
-    debugLog: false,
     logger: (level, message, {error, stackTrace}) {
-      if (level.name != 'error') return;
-
-      reportRecorderError(
-        message,
-        error,
-        stackTrace,
-      );
+      if (level.name == 'error') {
+        reportRecorderError(
+          message,
+          error,
+          stackTrace,
+        );
+      }
     },
   ),
 );
 ```
 
-The adapter is implemented by your application:
+The error reporter belongs to your application:
 
 ```dart
 void reportRecorderError(
@@ -174,182 +236,23 @@ void reportRecorderError(
 }
 ```
 
-You can connect it to tools such as:
-
-| Provider             | Example use                          |
-| -------------------- | ------------------------------------ |
-| Sentry               | Report a handled exception or error. |
-| Firebase Crashlytics | Record a non-fatal error.            |
-| Datadog              | Send an error-level log.             |
-| Bugsnag              | Report a handled error.              |
-
-Session Recorder does not add dependencies for any monitoring provider.
-
-When `debugLog` is disabled, diagnostic logs remain silent, but error-level messages are still sent to your custom logger when one is configured.
-
-## Recommended Navigation Observer
-
-`SessionNavigatorObserver` is recommended, not required. Without it, LOM
-capture, mutations, gestures, scroll, event association and reporting still
-work normally, without a missing-observer warning or error.
-
-Session Recorder works with only:
-
-```text
-SessionRecorder.init(...)
-+
-SessionRecorderWidget
-```
-
-Adding a navigation observer provides explicit navigation signals so captures after route transitions can be timed more precisely.
-
-Create the observer once after `SessionRecorder.init` and keep it stable:
-
-```dart
-final sessionObserver = SessionNavigatorObserver();
-
-MaterialApp(
-  navigatorObservers: [
-    anotherObserver,
-    sessionObserver,
-  ],
-  home: const HomeScreen(),
-  builder: (context, child) => SessionRecorderWidget(
-    child: child ?? const SizedBox.shrink(),
-  ),
-);
-```
-
-Do not create the observer inside `build`.
-
-Keep existing application observers and add the Session Recorder observer alongside them.
-
-Use a separate `SessionNavigatorObserver` instance for each Navigator.
-
-## Advanced Integration
-
-### Router / GoRouter
-
-For router-based applications, use the same capture boundary with `MaterialApp.router.builder`:
-
-```dart
-final sessionObserver = SessionNavigatorObserver();
-
-final router = GoRouter(
-  observers: [
-    anotherObserver,
-    sessionObserver,
-  ],
-  routes: [
-    // ...
-  ],
-);
-
-MaterialApp.router(
-  routerConfig: router,
-  builder: (context, child) => SessionRecorderWidget(
-    child: child ?? const SizedBox.shrink(),
-  ),
-);
-```
-
-No GoRouter-specific Session Recorder integration is required.
-
-The navigation observer remains recommended, not required.
-
-> [!IMPORTANT]
->
-> For better navigation context, give your routes a stable `name`.
-> Session Recorder uses `Route.settings.name` to generate anonymous route
-> metadata. Unnamed screens are still recorded normally, but their route context
-> cannot be included.
->
-> When using `GoRouter` with `pageBuilder`, make sure the returned `Page`
-> preserves the route name:
->
-> ```dart
-> CustomTransitionPage(
->   key: state.pageKey,
->   name: state.name,
->   child: const MyPage(),
-> )
-> ```
-
-### Existing `MaterialApp.builder`
-
-If your application already uses a builder, preserve it and wrap the final widget it produces:
-
-```dart
-builder: (context, child) {
-  final app = existingBuilder(context, child);
-
-  return SessionRecorderWidget(
-    child: app,
-  );
-}
-```
-
-Call the existing builder once and wrap its final result.
-
-### Multiple Navigators
-
-Applications with multiple Navigators may attach an optional `SessionNavigatorObserver` to each one.
-
-Use a different observer instance for every Navigator:
-
-```dart
-final rootObserver = SessionNavigatorObserver();
-final shellObserver = SessionNavigatorObserver();
-```
-
-All observer instances report to the same Session Recorder runtime.
-
-Observers provide navigation signals and best-effort anonymous context, without
-determining which UI subtree is captured.
-
-### Outer-Wrapper Convenience
-
-An outer-wrapper integration is also supported:
-
-```dart
-SessionRecorderWidget.observer(
-  builder: (observer) => MaterialApp(
-    navigatorObservers: [
-      anotherObserver,
-      observer,
-    ],
-    home: const HomeScreen(),
-  ),
-);
-```
-
-`MaterialApp.builder` remains the recommended integration when a more precise application boundary is desired.
-
-## Runtime Behavior
-
-* Install only one `SessionRecorderWidget` for the same application boundary.
-* Session data is grouped into chunks instead of sending one HTTP request for every interaction.
-* Debug and Profile builds do not send session chunks unless `debugSendSession` is enabled.
-* Release builds send session chunks normally.
-* UI captures represent only elements that are materialized and visible at capture time.
+Session Recorder does not depend on any error-monitoring provider.
 
 ## Obfuscated Builds
 
-Session Recorder supports applications built with `--obfuscate`.
+Applications built with `--obfuscate` are supported without additional configuration.
 
-Flutter widgets known to the SDK use stable canonical names. Custom, third-party, or unrecognized widgets may appear with an obfuscated, best-effort `t` label.
+Visible UI geometry, gestures, and scrolling continue working normally.
 
-Widget names are therefore not guaranteed to match between normal and obfuscated builds in every case.
-
-This does not prevent Session Recorder from capturing visible UI geometry, gestures, or scrolling activity.
-
-No obfuscation maps, symbol files, or additional configuration are required.
+Some custom or third-party widget type names may appear obfuscated.
 
 ## Migrating from V1
 
-V1 was distributed directly from GitHub. Version `2.0.0` is the first version distributed through pub.dev.
+V1 was distributed directly from GitHub.
 
-### 1. Update the Dependency
+Version `2.0.0` is the first version distributed through pub.dev.
+
+### Dependency
 
 V1:
 
@@ -366,7 +269,7 @@ dependencies:
   session_recorder_flutter: ^2.0.0
 ```
 
-Update the public import.
+### Import
 
 V1:
 
@@ -380,7 +283,7 @@ V2:
 import 'package:session_recorder_flutter/session_recorder_flutter.dart';
 ```
 
-### 2. Update Initialization
+### Initialization
 
 V1:
 
@@ -402,19 +305,9 @@ SessionRecorder.init(
 );
 ```
 
-Initialize Session Recorder once in `main`, after:
+### Capture Boundary
 
-```dart
-WidgetsFlutterBinding.ensureInitialized();
-```
-
-and before `runApp()`.
-
-### 3. Add the Capture Boundary
-
-`SessionRecorderWidget` is required.
-
-The recommended integration is:
+V2 requires one `SessionRecorderWidget` around the application content:
 
 ```dart
 MaterialApp(
@@ -424,24 +317,6 @@ MaterialApp(
   ),
 );
 ```
-
-For router-based applications, use the same approach with `MaterialApp.router.builder`.
-
-### 4. Navigation Tracking Is Now Optional
-
-V1 required navigation observer integration.
-
-In V2, `SessionNavigatorObserver` is optional. The required integration is only:
-
-```text
-SessionRecorder.init(...)
-+
-SessionRecorderWidget
-```
-
-The observer is recommended for navigation signals and anonymous context, not
-required. If used, create it once outside `build` after initialization and use
-a different instance for each Navigator.
 
 ### What Improves in V2?
 

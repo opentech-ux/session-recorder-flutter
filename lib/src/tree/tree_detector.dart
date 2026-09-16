@@ -170,6 +170,11 @@ class TreeDetector {
       return null;
     }
 
+    // Resolve after navigation settles, before this capture receives metadata.
+    // Also covers the first capture without a NavigatorObserver.
+    if (comesFromNavigation || _engine.context.currentLomRef == null) {
+      _engine.context.refreshScreenName();
+    }
     final lom = _inspector.captureLom(
       element,
       comesFromNavigation: comesFromNavigation,

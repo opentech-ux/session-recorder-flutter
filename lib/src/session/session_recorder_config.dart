@@ -39,6 +39,14 @@ class SessionRecorderConfig {
   /// Only active in debug builds regardless of this value.
   final bool debugShowTree;
 
+  /// Optional authoritative logical screen name, anonymized immediately.
+  ///
+  /// Null results or synchronous errors mean unknown, without an observer
+  /// fallback. Called for initial/navigation captures and observer callbacks,
+  /// not every build or input event. Keep this synchronous getter cheap and
+  /// side-effect free. Return a stable, non-sensitive identifier, not arguments.
+  final String? Function()? screenNameProvider;
+
   /// Force sending data to the endpoint even in debug mode.
   ///
   /// This will always be `[true]` in release mode. In debug mode, it will
@@ -56,6 +64,7 @@ class SessionRecorderConfig {
     this.endpoint = "",
     this.debugLog = false,
     this.debugShowTree = false,
+    this.screenNameProvider,
 
     /// Default to `[false]` to avoid sending to the `[endpoint]` the data
     /// captured in debug mode.
