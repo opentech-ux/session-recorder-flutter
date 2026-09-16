@@ -257,6 +257,24 @@ No GoRouter-specific Session Recorder integration is required.
 
 The navigation observer remains recommended, not required.
 
+> [!IMPORTANT]
+>
+> For better navigation context, give your routes a stable `name`.
+> Session Recorder uses `Route.settings.name` to generate anonymous route
+> metadata. Unnamed screens are still recorded normally, but their route context
+> cannot be included.
+>
+> When using `GoRouter` with `pageBuilder`, make sure the returned `Page`
+> preserves the route name:
+>
+> ```dart
+> CustomTransitionPage(
+>   key: state.pageKey,
+>   name: state.name,
+>   child: const MyPage(),
+> )
+> ```
+
 ### Existing `MaterialApp.builder`
 
 If your application already uses a builder, preserve it and wrap the final widget it produces:
@@ -287,8 +305,7 @@ final shellObserver = SessionNavigatorObserver();
 All observer instances report to the same Session Recorder runtime.
 
 Observers provide navigation signals and best-effort anonymous context, without
-determining which UI subtree is captured. With multiple Navigators, context
-follows the latest observed route change; the SDK does not infer a main screen.
+determining which UI subtree is captured.
 
 ### Outer-Wrapper Convenience
 

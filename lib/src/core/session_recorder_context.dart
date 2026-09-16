@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
 
@@ -23,7 +25,9 @@ abstract interface class SessionRecorderContext {
   /// Current LOM state ref used to bind events to their screen snapshot.
   String? get currentLomRef;
   List<String>? get observedAnonymousRoute;
-  void observeRouteName(String? name);
+  Object? get anonymousRouteOwner;
+  void observeRouteName(Object observer, String? name, {bool activate = true});
+  void releaseRouteContext(Object observer);
 
   /// Resolves the LOM state to freeze when a pointer starts.
   ({String lomRef, bool isResolved}) resolveLomStateForPointerDown();
@@ -50,7 +54,11 @@ class NoOpContext implements SessionRecorderContext {
   @override
   List<String>? get observedAnonymousRoute => null;
   @override
-  void observeRouteName(String? name) {}
+  Object? get anonymousRouteOwner => null;
+  @override
+  void observeRouteName(Object observer, String? name, {bool activate = true}) {}
+  @override
+  void releaseRouteContext(Object observer) {}
   @override
   bool get hasPendingPostScrollCapture => false;
   @override
@@ -90,18 +98,31 @@ class ContextImpl implements SessionRecorderContext {
   late Chunk _currentChunk;
   late Session _currentSession;
   LomAbstract? _currentLom;
-  List<String>? _observedAnonymousRoute;
+  // Activation order, not Navigator hierarchy. A null entry is an active
+  // unnamed screen and must mask older named contexts rather than skip them.
+  final _routeContexts = LinkedHashMap<Object, List<String>?>.identity();
 
   @override
-  List<String>? get observedAnonymousRoute => _observedAnonymousRoute;
+  List<String>? get observedAnonymousRoute =>
+      _routeContexts.isEmpty ? null : _routeContexts.values.last;
 
   @override
-  void observeRouteName(String? name) {
-    _observedAnonymousRoute = null;
+  Object? get anonymousRouteOwner =>
+      _routeContexts.isEmpty ? null : _routeContexts.keys.last;
+
+  @override
+  void observeRouteName(Object observer, String? name, {bool activate = true}) {
+    // A background pop/remove updates only its existing slot, not ownership.
+    if (!activate && !_routeContexts.containsKey(observer)) return;
+    if (activate) _routeContexts.remove(observer);
+    _routeContexts[observer] = null;
     runRecorderCallback('anonymous route', () {
-      _observedAnonymousRoute = anonymousRoute(name);
+      _routeContexts[observer] = anonymousRoute(name);
     });
   }
+
+  @override
+  void releaseRouteContext(Object observer) => _routeContexts.remove(observer);
 
   TreeDetector? _detector;
 
@@ -122,7 +143,7 @@ class ContextImpl implements SessionRecorderContext {
     _detector?.dispose();
     _detector = null;
     _currentLom = null;
-    _observedAnonymousRoute = null;
+    _routeContexts.clear();
     _currentChunk = _createChunk();
   }
 
