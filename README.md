@@ -153,7 +153,7 @@ GoRoute(
 ),
 ```
 
-If you use `pageBuilder` with a custom `Page`, such as `CustomTransitionPage`, also preserve the route `name` on the returned page.s
+If you use `pageBuilder` with a custom `Page`, such as `CustomTransitionPage`, also preserve the route `name` on the returned pages.
 
 > Screen names are hashed before being stored or sent.
 
