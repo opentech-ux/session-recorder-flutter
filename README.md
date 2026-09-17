@@ -69,9 +69,9 @@ and before `runApp()`.
 
 The same approach can be used with `MaterialApp.router.builder`.
 
-That's all that is required.
+**That's all that is required.**
 
-Navigation options can be added when more precise navigation context is needed.
+> Navigation options can be added when more precise navigation context is needed.
 
 ## Navigation
 
@@ -94,6 +94,10 @@ MaterialApp(
 ```
 
 Create the observer once and keep it stable.
+
+> If your application uses multiple `Navigator` instances, such as nested
+> navigation or shell routes, use a separate `SessionNavigatorObserver()` for each
+> Navigator.
 
 ### Complex Navigation
 
@@ -135,13 +139,23 @@ GoRoute(
   name: 'home',
   path: '/home',
   builder: (context, state) => const HomeScreen(),
-)
+),
+
+GoRoute(
+  name: 'details',
+  path: '/details',
+  pageBuilder: (context, state) => CustomTransitionPage(
+    key: state.pageKey,
+    name: state.name,
+    child: const DetailsScreen(),
+    transitionsBuilder: ...
+  ),
+),
 ```
 
-The provider should return a stable, non-sensitive logical screen name.
-Do not return route arguments or user data.
+If you use `pageBuilder` with a custom `Page`, such as `CustomTransitionPage`, also preserve the route `name` on the returned page.s
 
-Screen names are hashed before being stored or sent.
+> Screen names are hashed before being stored or sent.
 
 `screenNameProvider` is optional.
 

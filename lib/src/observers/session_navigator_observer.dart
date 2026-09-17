@@ -80,6 +80,7 @@ class SessionNavigatorObserver extends NavigatorObserver {
 
   // No super call: older supported Flutter versions do not expose this hook.
   // It reconciles the local screen only, without starting a transition.
+  // ignore: annotate_overrides
   void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
     SessionRecorder.engine.context.refreshScreenName();
     _observeRoute(topRoute);
