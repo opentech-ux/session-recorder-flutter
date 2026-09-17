@@ -113,7 +113,7 @@ SessionRecorder.init(
 );
 ```
 
-`navigationState.currentScreenName` s only an example. The callback should
+`navigationState.currentScreenName` is only an example. The callback should
 return the logical screen name from your application's own navigation system.
 
 For complex navigation, use `screenNameProvider` when you need more accurate screen context. Without it, recording still works, but navigation context may be less precise.
