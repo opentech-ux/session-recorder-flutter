@@ -17,6 +17,7 @@
 * Visible-only UI structure capture using application viewport coordinates.
 * Automatic UI-change detection and capture after relevant layout updates.
 * Optional `SessionNavigatorObserver` for more precise post-navigation capture timing.
+* Optional `screenNameProvider` for authoritative logical screen context in complex or router-based navigation.
 * Debug visualization of captured UI bounds through `debugShowTree`.
 
 ### Improved
