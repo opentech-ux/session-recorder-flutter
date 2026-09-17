@@ -1,54 +1,51 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:convert';
 
+import 'package:meta/meta.dart';
+
 import 'models.dart';
 
+@immutable
 abstract class LomAbstract {
-  final String id;
+  final String ref;
   final int timestamp;
+  final Root? root;
 
-  LomAbstract({
-    required this.id,
+  /// Record-local navigation metadata; null means unknown, never inherited.
+  final List<String>? anonymousRoute;
+
+  const LomAbstract({
+    required this.ref,
     required this.timestamp,
+    this.root,
+    this.anonymousRoute,
   });
 
   Map<String, dynamic> toMap();
 }
 
 class Lom extends LomAbstract {
+  final String id;
   final int width;
   final int height;
-  final Root? root;
 
-  Lom({
-    required super.id,
+  const Lom({
+    required this.id,
+    required super.ref,
     required super.timestamp,
     required this.width,
     required this.height,
-    this.root,
+    super.root,
+    super.anonymousRoute,
   });
-
-  Lom copyWith({
-    String? id,
-    int? timestamp,
-    int? width,
-    int? height,
-    Root? root,
-  }) {
-    return Lom(
-      id: id ?? this.id,
-      timestamp: timestamp ?? this.timestamp,
-      width: width ?? this.width,
-      height: height ?? this.height,
-      root: root ?? this.root,
-    );
-  }
 
   @override
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'id': id,
+      'ref': ref,
       'ts': timestamp,
+      if (anonymousRoute != null) 'ar': anonymousRoute,
       'w': width,
       'h': height,
       'r': (root == null) ? "" : root?.toMap(),
@@ -59,66 +56,40 @@ class Lom extends LomAbstract {
 
   @override
   String toString() {
-    return 'Lom(id: $id, timestamp: $timestamp, width: $width, height: $height, root: $root)';
-  }
-
-  @override
-  bool operator ==(covariant Lom other) {
-    if (identical(this, other)) return true;
-
-    return other.id == id &&
-        other.timestamp == timestamp &&
-        other.width == width &&
-        other.height == height &&
-        other.root == root;
-  }
-
-  @override
-  int get hashCode {
-    return id.hashCode ^
-        timestamp.hashCode ^
-        width.hashCode ^
-        height.hashCode ^
-        root.hashCode;
+    return 'Lom(id: $id, ref: $ref, timestamp: $timestamp, width: $width, height: $height, root: $root)';
   }
 }
 
 class LomRef extends LomAbstract {
-  LomRef({
-    required super.id,
+  const LomRef({
+    required super.ref,
     required super.timestamp,
+    super.root,
+    super.anonymousRoute,
   });
-
-  LomRef copyWith({
-    String? id,
-    int? timestamp,
-  }) {
-    return LomRef(
-      id: id ?? this.id,
-      timestamp: timestamp ?? this.timestamp,
-    );
-  }
 
   @override
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
-      'ref': id,
+      'ref': ref,
       'ts': timestamp,
+      if (anonymousRoute != null) 'ar': anonymousRoute,
     };
   }
 
   String toJson() => json.encode(toMap());
 
   @override
-  String toString() => 'LomRef(id: $id, timestamp: $timestamp)';
+  String toString() => 'LomRef(ref: $ref, timestamp: $timestamp)';
+}
 
-  @override
-  bool operator ==(covariant LomRef other) {
-    if (identical(this, other)) return true;
-
-    return other.id == id && other.timestamp == timestamp;
-  }
-
-  @override
-  int get hashCode => id.hashCode ^ timestamp.hashCode;
+@internal
+class LocalLomRef extends LomRef {
+  /// Internal ref used only to refresh the current LOM without network noise.
+  const LocalLomRef({
+    required super.ref,
+    required super.timestamp,
+    required super.root,
+    super.anonymousRoute,
+  });
 }

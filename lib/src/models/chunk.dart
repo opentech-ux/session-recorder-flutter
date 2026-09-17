@@ -1,45 +1,71 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kProfileMode;
+
 import 'package:session_recorder_flutter/src/constants/version_constant.dart';
 
 import 'models.dart';
 
+Map<String, String> _chunkEnvironment() {
+  final String os;
+  if (Platform.isAndroid) {
+    os = 'android';
+  } else if (Platform.isIOS) {
+    os = 'ios';
+  } else {
+    throw UnsupportedError('Flutter chunk environment requires Android or iOS');
+  }
+
+  return {
+    'fwk': 'flutter',
+    'os': os,
+    'bmd': kDebugMode ? 'debug' : (kProfileMode ? 'profile' : 'release'),
+  };
+}
+
 class Chunk {
+  String sId;
+
   final int timestamp;
-  final String sId;
   final List<LomAbstract> loms;
   final List<ExplorationEvent> explorationEvents;
   final List<ActionEvent> actionsEvents;
 
-  Chunk({
-    required this.timestamp,
-    required this.sId,
-    required this.loms,
-    required this.explorationEvents,
-    required this.actionsEvents,
-  });
+  Chunk()
+      : timestamp = DateTime.now().millisecondsSinceEpoch,
+        sId = "",
+        actionsEvents = [],
+        explorationEvents = [],
+        loms = [];
 
-  Chunk copyWith({
-    int? timestamp,
-    String? sId,
-    List<LomAbstract>? loms,
-    List<ExplorationEvent>? explorationEvents,
-    List<ActionEvent>? actionsEvents,
-  }) {
-    return Chunk(
-      timestamp: timestamp ?? this.timestamp,
-      sId: sId ?? this.sId,
-      loms: loms ?? this.loms,
-      explorationEvents: explorationEvents ?? this.explorationEvents,
-      actionsEvents: actionsEvents ?? this.actionsEvents,
-    );
+  bool get isChunkEmpty =>
+      loms.isEmpty && explorationEvents.isEmpty && actionsEvents.isEmpty;
+
+  /// Add a [LomAbstract] to the [Chunk].
+  ///
+  /// Could be a [Lom] or [LomRef] classes.
+  void addLom(LomAbstract lom) {
+    loms.add(lom);
   }
+
+  /// Add a [ExplorationEvent] list to the [Chunk]
+  void addExplorationEvent(ExplorationEvent exploration) {
+    explorationEvents.add(exploration);
+  }
+
+  /// Add a [ActionEvent] to the [Chunk]
+  void addActionEvent(ActionEvent actionEvent) {
+    actionsEvents.add(actionEvent);
+  }
+
+  String toJson() => json.encode(toMap());
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'lib_v': libraryVersion,
-      'lib_t': libraryType,
+      'type': libraryType,
+      'env': _chunkEnvironment(),
       'ts': timestamp,
       'sid': sId,
       'loms': loms.map((x) => x.toMap()).toList(),
@@ -48,8 +74,6 @@ class Chunk {
       'ae': actionsEvents.map((x) => x.concatenateString()).toList(),
     };
   }
-
-  String toJson() => json.encode(toMap());
 
   @override
   String toString() {
@@ -62,25 +86,5 @@ class Chunk {
         'explorationEvents: $explorationEvents, '
         'actionsEvents: $actionsEvents, '
         ')';
-  }
-
-  @override
-  bool operator ==(covariant Chunk other) {
-    if (identical(this, other)) return true;
-
-    return other.timestamp == timestamp &&
-        other.sId == sId &&
-        listEquals(other.loms, loms) &&
-        listEquals(other.explorationEvents, explorationEvents) &&
-        listEquals(other.actionsEvents, actionsEvents);
-  }
-
-  @override
-  int get hashCode {
-    return timestamp.hashCode ^
-        sId.hashCode ^
-        loms.hashCode ^
-        explorationEvents.hashCode ^
-        actionsEvents.hashCode;
   }
 }

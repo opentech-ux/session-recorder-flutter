@@ -3,11 +3,8 @@ import 'package:flutter/gestures.dart';
 /// The total movement constant
 const double touchSlop = 8.0;
 
-/// The total scale constant
-const double scaleSlop = touchSlop;
-
-/// The total movement constant
-final double doubleTapTouchSlop = kDoubleTapTouchSlop;
+/// The total pinch constant
+const double pinchSlop = 20.0;
 
 /// The maximum duration for a second touch
 final Duration doubleTapTimeout = kDoubleTapTimeout;
@@ -15,7 +12,12 @@ final Duration doubleTapTimeout = kDoubleTapTimeout;
 /// The time before a long press gesture attempts to win.
 final Duration longPressTimeout = kLongPressTimeout;
 
-// * SCALE CONSTS
+const Duration kDebounceTime = Duration(milliseconds: 300);
+const Duration kCooldownTime = Duration(milliseconds: 400);
+
+const double doubleTapSlop = 18.0;
+
+// * PINCH CONSTS
 
 /// Ratio between radial and tangential movement required
 /// to consider the gesture a valid zoom.
@@ -31,13 +33,13 @@ const double radialToTang = 1.5;
 /// ```
 const double consistencyFraction = 0.6;
 
-/// Minimum relative scale change to trigger a zoom event.
+/// Minimum relative pinch change to trigger a zoom event.
 ///
 /// ```
 /// Example: 0.05 = 5% zoom in or out.
 /// ```
-const double scaleThreshold = 0.05;
+const double pinchThreshold = 0.05;
 
 /// Minimum absolute change in average distance (in pixels)
 /// required to trigger a zoom gesture — useful for small or slow movements.
-const double scalePxThreshold = 6.0;
+const double pinchPxThreshold = 6.0;

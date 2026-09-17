@@ -1,0 +1,330 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import 'package:session_recorder_flutter/src/enums/gestures_type_enum.dart';
+import 'package:session_recorder_flutter/src/models/models.dart';
+import 'package:session_recorder_flutter/src/session/session_recorder.dart';
+import 'package:session_recorder_flutter/src/core/session_recorder_engine.dart';
+import 'package:session_recorder_flutter/src/utils/math_utils.dart';
+import 'package:session_recorder_flutter/src/utils/recorder_callback.dart';
+import 'package:session_recorder_flutter/src/session/session_logger.dart';
+
+/// Collects scroll position data and emits start/end [ScrollExplorationEvent]
+/// records for validated scroll sessions.
+class ScrollCollector {
+  static const double _movementTolerance = 1.0;
+  static const Duration _captureStabilization = Duration(milliseconds: 600);
+
+  final SessionRecorderEngineInternal _engine;
+
+  ScrollCollector({SessionRecorderEngineInternal? engine})
+      : _engine = engine ?? SessionRecorder.engine;
+
+  bool _isScrolling = false;
+
+  /// A start remains provisional until clamped offset movement exceeds the
+  /// tolerance; an unvalidated bounce emits no logical scroll session.
+  bool _isValidated = false;
+  bool _isDisposed = false;
+
+  /// Origin token only; a missing owner preserves the existing fail-open path.
+  BuildContext? _activeOwner;
+  ScrollExplorationEvent? _provisionalStart;
+  String? _activeLomRef;
+  Rect? _activeViewportBounds;
+  Offset? _initialOffset;
+  Offset? _activeOffset;
+  Timer? _captureTimer;
+
+  /// Handles incoming [ScrollNotification] events to detect and record scroll
+  /// interactions.
+  bool handleScrollNotification(ScrollNotification notification) {
+    if (!runRecorderCallback('scroll notification', () {
+      _handleScrollNotification(notification);
+    })) {
+      _cancelPendingCapture();
+      _releaseSuppressionAndReset();
+    }
+    return false;
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (_isDisposed) return false;
+    if (notification is OverscrollNotification) return false;
+    if (notification is! ScrollStartNotification &&
+        notification is! ScrollUpdateNotification &&
+        notification is! ScrollEndNotification) {
+      return false;
+    }
+
+    if (notification is ScrollStartNotification) {
+      _handleScrollStart(notification);
+    } else if (notification is ScrollUpdateNotification) {
+      _handleScrollUpdate(notification.context, notification.metrics);
+    } else if (notification is ScrollEndNotification) {
+      _handleScrollEnd(notification.context, notification.metrics);
+    }
+
+    return false;
+  }
+
+  void _handleScrollStart(ScrollStartNotification notification) {
+    /// New scrolling cancels stabilization, but post-scroll debt belongs to the
+    /// scheduler and survives until a successful capture satisfies it.
+    _cancelPendingCapture();
+
+    if (_isScrolling) {
+      try {
+        _finishSession(scheduleCapture: false);
+      } catch (error, stackTrace) {
+        SessionLogger.error('Scroll replacement failed', error, stackTrace);
+        _releaseSuppressionAndReset();
+      }
+    }
+
+    final rect = _captureViewportGeometry(notification.context);
+    final offset = _effectiveOffset(notification.metrics);
+    if (rect == null || offset == null) return;
+
+    _isScrolling = true;
+    _isValidated = false;
+    _activeOwner = notification.context;
+    _activeViewportBounds = rect;
+    _initialOffset = offset;
+    _activeOffset = offset;
+
+    /// Start and end share this frozen ref; later LOM changes cannot split one
+    /// logical scroll session across snapshots.
+    final lomRef = _engine.context.currentLomRef ?? '';
+    _activeLomRef = lomRef;
+    _provisionalStart = ScrollExplorationEvent(
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      viewport: rect,
+      phase: ScrollPhase.start,
+      offset: offset,
+      lomRef: lomRef,
+    );
+    _engine.context.setScrollActive(true);
+  }
+
+  void _handleScrollUpdate(BuildContext? context, ScrollMetrics scrollMetrics) {
+    if (!_isScrolling) return;
+    if (_activeOwner != null && !identical(context, _activeOwner)) return;
+
+    final rect = _captureViewportGeometry(context);
+    if (rect != null) _activeViewportBounds = rect;
+
+    final offset = _effectiveOffset(scrollMetrics);
+    if (offset == null) return;
+
+    _activeOffset = offset;
+    _validateMovement(offset);
+  }
+
+  void _handleScrollEnd(BuildContext? context, ScrollMetrics scrollMetrics) {
+    if (!_isScrolling) return;
+    if (_activeOwner != null && !identical(context, _activeOwner)) return;
+
+    try {
+      final rect = _captureViewportGeometry(context);
+      if (rect != null) _activeViewportBounds = rect;
+
+      final offset = _effectiveOffset(scrollMetrics);
+      if (offset != null) {
+        _activeOffset = offset;
+        _validateMovement(offset);
+      }
+
+      _finishSession();
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll end failed', error, stackTrace);
+      _releaseSuppressionAndReset();
+    }
+  }
+
+  /// Computes the visible viewport rectangle for a scrollable.
+  Rect? _captureViewportGeometry(BuildContext? context) {
+    if (context == null) return null;
+
+    try {
+      final view = View.maybeOf(context);
+      if (view == null) return null;
+
+      final devicePixelRatio = view.devicePixelRatio;
+      final physicalSize = view.physicalSize;
+      if (!devicePixelRatio.isFinite ||
+          devicePixelRatio <= 0 ||
+          !physicalSize.width.isFinite ||
+          !physicalSize.height.isFinite ||
+          physicalSize.width <= 0 ||
+          physicalSize.height <= 0) {
+        return null;
+      }
+
+      final viewportWidth = physicalSize.width / devicePixelRatio;
+      final viewportHeight = physicalSize.height / devicePixelRatio;
+      if (!viewportWidth.isFinite ||
+          !viewportHeight.isFinite ||
+          viewportWidth <= 0 ||
+          viewportHeight <= 0) {
+        return null;
+      }
+
+      final renderObject = context.findRenderObject();
+      final rect = MathUtils.transformRect(renderObject);
+
+      if (rect == null || !rect.isFinite || rect.isEmpty) return null;
+
+      final viewport = Rect.fromLTWH(0, 0, viewportWidth, viewportHeight);
+      final visibleRect = rect.intersect(viewport);
+      if (!visibleRect.isFinite ||
+          visibleRect.width <= 0 ||
+          visibleRect.height <= 0) {
+        return null;
+      }
+
+      return visibleRect;
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll geometry failed', error, stackTrace);
+      return null;
+    }
+  }
+
+  Offset? _effectiveOffset(ScrollMetrics scrollMetrics) {
+    try {
+      final pixels = scrollMetrics.pixels;
+      final min = scrollMetrics.minScrollExtent;
+      final max = scrollMetrics.maxScrollExtent;
+
+      if (pixels.isNaN || min.isNaN || max.isNaN || min > max) return null;
+
+      final effectivePixels = pixels.clamp(min, max).toDouble();
+      if (!effectivePixels.isFinite) return null;
+
+      /// Offset is event metadata only; it never translates gesture or LOM
+      /// coordinates into a document space.
+      return scrollMetrics.axis == Axis.horizontal
+          ? Offset(effectivePixels, 0)
+          : Offset(0, effectivePixels);
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll offset failed', error, stackTrace);
+      return null;
+    }
+  }
+
+  void _validateMovement(Offset offset) {
+    if (_isValidated) return;
+
+    final initialOffset = _initialOffset;
+    final provisionalStart = _provisionalStart;
+    if (initialOffset == null || provisionalStart == null) return;
+
+    if ((offset - initialOffset).distance <= _movementTolerance) return;
+
+    /// Validation commits the provisional start exactly once and creates the
+    /// post-scroll capture debt independently of the final offset.
+    _engine.context.recordExploration(provisionalStart);
+    _isValidated = true;
+    _engine.context.markPostScrollCapturePending();
+  }
+
+  /// Forced shutdown when the collection is interrupted
+  void forceRecordCollector() {
+    if (_isDisposed || !_isScrolling) return;
+
+    try {
+      _finishSession();
+    } catch (error, stackTrace) {
+      SessionLogger.error('Scroll drain failed', error, stackTrace);
+      _releaseSuppressionAndReset();
+    }
+  }
+
+  void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _cancelPendingCapture();
+
+    if (_isScrolling) {
+      _releaseSuppressionAndReset();
+      return;
+    }
+
+    _resetSessionState();
+  }
+
+  void _finishSession({bool scheduleCapture = true}) {
+    try {
+      final viewport = _activeViewportBounds;
+      final offset = _activeOffset;
+      final lomRef = _activeLomRef;
+
+      if (_isValidated &&
+          viewport != null &&
+          offset != null &&
+          lomRef != null) {
+        _engine.context.recordExploration(
+          ScrollExplorationEvent(
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            viewport: viewport,
+            phase: ScrollPhase.end,
+            offset: offset,
+            lomRef: lomRef,
+          ),
+        );
+      }
+    } finally {
+      _releaseSuppressionAndReset();
+    }
+
+    if (scheduleCapture && _engine.context.hasPendingPostScrollCapture) {
+      _scheduleStabilizedCapture();
+    }
+  }
+
+  void _releaseSuppressionAndReset() {
+    try {
+      _engine.context.setScrollActive(false);
+    } catch (error, stackTrace) {
+      SessionLogger.error(
+          'Scroll suppression cleanup failed', error, stackTrace);
+    } finally {
+      _resetSessionState();
+    }
+  }
+
+  void _resetSessionState() {
+    _isScrolling = false;
+    _isValidated = false;
+    _activeOwner = null;
+    _provisionalStart = null;
+    _activeLomRef = null;
+    _activeViewportBounds = null;
+    _initialOffset = null;
+    _activeOffset = null;
+  }
+
+  void _scheduleStabilizedCapture() {
+    if (_isDisposed) return;
+    _cancelPendingCapture();
+
+    late final Timer timer;
+    timer = Timer(_captureStabilization, () {
+      if (_isDisposed || !identical(_captureTimer, timer)) return;
+      _captureTimer = null;
+
+      try {
+        _engine.context.capturePendingPostScrollLom();
+      } catch (error, stackTrace) {
+        SessionLogger.error('Post-scroll capture failed', error, stackTrace);
+      }
+    });
+    _captureTimer = timer;
+  }
+
+  void _cancelPendingCapture() {
+    _captureTimer?.cancel();
+    _captureTimer = null;
+  }
+}
