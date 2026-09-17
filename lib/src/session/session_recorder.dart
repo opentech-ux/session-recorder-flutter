@@ -63,7 +63,7 @@ class SessionRecorder {
     try {
       SessionLogger.configure(configuration: config);
 
-      // config.validate();
+      config.validate();
 
       initializingEngine = SessionRecorderEngine(config);
       _engine = initializingEngine;

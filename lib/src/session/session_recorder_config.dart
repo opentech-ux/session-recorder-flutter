@@ -20,12 +20,15 @@ import 'package:session_recorder_flutter/src/session/session_logger.dart';
 class SessionRecorderConfig {
   /// The backend endpoint that receives session data.
   ///
-  /// This URL is provided by the the __company__ and must support **POST**
-  /// requests for session uploads.
+  /// Must be a non-empty, valid absolute HTTP or HTTPS URI with a host.
+  /// Localhost and IP-based endpoints are allowed. The endpoint must support
+  /// **POST** requests for session uploads.
   ///
-  /// If this does not match the official endpoint format, [validate] throws a
-  /// [FormatException]. `SessionRecorder.init` validates in every build mode
-  /// and falls back to no-op for invalid endpoints, including local URLs.
+  /// [validate] throws a [FormatException] for invalid endpoints.
+  /// `SessionRecorder.init` validates before starting the engine in every build
+  /// mode, contains initialization failures and leaves the SDK in no-op mode.
+  /// Errors are reported through SessionLogger; console output is not guaranteed
+  /// (the default logger is silent in Release).
   final String endpoint;
 
   /// Whether to show the debug logs.
@@ -56,10 +59,6 @@ class SessionRecorderConfig {
   ///{@macro session_logger}
   final SessionLoggerCallback logger;
 
-  static final RegExp _endpointRegExp = RegExp(
-    r'^https://[a-zA-Z0-9-]+\.ux-key\.com/endpoint$',
-  );
-
   const SessionRecorderConfig({
     this.endpoint = "",
     this.debugLog = false,
@@ -78,9 +77,27 @@ class SessionRecorderConfig {
         logger = logger ?? defaultSessionLogger;
 
   void validate() {
-    if (!_endpointRegExp.hasMatch(endpoint)) {
-      throw FormatException(
-        'Invalid Endpoint. The expected format is `https://[subdomain].ux-key.com/endpoint`, where the subdomain may only contain letters, numbers, and hyphens.',
+    final value = endpoint.trim();
+
+    if (value.isEmpty) {
+      throw const FormatException(
+        'Endpoint must not be empty.',
+      );
+    }
+
+    final uri = Uri.tryParse(value);
+
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      throw const FormatException(
+        'Endpoint must be a valid absolute URI.',
+      );
+    }
+
+    final scheme = uri.scheme.toLowerCase();
+
+    if (scheme != 'http' && scheme != 'https') {
+      throw const FormatException(
+        'Endpoint must use the http or https scheme.',
       );
     }
   }

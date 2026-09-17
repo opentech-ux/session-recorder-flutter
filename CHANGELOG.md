@@ -1,3 +1,10 @@
+## 2.0.1
+
+### Changed
+
+* **ADD** Endpoint validation, otherwise shows a ERROR message.
+* Invalid endpoints leave the SDK in no-op mode; errors are reported through the configured logger.
+
 ## 2.0.0
 
 > **Breaking:** This release introduces a new public API and integration model.

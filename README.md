@@ -12,7 +12,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  session_recorder_flutter: ^2.0.0
+  session_recorder_flutter: ^2.0.1
 ```
 
 Import the public API:
@@ -161,6 +161,9 @@ If you use `pageBuilder` with a custom `Page`, such as `CustomTransitionPage`, a
 
 ## Configuration
 
+`endpoint` accepts any non-empty, valid absolute HTTP or HTTPS URI with a host,
+including localhost and IP-based endpoints.
+
 ```dart
 SessionRecorderConfig(
   endpoint: 'https://your-subdomain.ux-key.com/endpoint',
@@ -280,7 +283,7 @@ V2:
 
 ```yaml
 dependencies:
-  session_recorder_flutter: ^2.0.0
+  session_recorder_flutter: ^2.0.1
 ```
 
 ### Import
